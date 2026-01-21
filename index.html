@@ -26,13 +26,21 @@
         /* MAIN FEED AREA */
         .main-feed { flex-grow: 1; max-width: 500px; min-width: 300px; }
 
-        /* FIXED COMPOSER (STAYS AT TOP) */
+        /* DYNAMIC STICKY COMPOSER */
         .sticky-composer {
             position: sticky;
-            top: 70px; /* Right under the nav */
+            top: 70px;
             z-index: 1000;
-            background: #e9ebee; /* Matches body to blend in */
+            background: #e9ebee;
             padding-bottom: 10px;
+            opacity: 0.7; /* Semi-transparent when idle */
+            transform: scale(0.98); /* Slightly smaller */
+            transition: all 0.3s ease; /* Smooth transition */
+        }
+
+        .sticky-composer:hover, .sticky-composer:focus-within {
+            opacity: 1; /* Fully visible on hover or typing */
+            transform: scale(1);
         }
 
         /* CARDS & UI */
@@ -46,13 +54,13 @@
         .trending-item:hover { background: #f5f6f7; }
         .trending-item b { color: #365899; }
 
-        input, textarea { width: 100%; border: 1px solid #dddfe2; padding: 10px; margin-bottom: 10px; border-radius: 3px; box-sizing: border-box; }
-        .btn { background-color: #4267b2; color: white; border: none; padding: 8px 16px; font-weight: bold; cursor: pointer; border-radius: 2px; }
+        input, textarea { width: 100%; border: 1px solid #dddfe2; padding: 8px; margin-bottom: 8px; border-radius: 3px; box-sizing: border-box; font-size: 13px; }
+        .btn { background-color: #4267b2; color: white; border: none; padding: 6px 12px; font-weight: bold; cursor: pointer; border-radius: 2px; font-size: 12px; }
         .post-user { color: #365899; font-weight: bold; font-size: 14px; }
         .post-date { color: #90949c; font-size: 11px; margin-bottom: 8px; }
-        .post-img { width: calc(100% + 24px); margin: 10px -12px; display: block; max-height: 450px; object-fit: cover; }
+        .post-img { width: calc(100% + 24px); margin: 10px -12px; display: block; max-height: 400px; object-fit: cover; }
         .action-bar { border-top: 1px solid #e9ebee; padding-top: 8px; margin-top: 10px; font-size: 13px; font-weight: bold; }
-        .comment-box { background: #f2f3f5; border-radius: 8px; padding: 8px 12px; margin-top: 5px; font-size: 13px; }
+        .comment-box { background: #f2f3f5; border-radius: 8px; padding: 8px 12px; margin-top: 5px; font-size: 12px; }
         
         .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3b5998; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -61,7 +69,7 @@
         @media (max-width: 600px) { 
             .container { flex-direction: column; } 
             .sidebar { width: 100%; position: static; max-height: none; } 
-            .sticky-composer { position: static; } /* Non-fixed on mobile for better space */
+            .sticky-composer { position: static; opacity: 1; transform: none; } 
         }
     </style>
 </head>
@@ -89,11 +97,13 @@
 
     <div class="main-feed">
         <div class="sticky-composer">
-            <div class="card" style="margin-bottom: 0;">
+            <div class="card" style="margin-bottom: 0; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
                 <input type="text" id="user" placeholder="Your Name">
                 <textarea id="msg" placeholder="What's on your mind?" rows="2"></textarea>
-                <input type="file" id="file" accept="image/*" style="font-size: 11px;">
-                <div style="text-align: right;"><button id="postBtn" class="btn" onclick="upload()">Post</button></div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <input type="file" id="file" accept="image/*" style="font-size: 10px; margin-bottom: 0; width: auto; border: none; padding: 0;">
+                    <button id="postBtn" class="btn" onclick="upload()">Post</button>
+                </div>
             </div>
         </div>
 
@@ -103,7 +113,7 @@
 </div>
 
 <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwaNxULB7-8G1SJwH81ovLG2FTwapWnu0aZVxQABHy0ck2qjLMto8piExLT3HTLWlsx/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwfxK3XvOXWrexHsA1oUEZ58MYkg83w6m15dzh-A4c/dev";
 
     window.onload = () => {
         const savedName = localStorage.getItem('gb_user');
@@ -118,8 +128,7 @@
     function scrollToPost(rowIndex) {
         const el = document.getElementById(`post-${rowIndex}`);
         if (el) {
-            // We need a larger offset (approx 250px) because the composer is now taking up space at the top
-            const offset = 260; 
+            const offset = 220; 
             window.scrollTo({ top: el.offsetTop - offset, behavior: "smooth" });
             el.style.backgroundColor = "#fff9c4";
             setTimeout(() => el.style.backgroundColor = "white", 1000);
