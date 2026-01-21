@@ -11,7 +11,14 @@
         .sidebar { width: 250px; position: sticky; top: 70px; }
         .main-feed { flex-grow: 1; max-width: 500px; min-width: 300px; }
         .sidebar-card { background: white; border: 1px solid #dddfe2; border-radius: 3px; padding: 12px; font-size: 13px; }
-        .sidebar-title { font-weight: bold; color: #4b4f56; margin-bottom: 10px; border-bottom: 1px solid #dddfe2; padding-bottom: 5px; }
+        
+        /* New Sidebar Header with Refresh */
+        .sidebar-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #dddfe2; margin-bottom: 10px; padding-bottom: 5px; }
+        .sidebar-title { font-weight: bold; color: #4b4f56; margin: 0; }
+        .refresh-btn { background: #f5f6f7; border: 1px solid #ccd0d5; border-radius: 2px; padding: 2px 6px; cursor: pointer; font-size: 11px; font-weight: bold; color: #4b4f56; }
+        .refresh-btn:hover { background: #ebedf0; }
+        .refresh-btn:active { background: #dddfe2; }
+
         .trending-item { margin-bottom: 10px; border-bottom: 1px dotted #e9ebee; padding-bottom: 5px; cursor: pointer; display: block; }
         .trending-item:hover { background: #f5f6f7; }
         .trending-item b { color: #365899; }
@@ -37,7 +44,10 @@
 <div class="container">
     <div class="sidebar">
         <div class="sidebar-card">
-            <div class="sidebar-title">🔥 Most Liked Posts</div>
+            <div class="sidebar-header">
+                <p class="sidebar-title">🔥 Trending</p>
+                <button class="refresh-btn" onclick="load()">🔄 Refresh</button>
+            </div>
             <div id="trending-list">Loading...</div>
         </div>
     </div>
@@ -55,9 +65,8 @@
 </div>
 
 <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxBoFDWnPkpXRtm_VBRYJppSHMm6CKQO7UsN40wOMmKeAhhPMhmlBzEBFlBopaUUJ8e/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwaNxULB7-8G1SJwH81ovLG2FTwapWnu0aZVxQABHy0ck2qjLMto8piExLT3HTLWlsx/exec";
 
-    // --- NAME MEMORY LOGIC ---
     window.onload = () => {
         const savedName = localStorage.getItem('gb_user');
         if (savedName) document.getElementById('user').value = savedName;
