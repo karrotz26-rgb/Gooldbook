@@ -5,34 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>The Gooldbook</title>
   <style>
-    /* Classic Facebook Aesthetic (circa 2008-2012) */
     body { background-color: #e9ebee; color: #1c1e21; font-family: "lucida grande", tahoma, verdana, arial, sans-serif; margin: 0; padding-bottom: 50px; }
-    
     .nav { background-color: #3b5998; border-bottom: 1px solid #29487d; color: white; padding: 10px 0; text-align: center; position: sticky; top: 0; z-index: 100; }
     .nav-title { font-size: 24px; font-weight: bold; text-decoration: none; color: white; }
-
     .container { max-width: 500px; margin: 15px auto; padding: 0 10px; }
-
-    /* Composer and Post Cards */
-    .card { background: white; border: 1px solid #dddfe2; border-radius: 0px; padding: 12px; margin-bottom: 12px; box-shadow: none; }
-    .card-title { background: #f5f6f7; border-bottom: 1px solid #dddfe2; margin: -12px -12px 10px -12px; padding: 8px 12px; font-size: 12px; font-weight: bold; color: #4b4f56; }
-
-    input[type="text"], textarea { width: 100%; border: 1px solid #dddfe2; padding: 8px; box-sizing: border-box; font-size: 13px; margin-bottom: 8px; border-radius: 0px; }
     
-    /* Buttons */
-    .btn { background-color: #4267b2; border: 1px solid #29487d; color: white; padding: 6px 12px; font-size: 12px; font-weight: bold; cursor: pointer; border-radius: 2px; }
-    .btn:hover { background-color: #365899; }
-    .btn:disabled { background-color: #9cb4d8; cursor: not-allowed; }
-    .btn-refresh { background-color: #f5f6f7; border-color: #ccd0d5; color: #4b4f56; width: 100%; margin-bottom: 15px; }
-    .btn-refresh:hover { background-color: #ebedf0; }
+    .card { background: white; border: 1px solid #dddfe2; padding: 12px; margin-bottom: 12px; }
+    .card-title { background: #f5f6f7; border-bottom: 1px solid #dddfe2; margin: -12px -12px 10px -12px; padding: 8px 12px; font-size: 12px; font-weight: bold; color: #4b4f56; }
+    
+    input[type="text"], textarea { width: 100%; border: 1px solid #dddfe2; padding: 8px; box-sizing: border-box; font-size: 13px; margin-bottom: 8px; }
+    .btn { background-color: #4267b2; border: 1px solid #29487d; color: white; padding: 6px 12px; font-size: 12px; font-weight: bold; cursor: pointer; }
+    .btn:disabled { background-color: #9cb4d8; }
+    
+    .post-user { color: #365899; font-weight: bold; font-size: 13px; }
+    .post-date { color: #90949c; font-size: 11px; margin-bottom: 10px; }
+    .post-msg { font-size: 14px; margin: 10px 0; }
+    .post-img { width: calc(100% + 24px); margin-left: -12px; display: block; border-top: 1px solid #dddfe2; }
 
-    /* Post Content */
-    .post-user { color: #365899; font-weight: bold; font-size: 13px; text-decoration: none; }
-    .post-date { color: #90949c; font-size: 12px; margin-bottom: 10px; }
-    .post-msg { font-size: 14px; line-height: 1.38; margin: 10px 0; }
-    .post-img { width: calc(100% + 24px); margin-left: -12px; border-top: 1px solid #e9ebee; border-bottom: 1px solid #e9ebee; display: block; }
+    /* Comments Section */
+    .comment-section { background-color: #f2f3f5; margin: 10px -12px -12px -12px; padding: 8px 12px; border-top: 1px solid #e9ebee; }
+    .comment-item { font-size: 12px; margin-bottom: 5px; }
+    .comment-user { color: #365899; font-weight: bold; }
+    .comment-input { width: 100%; font-size: 11px; padding: 4px; border: 1px solid #dddfe2; margin-top: 8px; }
 
-    /* Spinner */
     .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3b5998; border-radius: 50%; width: 20px; height: 20px; animation: spin 0.8s linear infinite; margin: 10px auto; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     .hidden { display: none; }
@@ -40,103 +35,108 @@
 </head>
 <body>
 
-  <div class="nav">
-    <div class="nav-title">theGooldbook</div>
-  </div>
+  <div class="nav"><div class="nav-title">theGooldbook</div></div>
 
   <div class="container">
     <div class="card">
       <div class="card-title">Update Status</div>
       <input type="text" id="user" placeholder="Your Name">
-      <textarea id="msg" placeholder="What's on your mind?" rows="3"></textarea>
+      <textarea id="msg" placeholder="What's on your mind?" rows="2"></textarea>
       <input type="file" id="file" accept="image/*" style="font-size: 11px; margin-bottom: 10px;">
-      <div style="text-align: right;">
-        <button id="btn" class="btn" onclick="upload()">Post</button>
-      </div>
+      <div style="text-align: right;"><button id="btn" class="btn" onclick="upload()">Post</button></div>
     </div>
 
-    <button class="btn btn-refresh" onclick="load()">🔄 Check for New Posts</button>
-
     <div id="loader" class="spinner hidden"></div>
-
     <div id="feed"></div>
   </div>
 
   <script>
-    // --- PASTE YOUR GOOGLE SCRIPT WEB APP URL HERE ---
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxyzpHbkkrfVDnm7dR-8RIyl9Wzl2m2R2zFLlSbZ_YBS6hBbcyApnq_Gvf3On9W5gM5/exec";
+    // --- PASTE YOUR WEB APP URL HERE ---
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx-R1SRoSu485ZmmqPzElcR_7i_tfj5ZKBdSR1jLWpdVbeiDZbjtA4NUM3a3MMeDD0/exec";
 
     async function load() {
       const loader = document.getElementById('loader');
-      const feed = document.getElementById('feed');
       loader.classList.remove('hidden');
-      
       try {
         const res = await fetch(SCRIPT_URL);
         const data = await res.json();
-        
-        feed.innerHTML = data.map(p => `
+        document.getElementById('feed').innerHTML = data.map(p => `
           <div class="card">
             <div class="post-user">${p.user}</div>
-            <div class="post-date">${p.timestamp || 'Recently'}</div>
+            <div class="post-date">${p.timestamp}</div>
             <div class="post-msg">${p.message}</div>
             ${p.image ? `<img src="${p.image}" class="post-img">` : ""}
-            <div style="border-top: 1px solid #e9ebee; margin-top: 10px; padding-top: 8px;">
-               <span style="color: #365899; font-size: 12px; font-weight: bold; cursor: pointer;">Like</span> 
-               <span style="color: #90949c; font-size: 12px;"> • ${p.likes || 0} people like this.</span>
+            
+            <div style="border-top: 1px solid #e9ebee; margin-top: 10px; padding: 8px 0;">
+               <span onclick="likePost(${p.id})" style="color: #365899; font-size: 12px; font-weight: bold; cursor: pointer;">Like</span> 
+               <span style="color: #90949c; font-size: 12px;"> • ${p.likes} likes</span>
+            </div>
+
+            <div class="comment-section">
+              ${p.comments.map(c => `
+                <div class="comment-item"><span class="comment-user">${c.user}</span> ${c.text}</div>
+              `).join('')}
+              <input type="text" class="comment-input" placeholder="Write a comment..." onkeypress="if(event.key==='Enter') addComment(${p.id}, this)">
             </div>
           </div>
         `).join('');
-      } catch (e) {
-        feed.innerHTML = "<div class='card'>Connection failed. Please ensure the Google Script is deployed as 'Anyone'.</div>";
-      } finally {
-        loader.classList.add('hidden');
-      }
+      } catch (e) { console.error(e); }
+      loader.classList.add('hidden');
+    }
+
+    async function likePost(id) {
+      await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "like", id: id }) });
+      load();
+    }
+
+    async function addComment(id, input) {
+      const user = document.getElementById('user').value || "Guest";
+      if(!input.value) return;
+      const text = input.value;
+      input.value = "Saving...";
+      await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: "comment", id: id, user: user, text: text }) });
+      load();
     }
 
     function upload() {
       const u = document.getElementById('user').value;
       const m = document.getElementById('msg').value;
       const f = document.getElementById('file').files[0];
-      const btn = document.getElementById('btn');
-      
-      if(!u || !m) return alert("Please enter your name and a message.");
-      
-      btn.disabled = true;
+      if(!u || !m) return alert("Name and message required!");
+
+      document.getElementById('btn').disabled = true;
       document.getElementById('loader').classList.remove('hidden');
 
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const payload = {
-          username: u,
-          message: m,
-          image: f ? e.target.result : ""
+      if (f) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 600; 
+            const scaleSize = MAX_WIDTH / img.width;
+            canvas.width = MAX_WIDTH;
+            canvas.height = img.height * scaleSize;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            sendData(u, m, canvas.toDataURL('image/jpeg', 0.6));
+          };
+          img.src = e.target.result;
         };
-        
-        try {
-          await fetch(SCRIPT_URL, {
-            method: 'POST',
-            body: JSON.stringify(payload)
-          });
-          document.getElementById('msg').value = "";
-          document.getElementById('file').value = "";
-          load();
-        } catch (err) {
-          alert("Could not post. Check your connection.");
-        } finally {
-          btn.disabled = false;
-        }
-      };
-
-      if(f) {
-        // Optional: you could add an image resizer here to keep the sheet smaller
-        reader.readAsDataURL(f); 
+        reader.readAsDataURL(f);
       } else {
-        reader.onload(); 
+        sendData(u, m, "");
       }
     }
-    
-    // Auto-load on open
+
+    async function sendData(username, message, image) {
+      await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ username, message, image }) });
+      document.getElementById('msg').value = "";
+      document.getElementById('file').value = "";
+      document.getElementById('btn').disabled = false;
+      load();
+    }
+
     window.onload = load;
   </script>
 </body>
