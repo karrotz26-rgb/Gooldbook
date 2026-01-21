@@ -12,30 +12,21 @@
         .main-feed { flex-grow: 1; max-width: 500px; min-width: 300px; }
         .sidebar-card { background: white; border: 1px solid #dddfe2; border-radius: 3px; padding: 12px; font-size: 13px; }
         .sidebar-title { font-weight: bold; color: #4b4f56; margin-bottom: 10px; border-bottom: 1px solid #dddfe2; padding-bottom: 5px; }
-        
-        /* Updated Trending Link Style */
-        .trending-item { 
-            margin-bottom: 10px; border-bottom: 1px dotted #e9ebee; padding-bottom: 5px; 
-            cursor: pointer; display: block; text-decoration: none; color: inherit; transition: background 0.2s;
-        }
+        .trending-item { margin-bottom: 10px; border-bottom: 1px dotted #e9ebee; padding-bottom: 5px; cursor: pointer; display: block; }
         .trending-item:hover { background: #f5f6f7; }
         .trending-item b { color: #365899; }
-
-        .card { background: white; border: 1px solid #dddfe2; border-radius: 3px; padding: 12px; margin-bottom: 15px; transition: border 0.5s; }
-        /* Highlight effect when jumping to a post */
-        .card:target { border: 2px solid #3b5998; }
-
+        .card { background: white; border: 1px solid #dddfe2; border-radius: 3px; padding: 12px; margin-bottom: 15px; }
         input, textarea { width: 100%; border: 1px solid #dddfe2; padding: 10px; margin-bottom: 10px; border-radius: 3px; box-sizing: border-box; }
         .btn { background-color: #4267b2; color: white; border: none; padding: 8px 16px; font-weight: bold; cursor: pointer; border-radius: 2px; }
         .post-user { color: #365899; font-weight: bold; font-size: 14px; }
         .post-date { color: #90949c; font-size: 11px; margin-bottom: 8px; }
         .post-img { width: calc(100% + 24px); margin: 10px -12px; display: block; max-height: 450px; object-fit: cover; }
-        .action-bar { border-top: 1px solid #e9ebee; padding-top: 8px; margin-top: 10px; font-size: 13px; font-weight: bold; color: #606770; }
+        .action-bar { border-top: 1px solid #e9ebee; padding-top: 8px; margin-top: 10px; font-size: 13px; font-weight: bold; }
+        .like-btn { cursor: pointer; margin-right: 5px; }
         .comment-box { background: #f2f3f5; border-radius: 8px; padding: 8px 12px; margin-top: 5px; font-size: 13px; }
         .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3b5998; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .hidden { display: none; }
-
         @media (max-width: 600px) { .container { flex-direction: column; } .sidebar { width: 100%; position: static; } .main-feed { width: 100%; } }
     </style>
 </head>
@@ -64,25 +55,25 @@
 </div>
 
 <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby0tuLXEL_PdlM5JCtMtPpiImzbTuPzpTYna59aqbqIUojci-OVKLzIMBVEtk1DsPP5/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxBoFDWnPkpXRtm_VBRYJppSHMm6CKQO7UsN40wOMmKeAhhPMhmlBzEBFlBopaUUJ8e/exec";
 
-    // New function to jump to a specific post
+    // --- NAME MEMORY LOGIC ---
+    window.onload = () => {
+        const savedName = localStorage.getItem('gb_user');
+        if (savedName) document.getElementById('user').value = savedName;
+        load();
+    };
+
+    document.getElementById('user').addEventListener('input', (e) => {
+        localStorage.setItem('gb_user', e.target.value);
+    });
+
     function scrollToPost(rowIndex) {
-        const element = document.getElementById(`post-${rowIndex}`);
-        if (element) {
-            // Offset for the sticky header
-            const headerOffset = 70;
-            const elementPosition = element.getBoundingClientRect().top;
-            const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-
-            window.scrollTo({
-                top: offsetPosition,
-                behavior: "smooth"
-            });
-            
-            // Temporary flash effect
-            element.style.backgroundColor = "#fff9c4";
-            setTimeout(() => element.style.backgroundColor = "white", 1000);
+        const el = document.getElementById(`post-${rowIndex}`);
+        if (el) {
+            window.scrollTo({ top: el.offsetTop - 70, behavior: "smooth" });
+            el.style.backgroundColor = "#fff9c4";
+            setTimeout(() => el.style.backgroundColor = "white", 1000);
         }
     }
 
@@ -90,6 +81,7 @@
         const feed = document.getElementById('feed');
         const trendingList = document.getElementById('trending-list');
         const loader = document.getElementById('loader');
+        const currentUser = document.getElementById('user').value.trim();
         loader.classList.remove('hidden');
 
         try {
@@ -102,18 +94,18 @@
                 return;
             }
 
-            // TRENDING LOGIC
-            const trending = [...posts].sort((a, b) => (b.likes || 0) - (a.likes || 0)).slice(0, 5);
+            // TRENDING
+            const trending = [...posts].sort((a, b) => (b.likes.length || 0) - (a.likes.length || 0)).slice(0, 5);
             trendingList.innerHTML = trending.map(p => `
                 <div class="trending-item" onclick="scrollToPost(${p.rowIndex})">
-                    <b>${p.likes || 0} Likes</b><br>
-                    ${p.message.substring(0, 40)}${p.message.length > 40 ? '...' : ''}
-                </div>
-            `).join('');
+                    <b>${p.likes.length} Likes</b><br>
+                    ${p.message.substring(0, 40)}...
+                </div>`).join('');
 
-            // FEED LOGIC
+            // FEED
             feed.innerHTML = posts.map(p => {
-                const comments = Array.isArray(p.comments) ? p.comments : [];
+                const likes = Array.isArray(p.likes) ? p.likes : [];
+                const hasLiked = likes.includes(currentUser);
                 return `
                 <div class="card" id="post-${p.rowIndex}">
                     <div class="post-user">${p.user}</div>
@@ -121,11 +113,15 @@
                     <div class="post-msg">${p.message}</div>
                     ${p.image ? `<img src="${p.image}" class="post-img">` : ''}
                     <div class="action-bar">
-                        <span style="color:#365899; cursor:pointer;" onclick="handleAction('like', ${p.rowIndex})">👍 Like</span>
-                        <span style="color:#90949c"> • ${p.likes || 0} likes</span>
+                        <span class="like-btn" style="color:#365899" onclick="handleAction('like', ${p.rowIndex})">
+                            ${hasLiked ? '❤️ Unlike' : '👍 Like'}
+                        </span>
+                        <span style="color:#90949c" title="Liked by: ${likes.join(', ')}">
+                            • ${likes.length} people like this
+                        </span>
                     </div>
-                    <div id="comments-${p.rowIndex}" style="margin-top: 10px;">
-                        ${comments.map(c => `<div class="comment-box"><b>${c.user}</b>: ${c.text}</div>`).join('')}
+                    <div id="comments-${p.rowIndex}" style="margin-top:10px;">
+                        ${p.comments.map(c => `<div class="comment-box"><b>${c.user}</b>: ${c.text}</div>`).join('')}
                     </div>
                     <div style="display:flex; gap:5px; margin-top:10px;">
                         <input type="text" id="reply-${p.rowIndex}" placeholder="Write a comment..." style="margin-bottom:0; padding:5px; font-size:12px;">
@@ -133,47 +129,41 @@
                     </div>
                 </div>`;
             }).join('');
-        } catch (err) {
-            feed.innerHTML = "<div class='card'>Unable to load.</div>";
-        } finally {
-            loader.classList.add('hidden');
-        }
+        } catch (e) { feed.innerHTML = "Error loading."; }
+        finally { loader.classList.add('hidden'); }
     }
 
     async function handleAction(type, rowIndex) {
-        const user = document.getElementById('user').value.trim() || "Anonymous";
+        const user = document.getElementById('user').value.trim();
+        if (!user) return alert("Enter your name!");
         const payload = { action: type, rowIndex: rowIndex, username: user };
         if (type === 'comment') {
-            const input = document.getElementById(`reply-${rowIndex}`);
-            if (!input.value.trim()) return;
-            payload.text = input.value;
-            input.value = "";
+            const inp = document.getElementById(`reply-${rowIndex}`);
+            if (!inp.value.trim()) return;
+            payload.text = inp.value;
+            inp.value = "";
         }
         document.getElementById('loader').classList.remove('hidden');
-        try {
-            await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
-            setTimeout(load, 1500); 
-        } catch (e) { document.getElementById('loader').classList.add('hidden'); }
+        await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+        setTimeout(load, 1500);
     }
 
     function upload() {
-        const user = document.getElementById('user').value.trim();
-        const msg = document.getElementById('msg').value.trim();
-        const file = document.getElementById('file').files[0];
-        if (!user || !msg) return alert("Fill in name and message.");
+        const u = document.getElementById('user').value.trim();
+        const m = document.getElementById('msg').value.trim();
+        const f = document.getElementById('file').files[0];
+        if (!u || !m) return alert("Fill in name and message.");
         document.getElementById('postBtn').disabled = true;
         document.getElementById('loader').classList.remove('hidden');
         const reader = new FileReader();
         reader.onload = async (e) => {
-            try {
-                await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'post', username: user, message: msg, image: file ? e.target.result : "" }) });
-                document.getElementById('msg').value = ""; document.getElementById('file').value = "";
-                setTimeout(load, 1500);
-            } catch (err) { alert("Upload failed."); } finally { document.getElementById('postBtn').disabled = false; }
+            await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'post', username: u, message: m, image: f ? e.target.result : "" }) });
+            document.getElementById('msg').value = ""; document.getElementById('file').value = "";
+            document.getElementById('postBtn').disabled = false;
+            setTimeout(load, 1500);
         };
-        if (file) reader.readAsDataURL(file); else reader.onload();
+        if (f) reader.readAsDataURL(f); else reader.onload();
     }
-    window.onload = load;
 </script>
 </body>
 </html>
