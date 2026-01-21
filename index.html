@@ -23,17 +23,14 @@
         .sidebar::-webkit-scrollbar { width: 5px; }
         .sidebar::-webkit-scrollbar-thumb { background: #ccd0d5; border-radius: 10px; }
         .main-feed { flex-grow: 1; max-width: 500px; min-width: 300px; }
-        
         .sticky-composer { position: sticky; top: 70px; z-index: 1000; background: #e9ebee; padding-bottom: 10px; opacity: 0.8; transform: scale(0.98); transition: all 0.3s ease; }
         .sticky-composer:hover, .sticky-composer:focus-within { opacity: 1; transform: scale(1); }
-
         .card { background: white; border: 1px solid #dddfe2; border-radius: 3px; padding: 12px; margin-bottom: 15px; }
         .sidebar-card { background: white; border: 1px solid #dddfe2; border-radius: 3px; padding: 12px; font-size: 13px; margin-bottom: 15px; }
         .sidebar-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #dddfe2; margin-bottom: 10px; padding-bottom: 5px; font-weight: bold; color: #4b4f56; }
         .refresh-btn { background: #f5f6f7; border: 1px solid #ccd0d5; border-radius: 2px; padding: 2px 6px; cursor: pointer; font-size: 11px; }
         .trending-item { margin-bottom: 10px; border-bottom: 1px dotted #e9ebee; padding-bottom: 5px; cursor: pointer; display: block; font-size: 12px; }
         .trending-item:hover { background: #f5f6f7; }
-
         input, textarea { width: 100%; border: 1px solid #dddfe2; padding: 8px; margin-bottom: 8px; border-radius: 3px; box-sizing: border-box; font-size: 13px; }
         .btn { background-color: #4267b2; color: white; border: none; padding: 8px 16px; font-weight: bold; cursor: pointer; border-radius: 2px; }
         .post-user { color: #365899; font-weight: bold; font-size: 14px; }
@@ -90,6 +87,7 @@
 
 <script>
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyWFfUUsMDwJ9ai2GjeprQPR3sBq5mpfL6Tn4FB7ZrvmTz6LGb0bMmLHdIWWchnTH-o/exec";
+    const CACHE_KEY = "gooldbook_cache";
     
     let allPosts = [];
     let displayedCount = 0;
@@ -98,12 +96,32 @@
     window.onload = () => {
         const savedName = localStorage.getItem('gb_user');
         if (savedName) document.getElementById('user').value = savedName;
+        
+        // 1. Load from Cache immediately
+        loadFromCache();
+        
+        // 2. Refresh from Google in background
         loadWithRetry(3);
     };
 
     document.getElementById('user').addEventListener('input', (e) => {
         localStorage.setItem('gb_user', e.target.value);
     });
+
+    function saveToCache() {
+        try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify(allPosts));
+        } catch(e) { console.warn("Cache full or unavailable"); }
+    }
+
+    function loadFromCache() {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+            allPosts = JSON.parse(cached);
+            renderSidebars();
+            renderMore(true);
+        }
+    }
 
     async function manualRefresh() {
         allPosts = [];
@@ -114,20 +132,23 @@
 
     async function loadWithRetry(retries) {
         const loader = document.getElementById('loader');
-        loader.classList.remove('hidden');
+        if (allPosts.length === 0) loader.classList.remove('hidden');
+
         for (let i = 0; i < retries; i++) {
             try {
                 const response = await fetch(SCRIPT_URL);
                 if (!response.ok) throw new Error();
                 allPosts = await response.json();
+                
+                saveToCache();
                 renderSidebars();
                 renderMore(true);
+                
                 loader.classList.add('hidden');
                 return;
             } catch (err) {
-                if (i === retries - 1) {
+                if (i === retries - 1 && allPosts.length === 0) {
                     document.getElementById('feed').innerHTML = "<div class='card'>Connection Error. Refresh manually.</div>";
-                    loader.classList.add('hidden');
                 }
                 await new Promise(r => setTimeout(r, 2000));
             }
@@ -193,6 +214,7 @@
                 if (!inp.value.trim()) return;
                 allPosts[postIdx].comments.push({ user: user, text: inp.value });
             }
+            saveToCache();
             const currentScroll = window.scrollY;
             renderSidebars();
             renderMore(true);
@@ -217,10 +239,11 @@
         reader.onload = async (e) => {
             const tempPost = { user: u, message: m, image: f ? e.target.result : "", likes: [], comments: [], timestamp: new Date(), rowIndex: Date.now() };
             allPosts.unshift(tempPost);
+            saveToCache();
             renderMore(true);
             document.getElementById('msg').value = ""; document.getElementById('file').value = "";
             await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'post', username: u, message: m, image: tempPost.image }) });
-            setTimeout(manualRefresh, 5000); // Sync real IDs later
+            setTimeout(manualRefresh, 5000); 
         };
         if (f) reader.readAsDataURL(f); else reader.onload();
     }
