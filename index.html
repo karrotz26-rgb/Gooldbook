@@ -1,118 +1,131 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby0tuLXEL_PdlM5JCtMtPpiImzbTuPzpTYna59aqbqIUojci-OVKLzIMBVEtk1DsPP5/exec";
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Gooldbook</title>
+  <style>
+    body { background-color: #e9ebee; color: #1c1e21; font-family: "lucida grande", tahoma, verdana, arial, sans-serif; margin: 0; padding-bottom: 50px; }
+    .nav { background-color: #3b5998; border-bottom: 1px solid #29487d; color: white; padding: 10px 0; text-align: center; position: sticky; top: 0; z-index: 100; }
+    .nav-title { font-size: 24px; font-weight: bold; text-decoration: none; color: white; }
+    .container { max-width: 500px; margin: 15px auto; padding: 0 10px; }
+    .card { background: white; border: 1px solid #dddfe2; padding: 12px; margin-bottom: 12px; }
+    .card-title { background: #f5f6f7; border-bottom: 1px solid #dddfe2; margin: -12px -12px 10px -12px; padding: 8px 12px; font-size: 12px; font-weight: bold; color: #4b4f56; }
+    input[type="text"], textarea { width: 100%; border: 1px solid #dddfe2; padding: 8px; box-sizing: border-box; font-size: 13px; margin-bottom: 8px; }
+    .btn { background-color: #4267b2; border: 1px solid #29487d; color: white; padding: 6px 12px; font-size: 12px; font-weight: bold; cursor: pointer; }
+    .btn:disabled { background-color: #9cb4d8; }
+    .post-user { color: #365899; font-weight: bold; font-size: 13px; }
+    .post-date { color: #90949c; font-size: 11px; margin-bottom: 10px; }
+    .post-msg { font-size: 14px; line-height: 1.38; margin: 10px 0; }
+    .post-img { width: calc(100% + 24px); margin-left: -12px; display: block; }
+    .comment-box { background: #f2f3f5; padding: 5px 8px; margin-top: 4px; border-radius: 4px; font-size: 12px; }
+    .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3b5998; border-radius: 50%; width: 20px; height: 20px; animation: spin 0.8s linear infinite; margin: 10px auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
 
-async function load() {
-  const loader = document.getElementById('loader');
-  const feed = document.getElementById('feed');
-  loader.classList.remove('hidden');
-  
-  try {
-    const res = await fetch(SCRIPT_URL);
-    const data = await res.json();
-    
-    feed.innerHTML = data.map(p => {
-      // Create HTML for comments
-      const commentHtml = p.comments.map(c => `
-        <div style="background: #f2f3f5; padding: 5px 8px; margin-top: 4px; border-radius: 4px; font-size: 12px;">
-          <b style="color: #365899;">${c.user}</b> ${c.text}
-        </div>
-      `).join('');
+  <div class="nav"><div class="nav-title">theGooldbook</div></div>
 
-      return `
-      <div class="card">
-        <div class="post-user">${p.user}</div>
-        <div class="post-date">${new Date(p.timestamp).toLocaleString()}</div>
-        <div class="post-msg">${p.message}</div>
-        ${p.image ? `<img src="${p.image}" class="post-img">` : ""}
+  <div class="container">
+    <div class="card">
+      <div class="card-title">Update Status</div>
+      <input type="text" id="user" placeholder="Your Name">
+      <textarea id="msg" placeholder="What's on your mind?" rows="3"></textarea>
+      <input type="file" id="file" accept="image/*">
+      <div style="text-align: right;"><button id="btn" class="btn" onclick="upload()">Post</button></div>
+    </div>
+
+    <div id="loader" class="spinner hidden"></div>
+    <div id="feed"></div>
+  </div>
+
+  <script>
+    // MAKE SURE THIS IS YOUR LATEST DEPLOYMENT URL
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby0tuLXEL_PdlM5JCtMtPpiImzbTuPzpTYna59aqbqIUojci-OVKLzIMBVEtk1DsPP5/exec";
+
+    async function load() {
+      const feed = document.getElementById('feed');
+      document.getElementById('loader').classList.remove('hidden');
+      
+      try {
+        const res = await fetch(SCRIPT_URL);
+        const data = await res.json();
         
-        <div style="border-top: 1px solid #e9ebee; margin-top: 10px; padding-top: 8px;">
-           <span onclick="handleAction('like', ${p.rowIndex})" style="color: #365899; font-size: 12px; font-weight: bold; cursor: pointer;">Like</span> 
-           <span style="color: #90949c; font-size: 12px;"> • ${p.likes || 0} people like this.</span>
-        </div>
+        feed.innerHTML = data.map(p => {
+          const comments = Array.isArray(p.comments) ? p.comments : [];
+          const commentHtml = comments.map(c => `
+            <div class="comment-box"><b style="color: #365899;">${c.user}</b> ${c.text}</div>
+          `).join('');
 
-        <div id="comments-${p.rowIndex}" style="margin-top: 8px;">
-          ${commentHtml}
-        </div>
+          return `
+          <div class="card">
+            <div class="post-user">${p.user}</div>
+            <div class="post-date">${p.timestamp ? new Date(p.timestamp).toLocaleString() : 'Just now'}</div>
+            <div class="post-msg">${p.message}</div>
+            ${p.image ? `<img src="${p.image}" class="post-img">` : ""}
+            
+            <div style="border-top: 1px solid #e9ebee; margin-top: 10px; padding-top: 8px;">
+               <span onclick="handleAction('like', ${p.rowIndex})" style="color: #365899; font-size: 12px; font-weight: bold; cursor: pointer;">Like</span> 
+               <span style="color: #90949c; font-size: 12px;"> • ${p.likes || 0} likes</span>
+            </div>
 
-        <div style="margin-top: 8px; display: flex; gap: 5px;">
-          <input type="text" id="input-${p.rowIndex}" placeholder="Write a comment..." style="margin-bottom: 0; font-size: 11px; padding: 4px;">
-          <button class="btn" onclick="handleAction('comment', ${p.rowIndex})" style="padding: 2px 8px;">Post</button>
-        </div>
-      </div>
-    `}).join('');
-  } catch (e) {
-    feed.innerHTML = "<div class='card'>Connection failed.</div>";
-  } finally {
-    loader.classList.add('hidden');
-  }
-}
+            <div id="comments-${p.rowIndex}">${commentHtml}</div>
 
-async function handleAction(action, rowIndex) {
-  const username = document.getElementById('user').value || "Anonymous";
-  const payload = { action, rowIndex, username };
-
-  if (action === 'comment') {
-    const commentInput = document.getElementById(`input-${rowIndex}`);
-    if (!commentInput.value) return;
-    payload.text = commentInput.value;
-    commentInput.value = "";
-  }
-
-  // Show loader and optimistically update or just wait for reload
-  document.getElementById('loader').classList.remove('hidden');
-
-  try {
-    await fetch(SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-    load(); // Refresh feed to show new like/comment
-  } catch (err) {
-    alert("Error updating post.");
-    document.getElementById('loader').classList.add('hidden');
-  }
-}
-
-function upload() {
-  const u = document.getElementById('user').value;
-  const m = document.getElementById('msg').value;
-  const f = document.getElementById('file').files[0];
-  const btn = document.getElementById('btn');
-  
-  if(!u || !m) return alert("Please enter your name and a message.");
-  
-  btn.disabled = true;
-  document.getElementById('loader').classList.remove('hidden');
-
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    // UPDATED PAYLOAD: added "action: 'post'"
-    const payload = {
-      action: "post",
-      username: u,
-      message: m,
-      image: f ? e.target.result : ""
-    };
-    
-    try {
-      await fetch(SCRIPT_URL, {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-      document.getElementById('msg').value = "";
-      document.getElementById('file').value = "";
-      load();
-    } catch (err) {
-      alert("Could not post.");
-    } finally {
-      btn.disabled = false;
+            <div style="margin-top: 8px; display: flex; gap: 5px;">
+              <input type="text" id="input-${p.rowIndex}" placeholder="Write a comment..." style="margin-bottom:0; height:25px;">
+              <button class="btn" onclick="handleAction('comment', ${p.rowIndex})">Reply</button>
+            </div>
+          </div>`;
+        }).join('');
+      } catch (e) {
+        feed.innerHTML = "Failed to load feed.";
+      } finally {
+        document.getElementById('loader').classList.add('hidden');
+      }
     }
-  };
 
-  if(f) {
-    reader.readAsDataURL(f); 
-  } else {
-    reader.onload(); 
-  }
-}
+    async function handleAction(action, rowIndex) {
+      const user = document.getElementById('user').value || "Anonymous";
+      let payload = { action, rowIndex, username: user };
 
-window.onload = load;
+      if (action === 'comment') {
+        const inp = document.getElementById(`input-${rowIndex}`);
+        if (!inp.value) return;
+        payload.text = inp.value;
+        inp.value = "";
+      }
+
+      document.getElementById('loader').classList.remove('hidden');
+      await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
+      load();
+    }
+
+    function upload() {
+      const u = document.getElementById('user').value;
+      const m = document.getElementById('msg').value;
+      const f = document.getElementById('file').files[0];
+      if(!u || !m) return alert("Fill in name and message");
+
+      document.getElementById('btn').disabled = true;
+      document.getElementById('loader').classList.remove('hidden');
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        await fetch(SCRIPT_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: "post", username: u, message: m, image: f ? e.target.result : "" })
+        });
+        document.getElementById('msg').value = "";
+        document.getElementById('file').value = "";
+        document.getElementById('btn').disabled = false;
+        load();
+      };
+      if(f) reader.readAsDataURL(f); else reader.onload();
+    }
+
+    window.onload = load;
+  </script>
+</body>
+</html>
