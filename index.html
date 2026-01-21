@@ -6,45 +6,27 @@
     <title>The Gooldbook</title>
     <style>
         body { background-color: #e9ebee; color: #1c1e21; font-family: Helvetica, Arial, sans-serif; margin: 0; padding-bottom: 50px; scroll-behavior: smooth; }
+        .nav { background-color: #3b5998; color: white; padding: 12px; text-align: center; font-weight: bold; font-size: 22px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         
-        /* NAVIGATION */
-        .nav { background-color: #3b5998; color: white; padding: 12px; text-align: center; font-weight: bold; font-size: 22px; position: sticky; top: 0; z-index: 2000; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-        
+        /* TWO-COLUMN LAYOUT */
         .container { max-width: 850px; margin: 20px auto; display: flex; gap: 20px; padding: 0 10px; align-items: flex-start; }
 
-        /* FIXED SIDEBAR */
+        /* INDEPENDENT SCROLL SIDEBAR */
         .sidebar { 
             width: 250px; 
             position: sticky; 
             top: 70px; 
-            max-height: calc(100vh - 90px); 
-            overflow-y: auto; 
+            max-height: calc(100vh - 90px); /* Height minus nav and margin */
+            overflow-y: auto; /* Independent scroll */
             padding-right: 5px;
-            z-index: 100;
         }
+        /* Custom scrollbar for sidebar */
+        .sidebar::-webkit-scrollbar { width: 5px; }
+        .sidebar::-webkit-scrollbar-thumb { background: #ccd0d5; border-radius: 10px; }
 
-        /* MAIN FEED AREA */
         .main-feed { flex-grow: 1; max-width: 500px; min-width: 300px; }
 
-        /* DYNAMIC STICKY COMPOSER */
-        .sticky-composer {
-            position: sticky;
-            top: 70px;
-            z-index: 1000;
-            background: #e9ebee;
-            padding-bottom: 10px;
-            opacity: 0.7; /* Semi-transparent when idle */
-            transform: scale(0.98); /* Slightly smaller */
-            transition: all 0.3s ease; /* Smooth transition */
-        }
-
-        .sticky-composer:hover, .sticky-composer:focus-within {
-            opacity: 1; /* Fully visible on hover or typing */
-            transform: scale(1);
-        }
-
         /* CARDS & UI */
-        .card { background: white; border: 1px solid #dddfe2; border-radius: 3px; padding: 12px; margin-bottom: 15px; }
         .sidebar-card { background: white; border: 1px solid #dddfe2; border-radius: 3px; padding: 12px; font-size: 13px; margin-bottom: 15px; }
         .sidebar-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #dddfe2; margin-bottom: 10px; padding-bottom: 5px; }
         .sidebar-title { font-weight: bold; color: #4b4f56; margin: 0; }
@@ -54,23 +36,20 @@
         .trending-item:hover { background: #f5f6f7; }
         .trending-item b { color: #365899; }
 
-        input, textarea { width: 100%; border: 1px solid #dddfe2; padding: 8px; margin-bottom: 8px; border-radius: 3px; box-sizing: border-box; font-size: 13px; }
-        .btn { background-color: #4267b2; color: white; border: none; padding: 6px 12px; font-weight: bold; cursor: pointer; border-radius: 2px; font-size: 12px; }
+        .card { background: white; border: 1px solid #dddfe2; border-radius: 3px; padding: 12px; margin-bottom: 15px; }
+        input, textarea { width: 100%; border: 1px solid #dddfe2; padding: 10px; margin-bottom: 10px; border-radius: 3px; box-sizing: border-box; }
+        .btn { background-color: #4267b2; color: white; border: none; padding: 8px 16px; font-weight: bold; cursor: pointer; border-radius: 2px; }
         .post-user { color: #365899; font-weight: bold; font-size: 14px; }
         .post-date { color: #90949c; font-size: 11px; margin-bottom: 8px; }
-        .post-img { width: calc(100% + 24px); margin: 10px -12px; display: block; max-height: 400px; object-fit: cover; }
+        .post-img { width: calc(100% + 24px); margin: 10px -12px; display: block; max-height: 450px; object-fit: cover; }
         .action-bar { border-top: 1px solid #e9ebee; padding-top: 8px; margin-top: 10px; font-size: 13px; font-weight: bold; }
-        .comment-box { background: #f2f3f5; border-radius: 8px; padding: 8px 12px; margin-top: 5px; font-size: 12px; }
+        .comment-box { background: #f2f3f5; border-radius: 8px; padding: 8px 12px; margin-top: 5px; font-size: 13px; }
         
         .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3b5998; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .hidden { display: none; }
         
-        @media (max-width: 600px) { 
-            .container { flex-direction: column; } 
-            .sidebar { width: 100%; position: static; max-height: none; } 
-            .sticky-composer { position: static; opacity: 1; transform: none; } 
-        }
+        @media (max-width: 600px) { .container { flex-direction: column; } .sidebar { width: 100%; position: static; max-height: none; } .main-feed { width: 100%; } }
     </style>
 </head>
 <body>
@@ -93,22 +72,21 @@
             </div>
             <div id="commented-list">Loading...</div>
         </div>
+
+        <div style="font-size: 11px; color: #90949c; padding: 0 5px;">
+            Gooldbook © 2026 · Independent Scroll Enabled
+        </div>
     </div>
 
     <div class="main-feed">
-        <div class="sticky-composer">
-            <div class="card" style="margin-bottom: 0; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                <input type="text" id="user" placeholder="Your Name">
-                <textarea id="msg" placeholder="What's on your mind?" rows="2"></textarea>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <input type="file" id="file" accept="image/*" style="font-size: 10px; margin-bottom: 0; width: auto; border: none; padding: 0;">
-                    <button id="postBtn" class="btn" onclick="upload()">Post</button>
-                </div>
-            </div>
+        <div class="card">
+            <input type="text" id="user" placeholder="Your Name">
+            <textarea id="msg" placeholder="What's on your mind?" rows="3"></textarea>
+            <input type="file" id="file" accept="image/*" style="font-size: 11px;">
+            <div style="text-align: right;"><button id="postBtn" class="btn" onclick="upload()">Post</button></div>
         </div>
-
         <div id="loader" class="spinner"></div>
-        <div id="feed" style="margin-top: 15px;"></div>
+        <div id="feed"></div>
     </div>
 </div>
 
@@ -128,8 +106,7 @@
     function scrollToPost(rowIndex) {
         const el = document.getElementById(`post-${rowIndex}`);
         if (el) {
-            const offset = 220; 
-            window.scrollTo({ top: el.offsetTop - offset, behavior: "smooth" });
+            window.scrollTo({ top: el.offsetTop - 70, behavior: "smooth" });
             el.style.backgroundColor = "#fff9c4";
             setTimeout(() => el.style.backgroundColor = "white", 1000);
         }
@@ -154,6 +131,7 @@
                 return;
             }
 
+            // --- MOST LIKED ---
             const trending = [...posts].sort((a, b) => (b.likes.length || 0) - (a.likes.length || 0)).slice(0, 5);
             trendingList.innerHTML = trending.map(p => `
                 <div class="trending-item" onclick="scrollToPost(${p.rowIndex})">
@@ -161,6 +139,7 @@
                     ${p.message.substring(0, 40)}...
                 </div>`).join('');
 
+            // --- MOST COMMENTED ---
             const commented = [...posts].sort((a, b) => (b.comments.length || 0) - (a.comments.length || 0)).slice(0, 5);
             commentedList.innerHTML = commented.map(p => `
                 <div class="trending-item" onclick="scrollToPost(${p.rowIndex})">
@@ -168,6 +147,7 @@
                     ${p.message.substring(0, 40)}...
                 </div>`).join('');
 
+            // --- FEED ---
             feed.innerHTML = posts.map(p => {
                 const likes = Array.isArray(p.likes) ? p.likes : [];
                 const hasLiked = likes.includes(currentUser);
@@ -178,7 +158,7 @@
                     <div class="post-msg">${p.message}</div>
                     ${p.image ? `<img src="${p.image}" class="post-img">` : ''}
                     <div class="action-bar">
-                        <span style="color:#365899; cursor:pointer;" onclick="handleAction('like', ${p.rowIndex})">
+                        <span class="like-btn" style="color:#365899" onclick="handleAction('like', ${p.rowIndex})">
                             ${hasLiked ? '❤️ Unlike' : '👍 Like'}
                         </span>
                         <span style="color:#90949c" title="Liked by: ${likes.join(', ')}">
