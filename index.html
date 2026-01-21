@@ -7,92 +7,21 @@
   
   <link rel="apple-touch-icon" href="https://img.icons8.com/ios-filled/512/sigmund-freud.png">
   <link rel="icon" type="image/png" href="https://img.icons8.com/ios-filled/512/sigmund-freud.png">
-  
+
   <style>
-    /* Classic Aesthetic */
-    body { 
-      background-color: #e9ebee; 
-      color: #1c1e21; 
-      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; 
-      margin: 0; 
-      padding-bottom: 50px; 
-    }
-    
-    .nav { 
-      background: linear-gradient(#4e69a2, #3b5998); 
-      border-bottom: 1px solid #29487d; 
-      height: 44px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      position: sticky; 
-      top: 0; 
-      z-index: 100;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
-    }
-    
+    body { background-color: #e9ebee; color: #1c1e21; font-family: -apple-system, sans-serif; margin: 0; padding-bottom: 50px; }
+    .nav { background: linear-gradient(#4e69a2, #3b5998); border-bottom: 1px solid #29487d; height: 44px; display: flex; justify-content: center; align-items: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
     .nav-content { display: flex; align-items: center; gap: 10px; }
-
-    /* Freud Silhouette in Header */
-    .freud-icon {
-      width: 26px;
-      height: 26px;
-      fill: white;
-      filter: drop-shadow(0 -1px 0 rgba(0,0,0,0.4));
-    }
-
-    .nav-title { 
-      font-size: 19px; 
-      font-weight: bold; 
-      color: white; 
-      text-shadow: 0 -1px 0 rgba(0,0,0,0.5);
-    }
-
+    .freud-icon { width: 26px; height: 26px; fill: white; filter: drop-shadow(0 -1px 0 rgba(0,0,0,0.4)); }
+    .nav-title { font-size: 19px; font-weight: bold; color: white; text-shadow: 0 -1px 0 rgba(0,0,0,0.5); }
     .container { max-width: 500px; margin: 0 auto; padding: 10px; }
-
-    .card { 
-      background: white; 
-      border: 1px solid #bcc0c4; 
-      border-radius: 3px; 
-      padding: 12px; 
-      margin-bottom: 10px; 
-    }
-
-    input[type="text"], textarea { 
-      width: 100%; 
-      border: 1px solid #dddfe2; 
-      padding: 10px; 
-      box-sizing: border-box; 
-      font-size: 14px; 
-      margin-bottom: 8px; 
-      border-radius: 4px;
-      outline: none;
-    }
-    
-    .btn { 
-      background: linear-gradient(#5f78ab, #3b5998);
-      border: 1px solid #29487d; 
-      color: white; 
-      padding: 8px 16px; 
-      font-size: 13px; 
-      font-weight: bold; 
-      border-radius: 3px;
-      cursor: pointer;
-    }
-
-    .btn-refresh { 
-      background: #f5f6f7; 
-      border: 1px solid #ccd0d5; 
-      color: #4b4f56; 
-      width: 100%; 
-      margin-bottom: 15px;
-    }
-
+    .card { background: white; border: 1px solid #bcc0c4; border-radius: 3px; padding: 12px; margin-bottom: 10px; }
+    input, textarea { width: 100%; border: 1px solid #dddfe2; padding: 10px; box-sizing: border-box; font-size: 14px; margin-bottom: 8px; border-radius: 4px; outline: none; }
+    .btn { background: linear-gradient(#5f78ab, #3b5998); border: 1px solid #29487d; color: white; padding: 8px 16px; font-weight: bold; border-radius: 3px; cursor: pointer; }
+    .btn-refresh { background: #f5f6f7; border: 1px solid #ccd0d5; color: #4b4f56; width: 100%; margin-bottom: 15px; }
     .post-user { color: #3b5998; font-weight: bold; font-size: 14px; }
-    .post-date { color: #90949c; font-size: 11px; margin-bottom: 8px; }
     .post-msg { font-size: 14px; line-height: 1.4; margin: 10px 0; word-wrap: break-word; }
     .post-img { width: calc(100% + 24px); margin-left: -12px; border-top: 1px solid #e9ebee; border-bottom: 1px solid #e9ebee; display: block; }
-
     .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3b5998; border-radius: 50%; width: 24px; height: 24px; animation: spin 0.8s linear infinite; margin: 15px auto; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     .hidden { display: none; }
@@ -102,99 +31,59 @@
 
   <div class="nav">
     <div class="nav-content">
-      <svg class="freud-icon" viewBox="0 0 50 50">
-        <path d="M 25 2 C 12.308594 2 2 12.308594 2 25 C 2 37.691406 12.308594 48 25 48 C 37.691406 48 48 37.691406 48 25 C 48 12.308594 37.691406 2 25 2 Z M 25 4 C 36.609375 4 46 13.390625 46 25 C 46 36.609375 36.609375 46 25 46 C 13.390625 46 4 36.609375 4 25 C 4 13.390625 13.390625 4 25 4 Z M 25 9 C 20.039063 9 16 13.039063 16 18 C 16 22.960938 20.039063 27 25 27 C 29.960938 27 34 22.960938 34 18 C 34 13.039063 29.960938 9 25 9 Z M 25 11 C 28.855469 11 32 14.144531 32 18 C 32 21.855469 28.855469 25 25 25 C 21.144531 25 18 21.855469 18 18 C 18 14.144531 21.144531 11 25 11 Z M 25 29 C 18.921875 29 14 33.921875 14 40 L 16 40 C 16 35.03125 20.03125 31 25 31 C 29.96875 31 34 35.03125 34 40 L 36 40 C 36 33.921875 31.078125 29 25 29 Z"></path>
-      </svg>
+      <svg class="freud-icon" viewBox="0 0 50 50"><path d="M 25 2 C 12.308594 2 2 12.308594 2 25 C 2 37.691406 12.308594 48 25 48 C 37.691406 48 48 37.691406 48 25 C 48 12.308594 37.691406 2 25 2 Z M 25 4 C 36.609375 4 46 13.390625 46 25 C 46 36.609375 36.609375 46 25 46 C 13.390625 46 4 36.609375 4 25 C 4 13.390625 13.390625 4 25 4 Z M 25 9 C 20.039063 9 16 13.039063 16 18 C 16 22.960938 20.039063 27 25 27 C 29.960938 27 34 22.960938 34 18 C 34 13.039063 29.960938 9 25 9 Z M 25 11 C 28.855469 11 32 14.144531 32 18 C 32 21.855469 28.855469 25 25 25 C 21.144531 25 18 21.855469 18 18 C 18 14.144531 21.144531 11 25 11 Z M 25 29 C 18.921875 29 14 33.921875 14 40 L 16 40 C 16 35.03125 20.03125 31 25 31 C 29.96875 31 34 35.03125 34 40 L 36 40 C 36 33.921875 31.078125 29 25 29 Z"></path></svg>
       <div class="nav-title">theGooldbook</div>
     </div>
   </div>
 
   <div class="container">
     <div class="card">
-      <input type="text" id="user" placeholder="Your Name">
-      <textarea id="msg" placeholder="What's on your mind?" rows="3"></textarea>
-      <input type="file" id="file" accept="image/*" style="font-size: 12px; margin-bottom: 10px;">
-      <div style="text-align: right;">
-        <button id="btn" class="btn" onclick="upload()">Post</button>
-      </div>
+      <input type="text" id="user" placeholder="Name">
+      <textarea id="msg" placeholder="Message" rows="3"></textarea>
+      <input type="file" id="file" accept="image/*">
+      <div style="text-align: right;"><button id="btn" class="btn" onclick="upload()">Post</button></div>
     </div>
-
-    <button class="btn btn-refresh" onclick="load()">🔄 Check for New Posts</button>
+    <button class="btn btn-refresh" onclick="load()">🔄 Refresh Feed</button>
     <div id="loader" class="spinner hidden"></div>
     <div id="feed"></div>
   </div>
 
   <script>
-    // --- REPLACE THIS URL WITH YOUR GOOGLE APPS SCRIPT WEB APP URL ---
+    // --- PASTE YOUR NEW GOOGLE SCRIPT URL BELOW ---
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwkf4KqZMcTeuRDqRjh9VM0Dw3qKYvOwQbwBDKRfcZ8tvOFGYfdlXiuaU3s1hpTemw/exec";
 
     async function load() {
-      const loader = document.getElementById('loader');
-      const feed = document.getElementById('feed');
-      loader.classList.remove('hidden');
-      
+      document.getElementById('loader').classList.remove('hidden');
       try {
         const res = await fetch(SCRIPT_URL);
         const data = await res.json();
-        
-        feed.innerHTML = data.map(p => `
+        document.getElementById('feed').innerHTML = data.map(p => `
           <div class="card">
             <div class="post-user">${p.user}</div>
-            <div class="post-date">${new Date(p.timestamp).toLocaleDateString()}</div>
             <div class="post-msg">${p.message}</div>
             ${p.image ? `<img src="${p.image}" class="post-img">` : ""}
           </div>
         `).join('');
-      } catch (e) {
-        feed.innerHTML = "<div class='card'>Could not connect to database. Make sure Google Script is deployed correctly.</div>";
-      } finally {
-        loader.classList.add('hidden');
-      }
+      } catch (e) { document.getElementById('feed').innerHTML = "Error loading feed."; }
+      document.getElementById('loader').classList.add('hidden');
     }
 
     function upload() {
-      const u = document.getElementById('user').value;
-      const m = document.getElementById('msg').value;
-      const f = document.getElementById('file').files[0];
-      const btn = document.getElementById('btn');
-      
-      if(!u || !m) return alert("Please provide a name and message.");
-      
+      const u = document.getElementById('user').value, m = document.getElementById('msg').value, f = document.getElementById('file').files[0], btn = document.getElementById('btn');
+      if(!u || !m) return alert("Fill in info.");
       btn.disabled = true;
       document.getElementById('loader').classList.remove('hidden');
-
       const reader = new FileReader();
       reader.onload = async (e) => {
-        const payload = {
-          username: u,
-          message: m,
-          image: f ? e.target.result : ""
-        };
-        
         try {
-          await fetch(SCRIPT_URL, {
-            method: 'POST',
-            body: JSON.stringify(payload)
-          });
-          document.getElementById('msg').value = "";
-          document.getElementById('file').value = "";
-          load();
-        } catch (err) {
-          alert("Error posting. Check your script deployment.");
-        } finally {
-          btn.disabled = false;
-        }
+          await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({username:u, message:m, image: f?e.target.result:""}) });
+          document.getElementById('msg').value = ""; load();
+        } catch (err) { alert("Error posting."); }
+        btn.disabled = false;
       };
-
-      if(f) {
-        reader.readAsDataURL(f); 
-      } else {
-        reader.onload(); 
-      }
+      if(f) reader.readAsDataURL(f); else reader.onload();
     }
-    
     window.onload = load;
   </script>
 </body>
 </html>
-    
