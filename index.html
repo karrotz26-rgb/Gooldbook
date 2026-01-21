@@ -106,7 +106,250 @@
 </div>
 
 <script>
+    const SCRIPT_URL = "<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Gooldbook</title>
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <script>
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(async function(OneSignal) {
+        await OneSignal.init({
+          appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064",
+          safari_web_id: "web.onesignal.auto.35c3b21f-3634-4ed2-bd52-fd09e2637415",
+          notifyButton: { enable: true },
+        });
+      });
+    </script>
+    <style>
+        body { background-color: #e9ebee; color: #1c1e21; font-family: Helvetica, Arial, sans-serif; margin: 0; padding-bottom: 50px; scroll-behavior: smooth; }
+        .nav { background-color: #3b5998; color: white; padding: 12px; text-align: center; font-weight: bold; font-size: 22px; position: sticky; top: 0; z-index: 2000; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        
+        .container { max-width: 850px; margin: 20px auto; display: flex; gap: 20px; padding: 0 10px; align-items: flex-start; }
+
+        .sidebar { 
+            width: 250px; position: sticky; top: 70px; 
+            max-height: calc(100vh - 90px); overflow-y: auto; padding-right: 5px;
+        }
+        .sidebar::-webkit-scrollbar { width: 5px; }
+        .sidebar::-webkit-scrollbar-thumb { background: #ccd0d5; border-radius: 10px; }
+
+        .main-feed { flex-grow: 1; max-width: 500px; min-width: 300px; }
+
+        /* STICKY & TRANSPARENT COMPOSER */
+        .sticky-composer {
+            position: sticky; top: 70px; z-index: 1000;
+            background: #e9ebee; padding-bottom: 10px;
+            opacity: 0.7; transform: scale(0.98); transition: all 0.3s ease;
+        }
+        .sticky-composer:hover, .sticky-composer:focus-within { opacity: 1; transform: scale(1); }
+
+        .card { background: white; border: 1px solid #dddfe2; border-radius: 3px; padding: 12px; margin-bottom: 15px; }
+        .sidebar-card { background: white; border: 1px solid #dddfe2; border-radius: 3px; padding: 12px; font-size: 13px; margin-bottom: 15px; }
+        .sidebar-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #dddfe2; margin-bottom: 10px; padding-bottom: 5px; }
+        .sidebar-title { font-weight: bold; color: #4b4f56; margin: 0; }
+        
+        .refresh-btn { background: #f5f6f7; border: 1px solid #ccd0d5; border-radius: 2px; padding: 2px 6px; cursor: pointer; font-size: 11px; font-weight: bold; color: #4b4f56; }
+        .trending-item { margin-bottom: 10px; border-bottom: 1px dotted #e9ebee; padding-bottom: 5px; cursor: pointer; display: block; }
+        .trending-item:hover { background: #f5f6f7; }
+        .trending-item b { color: #365899; }
+
+        input, textarea { width: 100%; border: 1px solid #dddfe2; padding: 8px; margin-bottom: 8px; border-radius: 3px; box-sizing: border-box; font-size: 13px; }
+        .btn { background-color: #4267b2; color: white; border: none; padding: 8px 16px; font-weight: bold; cursor: pointer; border-radius: 2px; }
+        
+        .post-user { color: #365899; font-weight: bold; font-size: 14px; }
+        .post-date { color: #90949c; font-size: 11px; margin-bottom: 8px; }
+        .post-img { width: calc(100% + 24px); margin: 10px -12px; display: block; max-height: 450px; object-fit: cover; }
+        .action-bar { border-top: 1px solid #e9ebee; padding-top: 8px; margin-top: 10px; font-size: 13px; font-weight: bold; }
+        
+        .load-more-btn { background: white; border: 1px solid #ccd0d5; color: #4b4f56; width: 100%; padding: 10px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .comment-box { background: #f2f3f5; border-radius: 8px; padding: 8px 12px; margin-top: 5px; font-size: 12px; }
+        
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3b5998; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .hidden { display: none; }
+        
+        @media (max-width: 600px) { .container { flex-direction: column; } .sidebar { width: 100%; position: static; max-height: none; } .sticky-composer { position: static; opacity: 1; transform: none; } }
+    </style>
+</head>
+<body>
+
+<div class="nav">theGooldbook</div>
+
+<div class="container">
+    <div class="sidebar">
+        <div class="sidebar-card">
+            <div class="sidebar-header">
+                <p class="sidebar-title">👍 Top Liked</p>
+                <button class="refresh-btn" onclick="manualRefresh()">🔄</button>
+            </div>
+            <div id="trending-list">Loading...</div>
+        </div>
+        <div class="sidebar-card">
+            <div class="sidebar-header">
+                <p class="sidebar-title">💬 Most Discussed</p>
+            </div>
+            <div id="commented-list">Loading...</div>
+        </div>
+    </div>
+
+    <div class="main-feed">
+        <div class="sticky-composer">
+            <div class="card" style="margin-bottom: 0;">
+                <input type="text" id="user" placeholder="Your Name">
+                <textarea id="msg" placeholder="What's on your mind?" rows="2"></textarea>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <input type="file" id="file" accept="image/*" style="font-size: 10px; border: none; width: auto;">
+                    <button id="postBtn" class="btn" onclick="upload()">Post</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="loader" class="spinner"></div>
+        <div id="feed" style="margin-top: 15px;"></div>
+        <button id="loadMoreBtn" class="load-more-btn hidden" onclick="renderMore()">Load More Posts...</button>
+    </div>
+</div>
+
+<script>
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzKaUraRNwllkK3aQY5hKnpWv3ir0BpBDoEwo46oIqwYvAWCWTZsED3jgf4orLc4DW3/exec";
+    
+    let allPosts = [];
+    let displayedCount = 0;
+    const PAGE_SIZE = 10;
+
+    window.onload = () => {
+        const savedName = localStorage.getItem('gb_user');
+        if (savedName) document.getElementById('user').value = savedName;
+        loadWithRetry(3);
+    };
+
+    document.getElementById('user').addEventListener('input', (e) => {
+        localStorage.setItem('gb_user', e.target.value);
+    });
+
+    async function manualRefresh() {
+        allPosts = [];
+        displayedCount = 0;
+        document.getElementById('feed').innerHTML = "";
+        loadWithRetry(3);
+    }
+
+    async function loadWithRetry(retries) {
+        const loader = document.getElementById('loader');
+        loader.classList.remove('hidden');
+
+        for (let i = 0; i < retries; i++) {
+            try {
+                const response = await fetch(SCRIPT_URL);
+                if (!response.ok) throw new Error();
+                allPosts = await response.json();
+                
+                renderSidebars();
+                renderMore(true);
+                
+                loader.classList.add('hidden');
+                return;
+            } catch (err) {
+                console.log(`Retry ${i+1}...`);
+                if (i === retries - 1) {
+                    document.getElementById('feed').innerHTML = "<div class='card'>Connection timed out. Please refresh manually.</div>";
+                    loader.classList.add('hidden');
+                }
+                await new Promise(r => setTimeout(r, 2000));
+            }
+        }
+    }
+
+    function renderMore(isFirstLoad = false) {
+        const feed = document.getElementById('feed');
+        const loadMoreBtn = document.getElementById('loadMoreBtn');
+        const currentUser = document.getElementById('user').value.trim();
+
+        const chunk = allPosts.slice(displayedCount, displayedCount + PAGE_SIZE);
+        const html = chunk.map(p => {
+            const likes = Array.isArray(p.likes) ? p.likes : [];
+            const hasLiked = likes.includes(currentUser);
+            return `
+            <div class="card" id="post-${p.rowIndex}">
+                <div class="post-user">${p.user}</div>
+                <div class="post-date">${p.timestamp ? new Date(p.timestamp).toLocaleString() : ''}</div>
+                <div class="post-msg">${p.message}</div>
+                ${p.image ? `<img src="${p.image}" class="post-img" loading="lazy">` : ''}
+                <div class="action-bar">
+                    <span style="color:#365899; cursor:pointer;" onclick="handleAction('like', ${p.rowIndex})">${hasLiked ? '❤️ Unlike' : '👍 Like'}</span>
+                    <span style="color:#90949c" title="${likes.join(', ')}"> • ${likes.length} likes</span>
+                </div>
+                <div id="comments-${p.rowIndex}">${p.comments.map(c => `<div class="comment-box"><b>${c.user}</b>: ${c.text}</div>`).join('')}</div>
+                <div style="display:flex; gap:5px; margin-top:10px;">
+                    <input type="text" id="reply-${p.rowIndex}" placeholder="Write a comment..." style="margin:0; padding:5px; font-size:12px;">
+                    <button class="btn" style="padding:4px 10px; font-size:11px;" onclick="handleAction('comment', ${p.rowIndex})">Reply</button>
+                </div>
+            </div>`;
+        }).join('');
+
+        if (isFirstLoad) feed.innerHTML = html;
+        else feed.insertAdjacentHTML('beforeend', html);
+
+        displayedCount += PAGE_SIZE;
+        loadMoreBtn.classList.toggle('hidden', displayedCount >= allPosts.length);
+    }
+
+    function renderSidebars() {
+        const trending = [...allPosts].sort((a,b) => (b.likes.length||0)-(a.likes.length||0)).slice(0,5);
+        document.getElementById('trending-list').innerHTML = trending.map(p => `
+            <div class="trending-item" onclick="scrollToPost(${p.rowIndex})"><b>${p.likes.length} Likes</b><br>${p.message.substring(0,35)}...</div>`).join('');
+        
+        const discussed = [...allPosts].sort((a,b) => (b.comments.length||0)-(a.comments.length||0)).slice(0,5);
+        document.getElementById('commented-list').innerHTML = discussed.map(p => `
+            <div class="trending-item" onclick="scrollToPost(${p.rowIndex})"><b>${p.comments.length} Comments</b><br>${p.message.substring(0,35)}...</div>`).join('');
+    }
+
+    function scrollToPost(rowIndex) {
+        const el = document.getElementById(`post-${rowIndex}`);
+        if (el) {
+            window.scrollTo({ top: el.offsetTop - 220, behavior: "smooth" });
+            el.style.backgroundColor = "#fff9c4";
+            setTimeout(() => el.style.backgroundColor = "white", 1000);
+        }
+    }
+
+    async function handleAction(type, rowIndex) {
+        const user = document.getElementById('user').value.trim();
+        if (!user) return alert("Enter your name!");
+        const payload = { action: type, rowIndex: rowIndex, username: user };
+        if (type === 'comment') {
+            const inp = document.getElementById(`reply-${rowIndex}`);
+            if (!inp.value.trim()) return;
+            payload.text = inp.value;
+            inp.value = "";
+        }
+        document.getElementById('loader').classList.remove('hidden');
+        await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+        setTimeout(manualRefresh, 1500);
+    }
+
+    function upload() {
+        const u = document.getElementById('user').value.trim();
+        const m = document.getElementById('msg').value.trim();
+        const f = document.getElementById('file').files[0];
+        if (!u || !m) return alert("Fill in name and message.");
+        document.getElementById('postBtn').disabled = true;
+        document.getElementById('loader').classList.remove('hidden');
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'post', username: u, message: m, image: f ? e.target.result : "" }) });
+            document.getElementById('msg').value = ""; document.getElementById('file').value = "";
+            document.getElementById('postBtn').disabled = false;
+            setTimeout(manualRefresh, 1500);
+        };
+        if (f) reader.readAsDataURL(f); else reader.onload();
+    }
+</script>
+</body>
+</html>";
     
     let allPosts = [];
     let displayedCount = 0;
