@@ -6,15 +6,18 @@
     <title>The Gooldbook</title>
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
     <script>
-      window.OneSignalDeferred = window.OneSignalDeferred || [];
-      OneSignalDeferred.push(async function(OneSignal) {
-        await OneSignal.init({
-          appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064",
-          safari_web_id: "web.onesignal.auto.35c3b21f-3634-4ed2-bd52-fd09e2637415",
-          notifyButton: { enable: true },
-        });
-      });
-    </script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064",
+      safari_web_id: "web.onesignal.auto.35c3b21f-3634-4ed2-bd52-fd09e2637415",
+      notifyButton: { enable: true },
+    });
+    
+    // Add this one line right here:
+    OneSignal.Notifications.requestPermission(); 
+  });
+</script>
     <style>
         body { background-color: #e9ebee; color: #1c1e21; font-family: Helvetica, Arial, sans-serif; margin: 0; padding-bottom: 50px; scroll-behavior: smooth; }
         .nav { background-color: #3b5998; color: white; padding: 12px; text-align: center; font-weight: bold; font-size: 22px; position: sticky; top: 0; z-index: 2000; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
