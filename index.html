@@ -54,6 +54,20 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .hidden { display: none; }
         @media (max-width: 600px) { .container { flex-direction: column; } .sidebar { width: 100%; position: static; max-height: none; } .sticky-composer { position: static; opacity: 1; transform: none; } }
+    .liked-by-list {
+    font-size: 11px;
+    color: #90949c;
+    margin-top: 5px;
+    font-style: italic;
+}
+.like-count {
+    cursor: pointer;
+    text-decoration: none;
+}
+.like-count:hover {
+    text-decoration: underline;
+}
+
     </style>
 </head>
 <body>
@@ -163,25 +177,45 @@
     }
 
     function generatePostHtml(p, currentUser) {
-        const likes = Array.isArray(p.likes) ? p.likes : [];
-        const hasLiked = likes.includes(currentUser);
-        return `
-            <div class="card" id="post-${p.rowIndex}">
-                <div class="post-user">${p.user}</div>
-                <div class="post-date">${p.timestamp ? new Date(p.timestamp).toLocaleString() : ''}</div>
-                <div class="post-msg">${p.message}</div>
-                ${p.image ? `<img src="${p.image}" class="post-img" loading="lazy">` : ''}
-                <div class="action-bar">
-                    <span style="color:#365899; cursor:pointer;" onclick="handleAction('like', ${p.rowIndex})">${hasLiked ? '❤️ Unlike' : '👍 Like'}</span>
-                    <span style="color:#90949c" title="${likes.join(', ')}"> • ${likes.length} likes</span>
-                </div>
-                <div id="comments-${p.rowIndex}">${p.comments.map(c => `<div class="comment-box"><b>${c.user}</b>: ${c.text}</div>`).join('')}</div>
-                <div style="display:flex; gap:5px; margin-top:10px;">
-                    <input type="text" id="reply-${p.rowIndex}" placeholder="Write a comment..." style="margin:0; padding:5px; font-size:12px;">
-                    <button class="btn" style="padding:4px 10px; font-size:11px;" onclick="handleAction('comment', ${p.rowIndex})">Reply</button>
-                </div>
-            </div>`;
+    const likes = Array.isArray(p.likes) ? p.likes : [];
+    const hasLiked = likes.includes(currentUser);
+    
+    // Create the "Liked by" text
+    let likedByText = "";
+    if (likes.length > 0) {
+        if (likes.length === 1) {
+            likedByText = `Liked by ${likes[0]}`;
+        } else if (likes.length === 2) {
+            likedByText = `Liked by ${likes[0]} and ${likes[1]}`;
+        } else {
+            likedByText = `Liked by ${likes[0]} and ${likes.length - 1} others`;
+        }
     }
+
+    return `
+        <div class="card" id="post-${p.rowIndex}">
+            <div class="post-user">${p.user}</div>
+            <div class="post-date">${p.timestamp ? new Date(p.timestamp).toLocaleString() : ''}</div>
+            <div class="post-msg">${p.message}</div>
+            ${p.image ? `<img src="${p.image}" class="post-img" loading="lazy">` : ''}
+            
+            <div class="action-bar">
+                <span style="color:#365899; cursor:pointer;" onclick="handleAction('like', ${p.rowIndex})">
+                    ${hasLiked ? '❤️ Unlike' : '👍 Like'}
+                </span>
+                <span class="like-count" onclick="alert('Liked by: \\n${likes.join('\\n')}')" style="color:#90949c">
+                    • ${likes.length} likes
+                </span>
+                <div class="liked-by-list">${likedByText}</div>
+            </div>
+
+            <div id="comments-${p.rowIndex}">${p.comments.map(c => `<div class="comment-box"><b>${c.user}</b>: ${c.text}</div>`).join('')}</div>
+            <div style="display:flex; gap:5px; margin-top:10px;">
+                <input type="text" id="reply-${p.rowIndex}" placeholder="Write a comment..." style="margin:0; padding:5px; font-size:12px;">
+                <button class="btn" style="padding:4px 10px; font-size:11px;" onclick="handleAction('comment', ${p.rowIndex})">Reply</button>
+            </div>
+        </div>`;
+}
 
     function renderMore(isFirstLoad = false) {
         const feed = document.getElementById('feed');
