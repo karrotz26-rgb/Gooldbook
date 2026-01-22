@@ -23,14 +23,22 @@
         .sidebar::-webkit-scrollbar { width: 5px; }
         .sidebar::-webkit-scrollbar-thumb { background: #ccd0d5; border-radius: 10px; }
         .main-feed { flex-grow: 1; max-width: 500px; min-width: 300px; }
+        
         .sticky-composer { position: sticky; top: 70px; z-index: 1000; background: #e9ebee; padding-bottom: 10px; opacity: 0.8; transform: scale(0.98); transition: all 0.3s ease; }
         .sticky-composer:hover, .sticky-composer:focus-within { opacity: 1; transform: scale(1); }
+
         .card { background: white; border: 1px solid #dddfe2; border-radius: 3px; padding: 12px; margin-bottom: 15px; }
         .sidebar-card { background: white; border: 1px solid #dddfe2; border-radius: 3px; padding: 12px; font-size: 13px; margin-bottom: 15px; }
         .sidebar-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #dddfe2; margin-bottom: 10px; padding-bottom: 5px; font-weight: bold; color: #4b4f56; }
-        .refresh-btn { background: #f5f6f7; border: 1px solid #ccd0d5; border-radius: 2px; padding: 2px 6px; cursor: pointer; font-size: 11px; }
+        
+        /* Utility Bar for Refresh button */
+        .utility-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid #e9ebee; }
+        .refresh-btn { background: #f5f6f7; border: 1px solid #ccd0d5; border-radius: 2px; padding: 4px 10px; cursor: pointer; font-size: 12px; font-weight: bold; color: #4b4f56; }
+        .refresh-btn:hover { background: #ebedf0; }
+
         .trending-item { margin-bottom: 10px; border-bottom: 1px dotted #e9ebee; padding-bottom: 5px; cursor: pointer; display: block; font-size: 12px; }
         .trending-item:hover { background: #f5f6f7; }
+
         input, textarea { width: 100%; border: 1px solid #dddfe2; padding: 8px; margin-bottom: 8px; border-radius: 3px; box-sizing: border-box; font-size: 13px; }
         .btn { background-color: #4267b2; color: white; border: none; padding: 8px 16px; font-weight: bold; cursor: pointer; border-radius: 2px; }
         .post-user { color: #365899; font-weight: bold; font-size: 14px; }
@@ -56,10 +64,7 @@
             <input type="text" id="searchBar" placeholder="Search posts..." oninput="handleSearch()">
         </div>
         <div class="sidebar-card">
-            <div class="sidebar-header">
-                <span>👍 Top Liked</span>
-                <button class="refresh-btn" onclick="manualRefresh()">🔄</button>
-            </div>
+            <div class="sidebar-header">👍 Top Liked</div>
             <div id="trending-list"></div>
         </div>
         <div class="sidebar-card">
@@ -77,6 +82,10 @@
                     <input type="file" id="file" accept="image/*" style="font-size: 10px; border: none; width: auto;">
                     <button id="postBtn" class="btn" onclick="upload()">Post</button>
                 </div>
+                <div class="utility-bar">
+                    <button class="refresh-btn" onclick="manualRefresh()">🔄 Refresh Feed</button>
+                    <span id="sync-time" style="font-size: 10px; color: #90949c;"></span>
+                </div>
             </div>
         </div>
         <div id="loader" class="spinner"></div>
@@ -86,7 +95,7 @@
 </div>
 
 <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyWFfUUsMDwJ9ai2GjeprQPR3sBq5mpfL6Tn4FB7ZrvmTz6LGb0bMmLHdIWWchnTH-o/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzWFfUUsMDwJ9ai2GjeprQPR3sBq5mpfL6Tn4FB7ZrvmTz6LGb0bMmLHdIWWchnTH-o/exec";
     const CACHE_KEY = "gooldbook_cache";
     
     let allPosts = [];
@@ -96,11 +105,7 @@
     window.onload = () => {
         const savedName = localStorage.getItem('gb_user');
         if (savedName) document.getElementById('user').value = savedName;
-        
-        // 1. Load from Cache immediately
         loadFromCache();
-        
-        // 2. Refresh from Google in background
         loadWithRetry(3);
     };
 
@@ -111,7 +116,8 @@
     function saveToCache() {
         try {
             localStorage.setItem(CACHE_KEY, JSON.stringify(allPosts));
-        } catch(e) { console.warn("Cache full or unavailable"); }
+            document.getElementById('sync-time').innerText = "Last Sync: " + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        } catch(e) { console.warn("Cache full"); }
     }
 
     function loadFromCache() {
@@ -139,11 +145,9 @@
                 const response = await fetch(SCRIPT_URL);
                 if (!response.ok) throw new Error();
                 allPosts = await response.json();
-                
                 saveToCache();
                 renderSidebars();
                 renderMore(true);
-                
                 loader.classList.add('hidden');
                 return;
             } catch (err) {
