@@ -5,14 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Gooldbook</title>
     <style>
-        body { background-color: #e9ebee; font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        body { background-color: #e9ebee; font-family: Arial, sans-serif; margin: 0; padding-bottom: 50px; }
         .nav { background: #3b5998; color: white; padding: 15px; text-align: center; font-weight: bold; position: sticky; top: 0; z-index: 100; }
-        .container { max-width: 500px; margin: auto; }
-        .card { background: white; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px; }
+        
+        /* Desktop Layout */
+        .container { max-width: 900px; margin: auto; display: flex; gap: 20px; padding: 10px; align-items: flex-start; }
+        .sidebar { width: 280px; position: sticky; top: 70px; }
+        .main-feed { flex-grow: 1; max-width: 550px; }
+
+        .card { background: white; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px; position: relative; }
+        .sidebar-card { background: white; border: 1px solid #ddd; padding: 12px; margin-bottom: 10px; border-radius: 4px; font-size: 13px; }
+        
         .user { color: #365899; font-weight: bold; }
         .post-img { width: 100%; margin-top: 10px; border-radius: 4px; }
-        .btn { background: #4267b2; color: white; border: none; padding: 10px; cursor: pointer; width: 100%; font-weight: bold; }
-        #loader { text-align: center; padding: 20px; color: #666; }
+        .btn { background: #4267b2; color: white; border: none; padding: 8px 12px; cursor: pointer; font-weight: bold; border-radius: 2px; }
+        
+        .sync-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; float: right; }
+        .dot-green { background: #4caf50; }
+        .dot-yellow { background: #ffc107; }
+        
+        .comment-box { background: #f2f3f5; border-radius: 8px; padding: 8px; margin-top: 5px; font-size: 13px; }
+        .trending-item { margin-bottom: 8px; cursor: pointer; color: #365899; display: block; text-decoration: none; border-bottom: 1px solid #f0f0f0; padding-bottom: 4px; }
+        .trending-item:hover { text-decoration: underline; }
+
+        input, textarea { width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+
+        /* Mobile Layout */
+        @media (max-width: 700px) {
+            .container { flex-direction: column; align-items: stretch; }
+            .sidebar { width: 100%; position: static; }
+        }
     </style>
 </head>
 <body>
@@ -20,72 +42,150 @@
 <div class="nav">theGooldbook</div>
 
 <div class="container">
-    <div class="card">
-        <input type="text" id="user" placeholder="Your Name" style="width:95%; padding:8px; margin-bottom:10px;">
-        <textarea id="msg" placeholder="What's on your mind?" style="width:95%; padding:8px; margin-bottom:10px;"></textarea>
-        <button class="btn" onclick="upload()">Post</button>
+    <div class="sidebar">
+        <div class="sidebar-card">
+            <b style="display:block; margin-bottom:8px;">🔍 Search Posts</b>
+            <input type="text" id="searchBar" placeholder="Filter by keyword..." oninput="render()">
+        </div>
+        <div class="sidebar-card">
+            <b style="display:block; margin-bottom:8px;">🔥 Most Liked</b>
+            <div id="top-liked"></div>
+        </div>
+        <div class="sidebar-card">
+            <b style="display:block; margin-bottom:8px;">💬 Most Discussed</b>
+            <div id="top-commented"></div>
+        </div>
     </div>
 
-    <div id="loader">Checking for posts...</div>
-    <div id="feed"></div>
+    <div class="main-feed">
+        <div class="card">
+            <input type="text" id="user" placeholder="Your Name">
+            <textarea id="msg" placeholder="What's on your mind?" rows="2"></textarea>
+            <button class="btn" style="width:100%" onclick="upload()">Post</button>
+            <button onclick="loadFeed()" style="width:100%; margin-top:10px; background:none; border:none; color:#666; cursor:pointer; font-size:12px;">🔄 Force Refresh Feed</button>
+        </div>
+
+        <div id="feed">Loading posts...</div>
+    </div>
 </div>
 
 <script>
-    // --- STEP 1: PASTE YOUR NEW URL HERE ---
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbya9m4KXIg2m73ryT3dEEEauRra5HskeL96siTWCCqHL9QuKclVx1Cug-JHvp8Ir_f3/exec";
+    let allPosts = [];
 
     async function loadFeed() {
-        const loader = document.getElementById('loader');
-        const feed = document.getElementById('feed');
         try {
             const res = await fetch(SCRIPT_URL);
-            const posts = await res.json();
-            
-            loader.style.display = 'none';
-            if (posts.length === 0) {
-                feed.innerHTML = "No posts found yet.";
-                return;
-            }
+            allPosts = await res.json();
+            render();
+        } catch (e) { console.error(e); }
+    }
 
-            feed.innerHTML = posts.map(p => `
-                <div class="card">
-                    <div class="user">${p.user}</div>
-                    <div style="font-size:12px; color:#999;">${new Date(p.timestamp).toLocaleString()}</div>
+    function render() {
+        const currentUser = document.getElementById('user').value.trim();
+        const searchQuery = document.getElementById('searchBar').value.toLowerCase();
+        const feed = document.getElementById('feed');
+        
+        // Filter posts based on search
+        const filteredPosts = allPosts.filter(p => 
+            p.message.toLowerCase().includes(searchQuery) || 
+            p.user.toLowerCase().includes(searchQuery)
+        );
+
+        // Update Feed
+        feed.innerHTML = filteredPosts.map(p => {
+            const likes = p.likes || [];
+            const comments = p.comments || [];
+            const isMod = currentUser.toLowerCase() === 'admin';
+
+            return `
+                <div class="card" id="post-${p.rowIndex}">
+                    <span class="user">${p.user}</span>
+                    <div class="sync-dot dot-green"></div>
                     <p>${p.message}</p>
                     ${p.image ? `<img src="${p.image}" class="post-img">` : ''}
+                    
+                    <div style="border-top:1px solid #eee; padding-top:10px; margin-top:10px;">
+                        <button onclick="handleAction('like', ${p.rowIndex})" style="background:none; border:none; color:#365899; font-weight:bold; cursor:pointer;">
+                            👍 Like (${likes.length})
+                        </button>
+                        ${isMod ? `<button onclick="handleAction('delete', ${p.rowIndex})" style="color:red; background:none; border:none; cursor:pointer; margin-left:10px;">🗑️ Delete</button>` : ''}
+                    </div>
+
+                    <div id="comments-${p.rowIndex}">
+                        ${comments.map(c => `<div class="comment-box"><b>${c.user}</b>: ${c.text}</div>`).join('')}
+                    </div>
+
+                    <div style="display:flex; margin-top:10px; gap:5px;">
+                        <input type="text" id="reply-${p.rowIndex}" placeholder="Write a comment..." style="margin:0; font-size:12px;">
+                        <button class="btn" style="padding:4px 10px; font-size:12px;" onclick="handleAction('comment', ${p.rowIndex})">Reply</button>
+                    </div>
                 </div>
-            `).join('');
-        } catch (e) {
-            loader.innerHTML = "Error loading feed. Check your Script URL.";
-            console.error(e);
+            `;
+        }).join('');
+
+        updateSidebars();
+    }
+
+    function updateSidebars() {
+        // Top Liked
+        const liked = [...allPosts].sort((a,b) => (b.likes.length || 0) - (a.likes.length || 0)).slice(0, 5);
+        document.getElementById('top-liked').innerHTML = liked.map(p => `
+            <a class="trending-item" onclick="scrollToPost(${p.rowIndex})">
+                <b>${p.likes.length} Likes</b>: ${p.message.substring(0,25)}...
+            </a>`).join('');
+
+        // Top Commented
+        const commented = [...allPosts].sort((a,b) => (b.comments.length || 0) - (a.comments.length || 0)).slice(0, 5);
+        document.getElementById('top-commented').innerHTML = commented.map(p => `
+            <a class="trending-item" onclick="scrollToPost(${p.rowIndex})">
+                <b>${p.comments.length} Comments</b>: ${p.message.substring(0,25)}...
+            </a>`).join('');
+    }
+
+    function scrollToPost(rowIndex) {
+        const el = document.getElementById(`post-${rowIndex}`);
+        if (el) window.scrollTo({ top: el.offsetTop - 80, behavior: 'smooth' });
+    }
+
+    async function handleAction(action, rowIndex) {
+        const user = document.getElementById('user').value.trim();
+        if (!user) return alert("Enter your name first!");
+
+        const dot = document.querySelector(`#post-${rowIndex} .sync-dot`);
+        if (dot) dot.className = "sync-status dot-yellow";
+
+        let payload = { action, rowIndex, username: user };
+
+        if (action === 'comment') {
+            const inp = document.getElementById(`reply-${rowIndex}`);
+            if (!inp.value.trim()) return;
+            payload.text = inp.value;
+            inp.value = "";
         }
+
+        try {
+            await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+            setTimeout(loadFeed, 1000);
+        } catch (e) { alert("Error saving."); }
     }
 
     async function upload() {
-        const u = document.getElementById('user').value;
-        const m = document.getElementById('msg').value;
-        if (!u || !m) return alert("Fill everything!");
+        const u = document.getElementById('user').value.trim();
+        const m = document.getElementById('msg').value.trim();
+        if (!u || !m) return alert("Fill in name and message.");
 
-        const payload = { action: 'post', username: u, message: m };
-        
-        // Show loading state
-        document.getElementById('feed').innerHTML = "Saving post...";
-        
-        await fetch(SCRIPT_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            body: JSON.stringify(payload)
-        });
-
-        // Wait 2 seconds for Google to process, then reload
-        setTimeout(() => {
-            document.getElementById('msg').value = "";
-            loadFeed();
-        }, 2000);
+        await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'post', username: u, message: m }) });
+        document.getElementById('msg').value = "";
+        setTimeout(loadFeed, 1500);
     }
 
-    // Run on start
-    loadFeed();
+    document.getElementById('user').oninput = (e) => localStorage.setItem('gb_user', e.target.value);
+    window.onload = () => {
+        document.getElementById('user').value = localStorage.getItem('gb_user') || "";
+        loadFeed();
+    };
 </script>
+
 </body>
 </html>
