@@ -112,7 +112,7 @@
 </div>
 
 <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzkl63dddV1qOf7G3bmbIt8Zbm1CezjlLmazcndbWGMHvQgqNV85mkxzEAxaZikwCoZ/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzxKAgpueqRISx7SkW53rjWP0UUShZoHi1PgezLGx1GOeeOQxDnlpHaqze5XBmaVufB/exec";
     const CACHE_KEY = "gooldbook_cache";
     
     let allPosts = [];
@@ -241,26 +241,46 @@
     }
 
     async function handleAction(type, rowIndex) {
-        const user = document.getElementById('user').value.trim();
-        if (!user) return alert("Enter your name!");
-        
-        const postIdx = allPosts.findIndex(p => p.rowIndex === rowIndex);
-        if (postIdx > -1) {
-            if (type === 'like') {
-                const likes = allPosts[postIdx].likes;
-                const uIdx = likes.indexOf(user);
-                if (uIdx === -1) likes.push(user); else likes.splice(uIdx, 1);
-            } else if (type === 'comment') {
-                const inp = document.getElementById(`reply-${rowIndex}`);
-                if (!inp.value.trim()) return;
-                allPosts[postIdx].comments.push({ user: user, text: inp.value });
-            }
-            saveToCache();
-            const currentScroll = window.scrollY;
-            renderSidebars();
-            renderMore(true);
-            window.scrollTo(0, currentScroll);
+    const user = document.getElementById('user').value.trim();
+    if (!user) return alert("Enter your name!");
+    
+    const postIdx = allPosts.findIndex(p => p.rowIndex === rowIndex);
+    if (postIdx > -1) {
+        if (type === 'like') {
+            const likes = allPosts[postIdx].likes;
+            const uIdx = likes.indexOf(user);
+            if (uIdx === -1) likes.push(user); else likes.splice(uIdx, 1);
+        } else if (type === 'comment') {
+            const inp = document.getElementById(`reply-${rowIndex}`);
+            if (!inp.value.trim()) return;
+            // Push to local memory immediately
+            allPosts[postIdx].comments.push({ user: user, text: inp.value });
         }
+        saveToCache();
+        renderMore(true); 
+    }
+
+    const payload = { action: type, rowIndex: rowIndex, username: user };
+    if (type === 'comment') {
+        const inp = document.getElementById(`reply-${rowIndex}`);
+        payload.text = inp.value;
+        inp.value = ""; // Clear input after saving to payload
+    }
+
+    // Background Sync with a longer timeout
+    try {
+        const response = await fetch(SCRIPT_URL, { 
+            method: 'POST', 
+            mode: 'no-cors', 
+            body: JSON.stringify(payload) 
+        });
+        console.log("Sync successful");
+    } catch (e) {
+        console.error("Sync failed", e);
+        // If it fails, we notify the user so they know it didn't save permanently
+        alert("Connection lost. Your comment may not have saved to the server.");
+    }
+}
 
         const payload = { action: type, rowIndex: rowIndex, username: user };
         if (type === 'comment') {
