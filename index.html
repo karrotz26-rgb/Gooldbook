@@ -4,174 +4,88 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Gooldbook</title>
-    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-    <script>
-      window.OneSignalDeferred = window.OneSignalDeferred || [];
-      OneSignalDeferred.push(async function(OneSignal) {
-        await OneSignal.init({
-          appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064",
-          safari_web_id: "web.onesignal.auto.35c3b21f-3634-4ed2-bd52-fd09e2637415",
-          notifyButton: { enable: true },
-        });
-      });
-    </script>
     <style>
-        body { background-color: #e9ebee; color: #1c1e21; font-family: Helvetica, Arial, sans-serif; margin: 0; padding-bottom: 50px; }
-        .nav { background-color: #3b5998; color: white; padding: 12px; text-align: center; font-weight: bold; font-size: 22px; position: sticky; top: 0; z-index: 2000; }
-        .container { max-width: 500px; margin: 20px auto; padding: 0 10px; }
-        .card { background: white; border: 1px solid #dddfe2; border-radius: 3px; padding: 12px; margin-bottom: 15px; position: relative; }
-        .sync-status { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-        .status-pending { background-color: #ffc107; }
-        .status-success { background-color: #4caf50; }
-        .status-error { background-color: #f44336; }
-        input, textarea { width: 100%; border: 1px solid #dddfe2; padding: 8px; margin-bottom: 8px; border-radius: 3px; box-sizing: border-box; }
-        .btn { background-color: #4267b2; color: white; border: none; padding: 8px 16px; font-weight: bold; cursor: pointer; border-radius: 2px; }
-        .post-user { color: #365899; font-weight: bold; }
-        .post-img { width: calc(100% + 24px); margin: 10px -12px; display: block; max-height: 450px; object-fit: cover; }
-        .comment-box { background: #f2f3f5; border-radius: 8px; padding: 8px 12px; margin-top: 5px; font-size: 12px; }
+        body { background-color: #e9ebee; font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        .nav { background: #3b5998; color: white; padding: 15px; text-align: center; font-weight: bold; position: sticky; top: 0; z-index: 100; }
+        .container { max-width: 500px; margin: auto; }
+        .card { background: white; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px; }
+        .user { color: #365899; font-weight: bold; }
+        .post-img { width: 100%; margin-top: 10px; border-radius: 4px; }
+        .btn { background: #4267b2; color: white; border: none; padding: 10px; cursor: pointer; width: 100%; font-weight: bold; }
+        #loader { text-align: center; padding: 20px; color: #666; }
     </style>
 </head>
 <body>
 
 <div class="nav">theGooldbook</div>
+
 <div class="container">
     <div class="card">
-        <input type="text" id="user" placeholder="Your Name">
-        <textarea id="msg" placeholder="What's on your mind?" rows="2"></textarea>
-        <div style="display: flex; justify-content: space-between;">
-            <input type="file" id="file" accept="image/*" style="width: auto; border:none; font-size:10px;">
-            <button class="btn" onclick="upload()">Post</button>
-        </div>
-        <button class="btn" style="width:100%; margin-top:10px; background:#f5f6f7; color:#4b4f56; border:1px solid #ddd;" onclick="manualRefresh()">🔄 Refresh Feed</button>
+        <input type="text" id="user" placeholder="Your Name" style="width:95%; padding:8px; margin-bottom:10px;">
+        <textarea id="msg" placeholder="What's on your mind?" style="width:95%; padding:8px; margin-bottom:10px;"></textarea>
+        <button class="btn" onclick="upload()">Post</button>
     </div>
 
+    <div id="loader">Checking for posts...</div>
     <div id="feed"></div>
 </div>
 
 <script>
+    // --- STEP 1: PASTE YOUR NEW URL HERE ---
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbya9m4KXIg2m73ryT3dEEEauRra5HskeL96siTWCCqHL9QuKclVx1Cug-JHvp8Ir_f3/exec";
-    const CACHE_KEY = "gooldbook_cache";
-    let allPosts = [];
 
-    window.onload = () => {
-        const saved = localStorage.getItem('gb_user');
-        if (saved) document.getElementById('user').value = saved;
-        loadFromCache();
-        manualRefresh();
-    };
-
-    function loadFromCache() {
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached) {
-            allPosts = JSON.parse(cached);
-            renderFeed();
-        }
-    }
-
-    async function manualRefresh() {
+    async function loadFeed() {
+        const loader = document.getElementById('loader');
+        const feed = document.getElementById('feed');
         try {
             const res = await fetch(SCRIPT_URL);
-            allPosts = await res.json();
-            localStorage.setItem(CACHE_KEY, JSON.stringify(allPosts));
-            renderFeed();
-        } catch (e) { console.error("Fetch failed", e); }
-    }
-
-    function renderFeed() {
-        const feed = document.getElementById('feed');
-        const user = document.getElementById('user').value.trim();
-        feed.innerHTML = allPosts.map(p => generatePostHtml(p, user)).join('');
-    }
-
-    function generatePostHtml(p, currentUser) {
-        const likes = p.likes || [];
-        const comments = p.comments || [];
-        const isMod = currentUser.toLowerCase() === 'admin'; // <--- Change 'admin' to your secret name
-
-        return `
-            <div class="card" id="post-${p.rowIndex}">
-                <div style="display:flex; justify-content:space-between;">
-                    <span class="post-user">${p.user}</span>
-                    <div>
-                        ${isMod ? `<span style="color:red; cursor:pointer; margin-right:10px;" onclick="handleAction('delete', ${p.rowIndex})">🗑️ Delete</span>` : ''}
-                        <div id="status-${p.rowIndex}" class="sync-status status-success"></div>
-                    </div>
-                </div>
-                <div style="font-size:11px; color:#90949c;">${p.timestamp ? new Date(p.timestamp).toLocaleString() : ''}</div>
-                <div style="margin:10px 0;">${p.message}</div>
-                ${p.image ? `<img src="${p.image}" class="post-img">` : ''}
-                
-                <div style="border-top:1px solid #eee; padding-top:8px; font-size:13px; font-weight:bold;">
-                    <span style="cursor:pointer; color:#365899;" onclick="handleAction('like', ${p.rowIndex})">👍 Like (${likes.length})</span>
-                </div>
-
-                <div id="comments-${p.rowIndex}">
-                    ${comments.map(c => `<div class="comment-box"><b>${c.user}</b>: ${c.text}</div>`).join('')}
-                </div>
-
-                <div style="display:flex; gap:5px; margin-top:10px;">
-                    <input type="text" id="reply-${p.rowIndex}" placeholder="Comment..." style="margin:0; padding:5px; font-size:12px;">
-                    <button class="btn" style="padding:4px 10px; font-size:11px;" onclick="handleAction('comment', ${p.rowIndex})">Reply</button>
-                </div>
-            </div>`;
-    }
-
-    async function handleAction(type, rowIndex) {
-        const user = document.getElementById('user').value.trim();
-        if (!user) return alert("Name required!");
-
-        if (type === 'delete' && !confirm("Delete this post?")) return;
-
-        const dot = document.getElementById(`status-${rowIndex}`);
-        if (dot) dot.className = "sync-status status-pending";
-
-        const payload = { action: type, rowIndex: rowIndex, username: user };
-        const post = allPosts.find(p => p.rowIndex === rowIndex);
-
-        if (type === 'like') {
-            const idx = post.likes.indexOf(user);
-            if (idx === -1) post.likes.push(user); else post.likes.splice(idx, 1);
-        } else if (type === 'comment') {
-            const inp = document.getElementById(`reply-${rowIndex}`);
-            if (!inp.value.trim()) return;
-            payload.text = inp.value;
-            post.comments.push({ user: user, text: inp.value });
-            inp.value = "";
-        } else if (type === 'delete') {
-            allPosts = allPosts.filter(p => p.rowIndex !== rowIndex);
-        }
-
-        renderFeed();
-
-        try {
-            await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
-            if (type !== 'delete') {
-                document.getElementById(`status-${rowIndex}`).className = "sync-status status-success";
+            const posts = await res.json();
+            
+            loader.style.display = 'none';
+            if (posts.length === 0) {
+                feed.innerHTML = "No posts found yet.";
+                return;
             }
+
+            feed.innerHTML = posts.map(p => `
+                <div class="card">
+                    <div class="user">${p.user}</div>
+                    <div style="font-size:12px; color:#999;">${new Date(p.timestamp).toLocaleString()}</div>
+                    <p>${p.message}</p>
+                    ${p.image ? `<img src="${p.image}" class="post-img">` : ''}
+                </div>
+            `).join('');
         } catch (e) {
-            if (document.getElementById(`status-${rowIndex}`)) {
-                document.getElementById(`status-${rowIndex}`).className = "sync-status status-error";
-            }
+            loader.innerHTML = "Error loading feed. Check your Script URL.";
+            console.error(e);
         }
     }
 
-    function upload() {
-        const u = document.getElementById('user').value.trim();
-        const m = document.getElementById('msg').value.trim();
-        const f = document.getElementById('file').files[0];
-        if (!u || !m) return alert("Name and message required.");
+    async function upload() {
+        const u = document.getElementById('user').value;
+        const m = document.getElementById('msg').value;
+        if (!u || !m) return alert("Fill everything!");
 
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            const img = f ? e.target.result : "";
-            allPosts.unshift({ user: u, message: m, image: img, likes: [], comments: [], timestamp: new Date(), rowIndex: Date.now() });
-            renderFeed();
+        const payload = { action: 'post', username: u, message: m };
+        
+        // Show loading state
+        document.getElementById('feed').innerHTML = "Saving post...";
+        
+        await fetch(SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify(payload)
+        });
+
+        // Wait 2 seconds for Google to process, then reload
+        setTimeout(() => {
             document.getElementById('msg').value = "";
-            await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'post', username: u, message: m, image: img }) });
-            setTimeout(manualRefresh, 4000);
-        };
-        if (f) reader.readAsDataURL(f); else reader.onload();
+            loadFeed();
+        }, 2000);
     }
+
+    // Run on start
+    loadFeed();
 </script>
 </body>
 </html>
