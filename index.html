@@ -33,8 +33,17 @@
         .dot-error { background: #f44336; }
         .liked-by { font-size: 12px; color: #606770; margin-top: 5px; cursor: pointer; }
         .comment-box { background: #f2f3f5; border-radius: 8px; padding: 8px; margin-top: 5px; font-size: 13px; }
-        .trending-item { margin-bottom: 8px; cursor: pointer; color: #365899; display: block; text-decoration: none; border-bottom: 1px solid #f0f0f0; padding-bottom: 4px; }
-        input, textarea { width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+       .trending-item { 
+    margin-bottom: 12px; 
+    cursor: pointer; 
+    color: #365899; 
+    display: block; 
+    text-decoration: none; 
+    border-bottom: 1px solid #f0f0f0; 
+    padding-bottom: 6px; 
+    line-height: 1.4; /* Adds spacing between lines of text */
+    word-wrap: break-word; /* Prevents long words from breaking the sidebar */
+}
         .load-more-btn { background: #fff; color: #4b4f56; border: 1px solid #ddd; width: 100%; padding: 12px; cursor: pointer; border-radius: 4px; font-weight: bold; }
         @media (max-width: 700px) { .container { flex-direction: column; align-items: stretch; } .sidebar { width: 100%; position: static; } }
     </style>
@@ -154,13 +163,24 @@
         updateSidebar();
     }
 
-    function updateSidebar() {
-        const liked = [...allPosts].sort((a,b) => (b.likes.length || 0) - (a.likes.length || 0)).slice(0, 5);
-        document.getElementById('top-liked').innerHTML = liked.map(p => `
+   function updateSidebar() {
+    // Top Liked - Increased substring to 50 characters
+    const liked = [...allPosts].sort((a,b) => (b.likes.length || 0) - (a.likes.length || 0)).slice(0, 5);
+    document.getElementById('top-liked').innerHTML = liked.map(p => `
+        <div class="trending-item" onclick="document.getElementById('post-${p.rowIndex}').scrollIntoView({behavior:'smooth'})">
+            <b>${p.likes.length} 👍</b>: ${p.message.substring(0, 50)}${p.message.length > 50 ? '...' : ''}
+        </div>`).join('');
+
+    // Optional: Add Top Commented back if you have the space
+    const commented = [...allPosts].sort((a,b) => (b.comments.length || 0) - (a.comments.length || 0)).slice(0, 5);
+    const topCommentedContainer = document.getElementById('top-commented'); // Only if you have this ID in your HTML
+    if (topCommentedContainer) {
+        topCommentedContainer.innerHTML = commented.map(p => `
             <div class="trending-item" onclick="document.getElementById('post-${p.rowIndex}').scrollIntoView({behavior:'smooth'})">
-                <b>${p.likes.length} 👍</b>: ${p.message.substring(0,15)}...
+                <b>${p.comments.length} 💬</b>: ${p.message.substring(0, 50)}${p.message.length > 50 ? '...' : ''}
             </div>`).join('');
     }
+}
 
     async function handleAction(action, rowIndex) {
         const user = document.getElementById('user').value.trim();
