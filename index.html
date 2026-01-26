@@ -20,25 +20,24 @@
         body { background-color: #e9ebee; color: #1c1e21; font-family: Helvetica, Arial, sans-serif; margin: 0; padding-bottom: 50px; scroll-behavior: smooth; }
         .nav { background-color: #3b5998; color: white; padding: 12px; text-align: center; font-weight: bold; font-size: 22px; position: sticky; top: 0; z-index: 2000; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         .container { max-width: 850px; margin: 20px auto; display: flex; gap: 20px; padding: 0 10px; align-items: flex-start; }
-        .sidebar { width: 250px; position: sticky; top: 70px; max-height: calc(100vh - 90px); overflow-y: auto; }
+        .sidebar { width: 250px; position: sticky; top: 70px; max-height: calc(100vh - 90px); overflow-y: auto; padding-right: 5px; }
+        .sidebar::-webkit-scrollbar { width: 5px; }
+        .sidebar::-webkit-scrollbar-thumb { background: #ccd0d5; border-radius: 10px; }
         .main-feed { flex-grow: 1; max-width: 500px; min-width: 300px; }
-        .sticky-composer { position: sticky; top: 70px; z-index: 1000; background: #e9ebee; padding-bottom: 10px; }
+        .sticky-composer { position: sticky; top: 70px; z-index: 1000; background: #e9ebee; padding-bottom: 10px; opacity: 0.9; }
         .card { background: white; border: 1px solid #dddfe2; border-radius: 3px; padding: 12px; margin-bottom: 15px; position: relative; }
-        
-        /* Sync Status Dots */
         .sync-status { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
         .status-pending { background-color: #ffc107; animation: pulse 1s infinite; }
         .status-success { background-color: #4caf50; }
         .status-error { background-color: #f44336; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-
-        input, textarea { width: 100%; border: 1px solid #dddfe2; padding: 8px; margin-bottom: 8px; border-radius: 3px; box-sizing: border-box; }
+        input, textarea { width: 100%; border: 1px solid #dddfe2; padding: 8px; margin-bottom: 8px; border-radius: 3px; box-sizing: border-box; font-size: 13px; }
         .btn { background-color: #4267b2; color: white; border: none; padding: 8px 16px; font-weight: bold; cursor: pointer; border-radius: 2px; }
         .post-user { color: #365899; font-weight: bold; font-size: 14px; }
         .post-img { width: calc(100% + 24px); margin: 10px -12px; display: block; max-height: 450px; object-fit: cover; }
         .action-bar { border-top: 1px solid #e9ebee; padding-top: 8px; margin-top: 10px; font-size: 13px; font-weight: bold; }
         .comment-box { background: #f2f3f5; border-radius: 8px; padding: 8px 12px; margin-top: 5px; font-size: 12px; }
-        .refresh-btn { background: #f5f6f7; border: 1px solid #ccd0d5; padding: 5px 10px; cursor: pointer; font-size: 12px; }
+        .refresh-btn { background: #f5f6f7; border: 1px solid #ccd0d5; padding: 5px 10px; cursor: pointer; font-size: 12px; width: 100%; margin-top: 10px; }
         .hidden { display: none; }
         @media (max-width: 600px) { .container { flex-direction: column; } .sidebar { width: 100%; position: static; } }
     </style>
@@ -61,22 +60,19 @@
                 <input type="text" id="user" placeholder="Your Name">
                 <textarea id="msg" placeholder="What's on your mind?" rows="2"></textarea>
                 <div style="display: flex; justify-content: space-between;">
-                    <input type="file" id="file" accept="image/*" style="width: auto; border:none;">
+                    <input type="file" id="file" accept="image/*" style="width: auto; border:none; font-size:10px;">
                     <button class="btn" onclick="upload()">Post</button>
                 </div>
-                <div style="margin-top:10px; border-top:1px solid #eee; padding-top:10px;">
-                    <button class="refresh-btn" onclick="manualRefresh()">🔄 Refresh Feed</button>
-                </div>
+                <button class="refresh-btn" onclick="manualRefresh()">🔄 Refresh Feed</button>
             </div>
         </div>
-        <div id="loader" class="spinner hidden"></div>
         <div id="feed"></div>
         <button id="loadMoreBtn" class="btn hidden" style="width:100%; background:#fff; color:#4b4f56; border:1px solid #ddd;" onclick="renderMore()">Load More...</button>
     </div>
 </div>
 
 <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwqphGjGFCwQ6s9z8QfB5bP-LrK5b7jHEN2VtgiFNUuT4CMO3GexqjKacxPKV2on9CD/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwYi0BmMtkKjZd0DF49zxKu6rB2OrYfPVSOgupv6LYBvjGXOmyjl0uwn4m2-tIwbpBI/exec";
     const CACHE_KEY = "gooldbook_cache";
     let allPosts = [], displayedCount = 0;
 
@@ -142,10 +138,12 @@
         const user = document.getElementById('user').value.trim();
         if (!user) return alert("Name required!");
         
+        const post = allPosts.find(p => p.rowIndex === rowIndex);
+        if (!post) return;
+
         const dot = document.getElementById(`status-${rowIndex}`);
         if (dot) dot.className = "sync-status status-pending";
 
-        const post = allPosts.find(p => p.rowIndex === rowIndex);
         const payload = { action: type, rowIndex: rowIndex, username: user };
 
         if (type === 'like') {
@@ -153,17 +151,30 @@
             if (idx === -1) post.likes.push(user); else post.likes.splice(idx, 1);
         } else {
             const inp = document.getElementById(`reply-${rowIndex}`);
-            if (!inp.value.trim()) return;
-            payload.text = inp.value;
-            post.comments.push({ user: user, text: inp.value });
+            const text = inp.value.trim();
+            if (!text) return;
+            payload.text = text;
+            post.comments.push({ user: user, text: text });
             inp.value = "";
         }
 
-        renderMore(true); 
+        // Target update: only refresh this specific card
+        const postCard = document.getElementById(`post-${rowIndex}`);
+        if (postCard) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = generatePostHtml(post, user);
+            postCard.innerHTML = tempDiv.querySelector('.card').innerHTML;
+            document.getElementById(`status-${rowIndex}`).className = "sync-status status-pending";
+        }
+
         try {
             await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
-            if (dot) dot.className = "sync-status status-success";
-        } catch (e) { if (dot) dot.className = "sync-status status-error"; }
+            const finalDot = document.getElementById(`status-${rowIndex}`);
+            if (finalDot) finalDot.className = "sync-status status-success";
+        } catch (e) { 
+            const finalDot = document.getElementById(`status-${rowIndex}`);
+            if (finalDot) finalDot.className = "sync-status status-error"; 
+        }
     }
 
     function upload() {
@@ -172,7 +183,7 @@
         const reader = new FileReader();
         reader.onload = async (e) => {
             const img = f ? e.target.result : "";
-            allPosts.unshift({ user: u, message: m, image: img, likes: [], comments: [], timestamp: new Date(), rowIndex: Date.now(), isTemp: true });
+            allPosts.unshift({ user: u, message: m, image: img, likes: [], comments: [], timestamp: new Date(), rowIndex: Date.now() });
             renderMore(true);
             await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'post', username: u, message: m, image: img }) });
             setTimeout(manualRefresh, 4000);
@@ -181,8 +192,8 @@
     }
 
     function manualRefresh() { loadWithRetry(3); }
-    function renderSidebars() { /* Similar logic to previous version */ }
-    function handleSearch() { /* Similar logic to previous version */ }
+    function renderSidebars() { /* Logic for top liked/discussed */ }
+    function handleSearch() { /* Logic for keyword filter */ }
 </script>
 </body>
 </html>
