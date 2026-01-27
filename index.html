@@ -4,10 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>The Gooldbook</title>
-   <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon.png">
-
-<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <script>
   window.OneSignalDeferred = window.OneSignalDeferred || [];
   OneSignalDeferred.push(async function(OneSignal) {
@@ -20,8 +17,8 @@
     });
   });
 </script>
-    
     <style>
+        /* Existing CSS remains the same */
         body { background-color: #e9ebee; font-family: Arial, sans-serif; margin: 0; padding-bottom: 50px; overflow-x: hidden; }
         .nav { background: #3b5998; color: white; padding: 15px; text-align: center; font-weight: bold; position: sticky; top: 0; z-index: 1000; }
         #pull-indicator { height: 0; overflow: hidden; background: #dfe3ee; text-align: center; line-height: 50px; font-size: 14px; color: #3b5998; font-weight: bold; transition: height 0.1s ease; }
@@ -40,18 +37,7 @@
         .liked-by { font-size: 12px; color: #606770; margin-top: 5px; cursor: pointer; }
         .comment-box { background: #f2f3f5; border-radius: 8px; padding: 8px; margin-top: 5px; font-size: 13px; }
         .trending-item { margin-bottom: 12px; cursor: pointer; color: #365899; display: block; text-decoration: none; border-bottom: 1px solid #f0f0f0; padding-bottom: 6px; line-height: 1.4; word-wrap: break-word; }
-        
-        /* THE FIXED INPUT CSS */
-        input, textarea { 
-            width: 100%; 
-            padding: 8px; 
-            margin-bottom: 8px; 
-            border: 1px solid #ddd; 
-            border-radius: 4px; 
-            box-sizing: border-box; 
-            display: block; /* This forces vertical stacking */
-        }
-
+        input, textarea { width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; display: block; }
         .load-more-btn { background: #fff; color: #4b4f56; border: 1px solid #ddd; width: 100%; padding: 12px; cursor: pointer; border-radius: 4px; font-weight: bold; }
         @media (max-width: 700px) { .container { flex-direction: column; align-items: stretch; } .sidebar { width: 100%; position: static; } }
     </style>
@@ -74,7 +60,6 @@
         <div class="card">
             <input type="text" id="user" placeholder="Your Name">
             <textarea id="msg" placeholder="What's on your mind?" rows="2"></textarea>
-            
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
                 <input type="file" id="file" accept="image/*" style="width: auto; border:none; margin:0; font-size:12px; display: inline-block;">
                 <button class="btn" onclick="upload()">Post</button>
@@ -88,11 +73,43 @@
 </div>
 
 <script>
-    // ... [REST OF YOUR SCRIPT REMAINS THE SAME] ...
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyHKbiNdzCkhbgLsZTT1WzzTs-5EHw3PY893cCou466CByH9V5YO0hZzLVBzJqJPMcd/exec";
     let allPosts = [];
     let postsToShow = 5;
 
+    // --- 1. TIMESTAMP HELPER FUNCTION (Fits at the top of Script) ---
+    function timeAgo(dateParam) {
+        if (!dateParam) return "";
+        const date = typeof dateParam === 'object' ? dateParam : new Date(dateParam);
+        const seconds = Math.round((new Date() - date) / 1000);
+        if (seconds < 60) return 'Just now';
+        const minutes = Math.round(seconds / 60);
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.round(minutes / 60);
+        if (hours < 24) return `${hours}h ago`;
+        const days = Math.round(hours / 24);
+        return `${days}d ago`;
+    }
+
+    // --- PULL TO REFRESH ---
+    let startY = 0;
+    const pullThreshold = 80;
+    const indicator = document.getElementById('pull-indicator');
+    window.addEventListener('touchstart', (e) => { if (window.scrollY === 0) startY = e.touches[0].pageY; }, {passive: true});
+    window.addEventListener('touchmove', (e) => {
+        const y = e.touches[0].pageY;
+        const pullDistance = y - startY;
+        if (window.scrollY === 0 && pullDistance > 0) {
+            indicator.style.height = Math.min(pullDistance, pullThreshold) + 'px';
+            indicator.innerText = pullDistance > pullThreshold ? "🚀 Release to Refresh" : "🔽 Pull to refresh";
+        }
+    }, {passive: true});
+    window.addEventListener('touchend', () => {
+        if (parseInt(indicator.style.height) >= pullThreshold) { indicator.innerText = "🔄 Loading..."; loadFeed(); }
+        indicator.style.height = '0px';
+    });
+
+    // --- CORE LOGIC ---
     async function loadFeed() {
         try {
             const res = await fetch(SCRIPT_URL);
@@ -102,6 +119,7 @@
         } catch (e) { document.getElementById('feed').innerText = "Error loading. Pull down to try again."; }
     }
 
+    // --- 2. UPDATED RENDER FUNCTION (Displaying the Timestamp) ---
     function render(loadMore = false) {
         if (loadMore) postsToShow += 5;
         const user = document.getElementById('user').value.trim();
@@ -127,8 +145,11 @@
 
             return `
                 <div class="card" id="post-${p.rowIndex}">
-                    <div style="display:flex; justify-content:space-between;">
-                        <span class="user">${p.user}</span>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <span class="user">${p.user}</span>
+                            <span style="font-size: 11px; color: #90949c; margin-left: 8px;">${timeAgo(p.timestamp)}</span>
+                        </div>
                         <div class="sync-dot dot-green"></div>
                     </div>
                     <p>${p.message}</p>
@@ -192,7 +213,6 @@
     async function upload() {
         const u = document.getElementById('user').value.trim(), m = document.getElementById('msg').value.trim(), f = document.getElementById('file').files[0];
         if (!u || !m) return alert("Fill fields!");
-        
         const reader = new FileReader();
         reader.onload = async (e) => {
             const imgData = f ? e.target.result : "";
@@ -216,3 +236,6 @@
 </script>
 </body>
 </html>
+
+
+
