@@ -7,17 +7,20 @@
    <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.png">
 
-    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-    <script>
-      window.OneSignalDeferred = window.OneSignalDeferred || [];
-      OneSignalDeferred.push(async function(OneSignal) {
-        await OneSignal.init({
-          appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064",
-          safari_web_id: "web.onesignal.auto.35c3b21f-3634-4ed2-bd52-fd09e2637415",
-          notifyButton: { enable: true },
-        });
-      });
-    </script>
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064",
+      safari_web_id: "web.onesignal.auto.35c3b21f-3634-4ed2-bd52-fd09e2637415",
+      notifyButton: {
+        enable: true,
+      },
+    });
+  });
+</script>
+    
     <style>
         body { background-color: #e9ebee; font-family: Arial, sans-serif; margin: 0; padding-bottom: 50px; overflow-x: hidden; }
         .nav { background: #3b5998; color: white; padding: 15px; text-align: center; font-weight: bold; position: sticky; top: 0; z-index: 1000; }
@@ -86,7 +89,7 @@
 
 <script>
     // ... [REST OF YOUR SCRIPT REMAINS THE SAME] ...
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbya9m4KXIg2m73ryT3dEEEauRra5HskeL96siTWCCqHL9QuKclVx1Cug-JHvp8Ir_f3/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyHKbiNdzCkhbgLsZTT1WzzTs-5EHw3PY893cCou466CByH9V5YO0hZzLVBzJqJPMcd/exec";
     let allPosts = [];
     let postsToShow = 5;
 
