@@ -18,7 +18,6 @@
   });
 </script>
     <style>
-        /* Existing CSS remains the same */
         body { background-color: #e9ebee; font-family: Arial, sans-serif; margin: 0; padding-bottom: 50px; overflow-x: hidden; }
         .nav { background: #3b5998; color: white; padding: 15px; text-align: center; font-weight: bold; position: sticky; top: 0; z-index: 1000; }
         #pull-indicator { height: 0; overflow: hidden; background: #dfe3ee; text-align: center; line-height: 50px; font-size: 14px; color: #3b5998; font-weight: bold; transition: height 0.1s ease; }
@@ -77,7 +76,6 @@
     let allPosts = [];
     let postsToShow = 5;
 
-    // --- 1. TIMESTAMP HELPER FUNCTION (Fits at the top of Script) ---
     function timeAgo(dateParam) {
         if (!dateParam) return "";
         const date = typeof dateParam === 'object' ? dateParam : new Date(dateParam);
@@ -91,7 +89,6 @@
         return `${days}d ago`;
     }
 
-    // --- PULL TO REFRESH ---
     let startY = 0;
     const pullThreshold = 80;
     const indicator = document.getElementById('pull-indicator');
@@ -109,7 +106,6 @@
         indicator.style.height = '0px';
     });
 
-    // --- CORE LOGIC ---
     async function loadFeed() {
         try {
             const res = await fetch(SCRIPT_URL);
@@ -119,7 +115,6 @@
         } catch (e) { document.getElementById('feed').innerText = "Error loading. Pull down to try again."; }
     }
 
-    // --- 2. UPDATED RENDER FUNCTION (Displaying the Timestamp) ---
     function render(loadMore = false) {
         if (loadMore) postsToShow += 5;
         const user = document.getElementById('user').value.trim();
@@ -161,7 +156,17 @@
                         ${user.toLowerCase() === 'admin' ? `<button onclick="handleAction('delete', ${p.rowIndex})" style="color:red; background:none; border:none; cursor:pointer; margin-left:10px;">🗑️ Delete</button>` : ''}
                         ${likedText ? `<div class="liked-by" onclick="alert('Liked by:\\n${likes.join('\\n')}')">${likedText}</div>` : ''}
                     </div>
-                    <div id="comments-${p.rowIndex}">${(p.comments || []).map(c => `<div class="comment-box"><b>${c.user}</b>: ${c.text}</div>`).join('')}</div>
+                    <div id="comments-${p.rowIndex}">
+                        ${(p.comments || []).map(c => `
+                            <div class="comment-box">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <b>${c.user}</b>
+                                    <span style="font-size:10px; color:#90949c;">${timeAgo(c.time || c.timestamp)}</span>
+                                </div>
+                                <div>${c.text}</div>
+                            </div>
+                        `).join('')}
+                    </div>
                     <div style="display:flex; margin-top:10px; gap:5px;">
                         <input type="text" id="reply-${p.rowIndex}" placeholder="Comment..." style="margin:0; font-size:12px;">
                         <button class="btn" style="padding:4px 10px; font-size:12px;" onclick="handleAction('comment', ${p.rowIndex})">Reply</button>
@@ -193,7 +198,8 @@
             const inp = document.getElementById(`reply-${rowIndex}`);
             if (!inp.value.trim()) return;
             payload.text = inp.value;
-            post.comments.push({ user, text: inp.value });
+            // Add comment locally with current timestamp for instant display
+            post.comments.push({ user, text: inp.value, time: new Date().toISOString() });
             inp.value = "";
         } else if (action === 'like') {
             const idx = post.likes.indexOf(user);
@@ -236,6 +242,3 @@
 </script>
 </body>
 </html>
-
-
-
