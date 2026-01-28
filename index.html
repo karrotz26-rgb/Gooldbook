@@ -5,18 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>The Gooldbook</title>
     <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-<script>
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  OneSignalDeferred.push(async function(OneSignal) {
-    await OneSignal.init({
-      appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064",
-      safari_web_id: "web.onesignal.auto.35c3b21f-3634-4ed2-bd52-fd09e2637415",
-      notifyButton: {
-        enable: true,
-      },
-    });
-  });
-</script>
+    <script>
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(async function(OneSignal) {
+        await OneSignal.init({
+          appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064",
+          safari_web_id: "web.onesignal.auto.35c3b21f-3634-4ed2-bd52-fd09e2637415",
+          notifyButton: { enable: true },
+        });
+      });
+    </script>
     <style>
         body { background-color: #e9ebee; font-family: Arial, sans-serif; margin: 0; padding-bottom: 50px; overflow-x: hidden; }
         .nav { background: #3b5998; color: white; padding: 15px; text-align: center; font-weight: bold; position: sticky; top: 0; z-index: 1000; }
@@ -29,6 +27,20 @@
         .user { color: #365899; font-weight: bold; }
         .post-img { width: 100%; margin-top: 10px; border-radius: 4px; display: block; }
         .btn { background: #4267b2; color: white; border: none; padding: 8px 12px; cursor: pointer; font-weight: bold; border-radius: 2px; }
+        
+        /* Pulse Refresh Button */
+        .btn-refresh { 
+            background: #f5f6f7; color: #4b4f56; border: 1px solid #ddd; 
+            margin-top: 10px; width: 100%; padding: 8px; font-size: 13px; 
+            cursor: pointer; font-weight: bold; border-radius: 4px; transition: all 0.3s ease;
+        }
+        .updating { animation: pulse 1.5s infinite; background: #dfe3ee !important; color: #3b5998 !important; pointer-events: none; }
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(0.98); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
         .sync-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; float: right; }
         .dot-green { background: #4caf50; }
         .dot-yellow { background: #ffc107; }
@@ -53,6 +65,7 @@
             <input type="text" id="searchBar" placeholder="Filter posts..." oninput="postsToShow=5; render();">
         </div>
         <div class="sidebar-card"><b>🔥 Trending</b><div id="top-liked"></div></div>
+        <div class="sidebar-card"><b>💬 Most Commented</b><div id="top-commented"></div></div>
     </div>
 
     <div class="main-feed">
@@ -63,6 +76,7 @@
                 <input type="file" id="file" accept="image/*" style="width: auto; border:none; margin:0; font-size:12px; display: inline-block;">
                 <button class="btn" onclick="upload()">Post</button>
             </div>
+            <button id="refreshBtn" class="btn-refresh" onclick="loadFeed()">Update Feed</button>
         </div>
         <div id="feed">Loading feed...</div>
         <div id="load-more-container" style="display:none; margin-bottom: 20px;">
@@ -89,6 +103,7 @@
         return `${days}d ago`;
     }
 
+    // Pull to Refresh Logic
     let startY = 0;
     const pullThreshold = 80;
     const indicator = document.getElementById('pull-indicator');
@@ -102,17 +117,22 @@
         }
     }, {passive: true});
     window.addEventListener('touchend', () => {
-        if (parseInt(indicator.style.height) >= pullThreshold) { indicator.innerText = "🔄 Loading..."; loadFeed(); }
+        if (parseInt(indicator.style.height) >= pullThreshold) { loadFeed(); }
         indicator.style.height = '0px';
     });
 
     async function loadFeed() {
+        const btn = document.getElementById('refreshBtn');
+        btn.classList.add('updating');
+        btn.innerText = "Updating...";
         try {
             const res = await fetch(SCRIPT_URL);
             allPosts = await res.json();
             postsToShow = 5; 
             render();
         } catch (e) { document.getElementById('feed').innerText = "Error loading. Pull down to try again."; }
+        btn.classList.remove('updating');
+        btn.innerText = "Update Feed";
     }
 
     function render(loadMore = false) {
@@ -182,7 +202,13 @@
         const liked = [...allPosts].sort((a,b) => (b.likes.length || 0) - (a.likes.length || 0)).slice(0, 5);
         document.getElementById('top-liked').innerHTML = liked.map(p => `
             <div class="trending-item" onclick="document.getElementById('post-${p.rowIndex}').scrollIntoView({behavior:'smooth'})">
-                <b>${p.likes.length} 👍</b>: ${p.message.substring(0, 50)}${p.message.length > 50 ? '...' : ''}
+                <b>${p.likes.length} 👍</b>: ${p.message.substring(0, 40)}...
+            </div>`).join('');
+
+        const commented = [...allPosts].sort((a,b) => (b.comments.length || 0) - (a.comments.length || 0)).slice(0, 5);
+        document.getElementById('top-commented').innerHTML = commented.map(p => `
+            <div class="trending-item" onclick="document.getElementById('post-${p.rowIndex}').scrollIntoView({behavior:'smooth'})">
+                <b>${p.comments.length} 💬</b>: ${p.message.substring(0, 40)}...
             </div>`).join('');
     }
 
@@ -198,7 +224,6 @@
             const inp = document.getElementById(`reply-${rowIndex}`);
             if (!inp.value.trim()) return;
             payload.text = inp.value;
-            // Add comment locally with current timestamp for instant display
             post.comments.push({ user, text: inp.value, time: new Date().toISOString() });
             inp.value = "";
         } else if (action === 'like') {
