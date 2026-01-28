@@ -198,19 +198,49 @@
         updateSidebar();
     }
 
-    function updateSidebar() {
-        const liked = [...allPosts].sort((a,b) => (b.likes.length || 0) - (a.likes.length || 0)).slice(0, 5);
-        document.getElementById('top-liked').innerHTML = liked.map(p => `
-            <div class="trending-item" onclick="document.getElementById('post-${p.rowIndex}').scrollIntoView({behavior:'smooth'})">
-                <b>${p.likes.length} 👍</b>: ${p.message.substring(0, 40)}...
-            </div>`).join('');
+   function updateSidebar() {
+    // Trending (Most Liked)
+    const liked = [...allPosts].sort((a,b) => (b.likes.length || 0) - (a.likes.length || 0)).slice(0, 5);
+    document.getElementById('top-liked').innerHTML = liked.map(p => `
+        <div class="trending-item" onclick="navigateToPost(${p.rowIndex})">
+            <b>${p.likes.length} 👍</b>: ${p.message.substring(0, 40)}...
+        </div>`).join('');
 
-        const commented = [...allPosts].sort((a,b) => (b.comments.length || 0) - (a.comments.length || 0)).slice(0, 5);
-        document.getElementById('top-commented').innerHTML = commented.map(p => `
-            <div class="trending-item" onclick="document.getElementById('post-${p.rowIndex}').scrollIntoView({behavior:'smooth'})">
-                <b>${p.comments.length} 💬</b>: ${p.message.substring(0, 40)}...
-            </div>`).join('');
+    // Most Commented
+    const commented = [...allPosts].sort((a,b) => (b.comments.length || 0) - (a.comments.length || 0)).slice(0, 5);
+    document.getElementById('top-commented').innerHTML = commented.map(p => `
+        <div class="trending-item" onclick="navigateToPost(${p.rowIndex})">
+            <b>${p.comments.length} 💬</b>: ${p.message.substring(0, 40)}...
+        </div>`).join('');
+}
+
+// New helper function to handle the "Load & Scroll" logic
+function navigateToPost(rowIndex) {
+    const postElement = document.getElementById(`post-${rowIndex}`);
+
+    if (!postElement) {
+        // If post isn't found, find its position in the full list
+        const postIndex = allPosts.findIndex(p => p.rowIndex === rowIndex);
+        if (postIndex !== -1) {
+            // Expand the view to include this post
+            postsToShow = postIndex + 1;
+            render(); 
+        }
     }
+
+    // Now that it's rendered, scroll to it
+    setTimeout(() => {
+        const target = document.getElementById(`post-${rowIndex}`);
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Optional: add a quick highlight effect
+            target.style.transition = "background 0.5s";
+            target.style.background = "#fff9c4"; // Light yellow highlight
+            setTimeout(() => target.style.background = "white", 2000);
+        }
+    }, 100);
+}
+
 
     async function handleAction(action, rowIndex) {
         const user = document.getElementById('user').value.trim();
