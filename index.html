@@ -107,7 +107,15 @@ window.onload = () => {
   document.getElementById('user').value = localStorage.getItem("gb_user") || "";
   if(allPosts.length) render();
   loadFeed();
+  
+  // Check for shared post link
+  const urlParams = new URLSearchParams(window.location.search);
+  const postId = urlParams.get('post');
+  if (postId) {
+    setTimeout(() => scrollToPost(parseInt(postId)), 1000);
+  }
 };
+;
 
 async function loadFeed() {
   try {
@@ -130,7 +138,12 @@ function render() {
       <div class="user">${p.user} <span style="font-size:11px;color:#888;">${timeAgo(p.timestamp)}</span></div>
       <p>${p.message}</p>
       ${p.image ? `<img src="${p.image}" class="post-img" loading="lazy" onerror="this.style.display='none'">` : ''}
-      <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} (${p.likes.length})</button>
+      
+      <div style="margin-top:10px; display:flex; gap:10px;">
+        <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} (${p.likes.length})</button>
+        <button class="btn" style="background:#27ae60;" onclick="sharePost(${p.rowIndex})">🔗 Share</button>
+      </div>
+      
       ${p.likes.length > 0 ? `
         <div style="margin-top:8px; font-size:12px; color:#666;">
           <span style="cursor:pointer;" onclick="toggleLikes(${p.rowIndex})">
@@ -374,6 +387,59 @@ function scrollToPost(rowIndex) {
   
   // Update localStorage
   localStorage.setItem("gb_cache", JSON.stringify(allPosts));
+}
+function sharePost(rowIndex) {
+  const post = allPosts.find(p => p.rowIndex === rowIndex);
+  if (!post) return;
+  
+  // Create shareable URL with post ID
+  const shareUrl = `${window.location.origin}${window.location.pathname}?post=${rowIndex}`;
+  
+  // Check if Web Share API is available (mobile devices)
+  if (navigator.share) {
+    navigator.share({
+      title: `${post.user} on theGooldbook`,
+      text: post.message,
+      url: shareUrl
+    }).catch(err => console.log('Share cancelled'));
+  } else {
+    // Fallback: Copy to clipboard
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      showShareOptions(shareUrl, post);
+    });
+  }
+}
+
+function showShareOptions(url, post) {
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+  `;
+  
+  modal.innerHTML = `
+    <div style="background: white; padding: 20px; border-radius: 8px; max-width: 400px; width: 90%;">
+      <h3 style="margin-top: 0;">Share this post 🔗</h3>
+      <p style="font-size: 13px; color: #666;">Link copied to clipboard!</p>
+      <input value="${url}" readonly style="width: 100%; padding: 8px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px;">
+      <div style="display: flex; gap: 10px; margin-top: 15px;">
+        <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}" target="_blank" class="btn" style="flex: 1; text-align: center; text-decoration: none;">Facebook</a>
+        <a href="https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(post.message)}" target="_blank" class="btn" style="flex: 1; text-align: center; text-decoration: none;">Twitter</a>
+      </div>
+      <button class="btn-refresh" onclick="this.parentElement.parentElement.remove()" style="margin-top: 10px;">Close</button>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
 }
 
 </script>
