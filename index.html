@@ -239,7 +239,7 @@ function updateTrending() {
     score: p.likes.length + p.comments.length
   }));
   
-  // Sort by score and get top 3
+  // Sort by score and get top 5
   const top = scored
     .filter(p => p.score > 0) // Only show posts with activity
     .sort((a, b) => b.score - a.score)
@@ -248,11 +248,27 @@ function updateTrending() {
   if (top.length === 0) {
     document.getElementById('trending').innerHTML = `
       <div class="sidebar-card">
-        <b>🔥 Trending</b><br>
-        <div style="padding:8px 0; color:#888; font-size:12px;">No trending posts yet</div>
+        <b>🔥 Most Active</b><br>
+        <div style="padding:8px 0; color:#888; font-size:12px;">No active posts yet</div>
       </div>`;
     return;
   }
+  
+  document.getElementById('trending').innerHTML = `
+    <div class="sidebar-card">
+      <b>🔥 Most Active</b><br>
+      ${top.map(p => `
+        <div style="cursor:pointer; padding:6px 0; border-bottom:1px solid #e9ebee;" 
+             onclick="scrollToPost(${p.rowIndex})">
+          <div style="font-weight:bold; color:#365899; font-size:12px;">${p.user}</div>
+          <div style="font-size:11px; color:#666; margin:2px 0;">${truncate(p.message, 50)}</div>
+          <div style="font-size:10px; color:#888;">
+            ❤️ ${p.likes.length} likes • 💬 ${p.comments.length} comments
+          </div>
+        </div>
+      `).join('')}
+    </div>`;
+}
   
   document.getElementById('trending').innerHTML = `
     <div class="sidebar-card">
@@ -305,6 +321,33 @@ function truncate(str, max) {
   
   // Remove unicorn after animation
   setTimeout(() => unicorn.remove(), 2000);
+}
+function scrollToPost(rowIndex) {
+  // Wait a moment for any rendering to complete
+  setTimeout(() => {
+    const element = document.getElementById(`post-${rowIndex}`);
+    if (element) {
+      element.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' // Centers the post in the viewport
+      });
+      
+      // Add a highlight effect to make it obvious
+      element.style.transition = 'background-color 0.5s';
+      element.style.backgroundColor = '#e3f2fd';
+      
+      setTimeout(() => {
+        element.style.backgroundColor = '#fff';
+      }, 1500);
+    } else {
+      // If post not visible, load more and try again
+      if (postsToShow < allPosts.length) {
+        postsToShow += 10;
+        render();
+        setTimeout(() => scrollToPost(rowIndex), 300);
+      }
+    }
+  }, 100);
 }
 
 </script>
