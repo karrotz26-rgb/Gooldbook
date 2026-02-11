@@ -163,11 +163,46 @@ function timeAgo(d) {
 function saveUser() { localStorage.setItem("gb_user", document.getElementById('user').value); }
 
 function updateTrending() {
-  const top = [...allPosts].sort((a,b) => b.likes.length - a.likes.length).slice(0,3);
+  // Calculate popularity score (likes + comments)
+  const scored = allPosts.map(p => ({
+    ...p,
+    score: p.likes.length + p.comments.length
+  }));
+  
+  // Sort by score and get top 3
+  const top = scored
+    .filter(p => p.score > 0) // Only show posts with activity
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+  
+  if (top.length === 0) {
+    document.getElementById('trending').innerHTML = `
+      <div class="sidebar-card">
+        <b>🔥 Trending</b><br>
+        <div style="padding:8px 0; color:#888; font-size:12px;">No trending posts yet</div>
+      </div>`;
+    return;
+  }
+  
   document.getElementById('trending').innerHTML = `
-    <div class="sidebar-card"><b>🔥 Popular</b><br>
-    ${top.map(p => `<div style="cursor:pointer; padding:4px 0;" onclick="document.getElementById('post-${p.rowIndex}').scrollIntoView({behavior:'smooth'})">❤️ ${p.likes.length} ${p.user}</div>`).join('')}
+    <div class="sidebar-card">
+      <b>🔥 Trending</b><br>
+      ${top.map(p => `
+        <div style="cursor:pointer; padding:6px 0; border-bottom:1px solid #e9ebee;" 
+             onclick="document.getElementById('post-${p.rowIndex}').scrollIntoView({behavior:'smooth'})">
+          <div style="font-weight:bold; color:#365899; font-size:12px;">${p.user}</div>
+          <div style="font-size:11px; color:#666; margin:2px 0;">${truncate(p.message, 50)}</div>
+          <div style="font-size:10px; color:#888;">
+            ❤️ ${p.likes.length} likes • 💬 ${p.comments.length} comments
+          </div>
+        </div>
+      `).join('')}
     </div>`;
+}
+
+function truncate(str, max) {
+  if (!str) return "";
+  return str.length > max ? str.substring(0, max) + "..." : str;
 }
 </script>
 </body>
