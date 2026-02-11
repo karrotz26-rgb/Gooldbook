@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Gooldbook</title>
 
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
@@ -14,7 +14,7 @@ body { background:#e9ebee; font-family:Arial,sans-serif; margin:0; padding-botto
 .sidebar { width:280px; position:sticky; top:70px; }
 .main-feed { flex-grow:1; max-width:550px; width:100%; }
 .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:4px; position:relative; }
-.sidebar-card { background:#fff; border:1px solid #ddd; padding:12px; margin-bottom:10px; border-radius:4px; font-size:13px; cursor:pointer; }
+.sidebar-card { background:#fff; border:1px solid #ddd; padding:10px; margin-bottom:10px; border-radius:4px; font-size:13px; cursor:pointer; }
 .user { color:#365899; font-weight:bold; }
 .post-img { width:100%; margin-top:10px; border-radius:4px; background:#f0f2f5; min-height:150px; display:block; }
 .btn { background:#4267b2; color:#fff; border:none; padding:8px 12px; cursor:pointer; font-weight:bold; border-radius:3px; }
@@ -22,37 +22,30 @@ body { background:#e9ebee; font-family:Arial,sans-serif; margin:0; padding-botto
 .comment { background:#f0f2f5; padding:6px; border-radius:6px; margin-top:4px; font-size:13px; }
 input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:4px; font-size:16px; }
 .load-more-btn { width:100%; padding:12px; border:1px solid #ddd; background:#fff; font-weight:bold; }
-.unicorn-pop { position:absolute; pointer-events:none; font-size:24px; animation:floatUp 1s ease-out forwards; z-index:10000; will-change:transform,opacity; }
-@keyframes floatUp { 0% { transform: translateY(0) scale(0.5) rotate(0deg); opacity:1; } 50% { transform: translateY(-50px) scale(1.2) rotate(15deg); opacity:0.8; } 100% { transform: translateY(-100px) scale(1.5) rotate(30deg); opacity:0; } }
+.unicorn-pop { position:absolute; pointer-events:none; font-size:24px; animation:floatUp 1s ease-out forwards; z-index:10000; }
+@keyframes floatUp {
+  0% { transform: translateY(0) scale(0.5) rotate(0deg); opacity:1; }
+  50% { transform: translateY(-50px) scale(1.2) rotate(15deg); opacity:0.8; }
+  100% { transform: translateY(-100px) scale(1.5) rotate(30deg); opacity:0; }
+}
 @media(max-width:700px){ .container{flex-direction:column;} .sidebar{width:100%; position:static;} }
 </style>
 </head>
-
 <body>
 
 <div class="nav">theGooldbook</div>
 
 <div class="container">
 
-<!-- Sidebar -->
 <div class="sidebar">
   <div class="sidebar-card">
     <b>🔍 Search</b>
     <input id="searchBar" placeholder="Filter posts..." oninput="postsToShow=5;render()">
   </div>
-
-  <div class="sidebar-card">
-    <b>❤️ Trending Likes</b>
-    <div id="topLiked"></div>
-  </div>
-
-  <div class="sidebar-card">
-    <b>💬 Trending Comments</b>
-    <div id="topCommented"></div>
-  </div>
+  <div class="sidebar-card"><b>🔥 Top Liked</b><div id="topLiked"></div></div>
+  <div class="sidebar-card"><b>💬 Top Commented</b><div id="topCommented"></div></div>
 </div>
 
-<!-- Main Feed -->
 <div class="main-feed">
 
 <div class="card">
@@ -65,7 +58,6 @@ input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #
 </div>
 
 <div id="feed">Loading...</div>
-
 <div id="load-more-container" style="display:none;">
   <button class="load-more-btn" onclick="render(true)">Load More</button>
 </div>
@@ -74,121 +66,125 @@ input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzHTG44yW0PA3QWt_uqYEZ5dnBOZnGoxHNlO9zEQ1Egncv-qEvU91SGiqoRDdItI4dO/exec";
-let allPosts=[], postsToShow=5;
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzU2kuaRuqCec8cBQTG7sSpPFDIVNq5SkOIf6NxdOecOEI3UdwJJFTXocyBa1t6d3s_/exec";
+let allPosts = [], postsToShow = 5;
 
-// DOM references
-const feed=document.getElementById('feed');
-const topLiked=document.getElementById('topLiked');
-const topCommented=document.getElementById('topCommented');
-const user=document.getElementById('user');
-const searchBar=document.getElementById('searchBar');
-const fixImagesBtn=document.getElementById('fixImagesBtn');
-const msg=document.getElementById('msg');
-const file=document.getElementById('file');
-
-// OneSignal init
+// OneSignal
 window.OneSignalDeferred = window.OneSignalDeferred || [];
 OneSignalDeferred.push(async function(OneSignal){
   await OneSignal.init({ appId:"4577a6bd-cd70-41d2-bf78-aba5f6211064", notifyButton:{enable:false} });
   setTimeout(()=>OneSignal.Notifications.requestPermission(),5000);
-  user.addEventListener('blur',()=>{ if(user.value.trim()) OneSignal.login(user.value.trim()); });
+  document.getElementById('user').addEventListener('blur',()=>{ const u=user.value.trim(); if(u) OneSignal.login(u); });
 });
 
-// Utilities
-function timeAgo(d){ const s=Math.floor((Date.now()-new Date(d))/1000); if(s<60)return"Just now"; if(s<3600)return Math.floor(s/60)+"m ago"; if(s<86400)return Math.floor(s/3600)+"h ago"; return Math.floor(s/86400)+"d ago"; }
-function normalizeImage(url){ if(!url) return ""; const m=url.match(/id=([a-zA-Z0-9_-]+)/)||url.match(/\/d\/([a-zA-Z0-9_-]+)/); if(!m) return url; return `https://drive.google.com/uc?export=view&id=${m[1]}`; }
-
-// Load feed
-async function loadFeed(){
-  try{
-    const r=await fetch(SCRIPT_URL);
-    allPosts=await r.json();
-    allPosts.forEach(p=>{ if(!Array.isArray(p.likes)) p.likes=[]; if(!Array.isArray(p.comments)) p.comments=[]; });
-    localStorage.setItem("gb_cache",JSON.stringify(allPosts));
-  }catch(e){
-    console.error(e);
-    const cache=localStorage.getItem("gb_cache");
-    if(cache) allPosts=JSON.parse(cache);
-  }
-  postsToShow=5;
-  render();
+function timeAgo(d){
+  const s=Math.floor((Date.now()-new Date(d))/1000);
+  if(s<60)return"Just now";
+  if(s<3600)return Math.floor(s/60)+"m ago";
+  if(s<86400)return Math.floor(s/3600)+"h ago";
+  return Math.floor(s/86400)+"d ago";
 }
 
-// Render posts
+async function loadFeed(){
+  try{
+    const r = await fetch(SCRIPT_URL);
+    allPosts = await r.json();
+    allPosts.forEach(p=>{ if(!Array.isArray(p.likes)) p.likes=[]; if(!Array.isArray(p.comments)) p.comments=[]; });
+    localStorage.setItem("gb_cache",JSON.stringify(allPosts));
+    postsToShow=5;
+    render();
+  }catch(e){ console.error(e); feed.innerHTML="Failed to load posts.";}
+}
+
 function render(loadMore=false){
   if(loadMore) postsToShow+=5;
   const u=user.value.trim();
   const s=searchBar.value.toLowerCase();
-  const list = allPosts.filter(p=>p.message?.toLowerCase().includes(s)||p.user?.toLowerCase().includes(s)).slice(0,postsToShow);
+  const list=allPosts.filter(p=>p.message?.toLowerCase().includes(s) || p.user?.toLowerCase().includes(s)).slice(0,postsToShow);
 
   feed.innerHTML=list.map(p=>{
-    const liked=p.likes.includes(u);
-    const img=p.image?`<img src="${normalizeImage(p.image)}" class="post-img" loading="lazy" onerror="this.style.display='none'">`:'';
-    const comments=p.comments.map(c=>`<div class="comment"><b>${c.user}</b>: ${c.text}</div>`).join("");
+    const liked = p.likes.includes(u);
+    const img = p.image ? `<img src="${p.image}" class="post-img" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">` : '';
+    const comments = p.comments.map(c=>`<div class="comment"><b>${c.user}</b>: ${c.text}</div>`).join('');
     return `<div class="card" id="post-${p.rowIndex}">
       <div><span class="user">${p.user}</span> <span style="font-size:11px;color:#888;">${timeAgo(p.timestamp)}</span></div>
       <p>${p.message}</p>
       ${img}
-      <button class="btn" style="margin-top:6px" onclick="toggleLike(${p.rowIndex},event)">${liked?'❤️ Unlike':'👍 Like'} (${p.likes.length})</button>
+      <button class="btn" style="margin-top:6px" onclick="toggleLike(${p.rowIndex},event)">
+        ${liked?'❤️ Unlike':'👍 Like'} (${p.likes.length})
+      </button>
       <div style="margin-top:6px">${comments}</div>
       <div style="display:flex;gap:6px;margin-top:6px">
         <input id="c-${p.rowIndex}" placeholder="Write a comment…" style="font-size:13px">
         <button class="btn" onclick="addComment(${p.rowIndex})">Post</button>
       </div>
     </div>`;
-  }).join("");
+  }).join('');
 
   load-more-container.style.display=list.length<allPosts.length?'block':'none';
   updateTrending();
 }
 
-// Unicorn sparkle
-function spawnUnicorn(e){
-  const rect=e.getBoundingClientRect();
-  const u=document.createElement('div');
-  u.className='unicorn-pop';
-  u.innerText='🦄';
-  u.style.left=(rect.left+rect.width/2)+'px';
-  u.style.top=(rect.top+window.scrollY-20)+'px';
-  document.body.appendChild(u);
-  setTimeout(()=>u.remove(),1000);
-}
-
-// Likes and comments
 function toggleLike(rowIndex,event){
-  const u=user.value.trim();
-  if(!u) return alert("Enter your name");
+  const u=user.value.trim(); if(!u) return alert("Enter your name");
   const p=allPosts.find(x=>x.rowIndex===rowIndex);
   const i=p.likes.indexOf(u);
-  if(i===-1){ p.likes.push(u); spawnUnicorn(event.currentTarget); } else p.likes.splice(i,1);
+  if(i===-1){ p.likes.push(u); triggerUnicorn(event); }
+  else p.likes.splice(i,1);
   render();
-  fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',body:JSON.stringify({action:'like',rowIndex,username:u})});
+  fetch(SCRIPT_URL,{method:'POST',mode:'cors',headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'like',rowIndex,username:u})});
 }
+
 function addComment(rowIndex){
-  const u=user.value.trim();
-  const inp=document.getElementById(`c-${rowIndex}`);
+  const u=user.value.trim(); const inp=document.getElementById(`c-${rowIndex}`);
   if(!u||!inp.value.trim()) return;
   const p=allPosts.find(x=>x.rowIndex===rowIndex);
   p.comments.push({user:u,text:inp.value});
   render();
-  fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',body:JSON.stringify({action:'comment',rowIndex,username:u,text:inp.value})});
+  fetch(SCRIPT_URL,{method:'POST',mode:'cors',headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'comment',rowIndex,username:u,text:inp.value})});
 }
 
-// Trending sidebar
 function updateTrending(){
-  const liked=[...allPosts].sort((a,b)=>b.likes.length-a.likes.length).slice(0,5);
-  const commented=[...allPosts].sort((a,b)=>b.comments.length-a.comments.length).slice(0,5);
-  topLiked.innerHTML=liked.map(p=>`<div class="sidebar-card" onclick="go(${p.rowIndex})">❤️ ${p.likes.length} — ${p.message.slice(0,30)}…</div>`).join("");
-  topCommented.innerHTML=commented.map(p=>`<div class="sidebar-card" onclick="go(${p.rowIndex})">💬 ${p.comments.length} — ${p.message.slice(0,30)}…</div>`).join("");
+  topLiked.innerHTML=[...allPosts].sort((a,b)=>b.likes.length-a.likes.length).slice(0,5)
+    .map(p=>`<div class="sidebar-card" onclick="go(${p.rowIndex})">❤️ ${p.likes.length} — ${p.message.slice(0,30)}…</div>`).join('');
+  topCommented.innerHTML=[...allPosts].sort((a,b)=>b.comments.length-a.comments.length).slice(0,5)
+    .map(p=>`<div class="sidebar-card" onclick="go(${p.rowIndex})">💬 ${p.comments.length} — ${p.message.slice(0,30)}…</div>`).join('');
 }
+
 function go(i){ const el=document.getElementById(`post-${i}`); if(el) el.scrollIntoView({behavior:'smooth',block:'center'}); }
 
-// Upload / fix images
-async function upload(){ if(!user.value||!msg.value) return alert("Name & message required"); const r=new FileReader(); r.onload=async e=>{ await fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',body:JSON.stringify({action:'post',username:user.value,message:msg.value,image:e.target.result})}); msg.value=""; file.value=""; loadFeed(); }; file.files[0]?r.readAsDataURL(file.files[0]):r.onload({target:{result:""}}); }
-async function fixOldImages(){ if(!confirm("Fix old Drive image links?")) return; let fixed=0; for(const p of allPosts){ if(!p.image) continue; const m=p.image.match(/id=([a-zA-Z0-9_-]+)/)||p.image.match(/\/d\/([a-zA-Z0-9_-]+)/); if(!m) continue; const url=`https://drive.google.com/uc?export=view&id=${m[1]}`; if(p.image===url) continue; p.image=url; fixed++; fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',body:JSON.stringify({action:'fixImage',rowIndex:p.rowIndex,image:url})}); } alert(`✅ Fixed ${fixed} images`); render(); }
+function triggerUnicorn(event){
+  const rect=event.target.getBoundingClientRect();
+  const unicorn=document.createElement('div');
+  unicorn.innerText='🦄'; unicorn.className='unicorn-pop';
+  unicorn.style.left=(rect.left+rect.width/2)+'px'; unicorn.style.top=(rect.top+window.scrollY-20)+'px';
+  document.body.appendChild(unicorn); setTimeout(()=>unicorn.remove(),1000);
+}
 
-// Load on start
+async function upload(){
+  if(!user.value||!msg.value) return alert("Name & message required");
+  const r=new FileReader();
+  r.onload=async e=>{
+    await fetch(SCRIPT_URL,{method:'POST',mode:'cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'post',username:user.value,message:msg.value,image:e.target.result})});
+    msg.value=""; file.value=""; loadFeed();
+  };
+  file.files[0]?r.readAsDataURL(file.files[0]):r.onload({target:{result:""}});
+}
+
+async function fixOldImages(){
+  if(!confirm("Fix old Drive image links?")) return;
+  let fixed=0;
+  for(const p of allPosts){
+    if(!p.image) continue;
+    const m=p.image.match(/id=([a-zA-Z0-9_-]+)/)||p.image.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if(!m) continue;
+    const url=`https://drive.google.com/thumbnail?id=${m[1]}&sz=w1200`;
+    if(p.image===url) continue; p.image=url; fixed++;
+    fetch(SCRIPT_URL,{method:'POST',mode:'cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'fixImage',rowIndex:p.rowIndex,image:url})});
+  }
+  alert(`✅ Fixed ${fixed} images`); render();
+}
+
 window.onload=()=>{
   user.value=localStorage.getItem("gb_user")||"";
   const c=localStorage.getItem("gb_cache");
@@ -197,6 +193,5 @@ window.onload=()=>{
 };
 user.oninput=()=>{ localStorage.setItem("gb_user",user.value); fixImagesBtn.style.display=user.value.toLowerCase()==="admin"?"block":"none"; };
 </script>
-
 </body>
 </html>
