@@ -140,10 +140,11 @@ function render() {
       <p>${p.message}</p>
       ${p.image ? `<img src="${p.image}" class="post-img" loading="lazy" onerror="this.style.display='none'">` : ''}
       
-      <div style="margin-top:10px; display:flex; gap:10px;">
-        <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} (${p.likes.length})</button>
-        <button class="btn" style="background:#27ae60;" onclick="sharePost(${p.rowIndex})">🔗 Share</button>
-      </div>
+      <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+  <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} (${p.likes.length})</button>
+  <button class="btn" style="background:#27ae60;" onclick="sharePost(${p.rowIndex})">🔗 Share</button>
+  <button class="btn" style="background:#9b59b6;" onclick="shareAsImage(${p.rowIndex})">📸 Image</button>
+</div>
       
       ${p.likes.length > 0 ? `
         <div style="margin-top:8px; font-size:12px; color:#666;">
@@ -159,8 +160,6 @@ function render() {
       <div style="display:flex; gap:5px; margin-top:10px">
         <input id="c-${p.rowIndex}" placeholder="Comment..." style="margin:0; font-size:13px">
         <button class="btn" onclick="apiCall('comment', ${p.rowIndex})">Post</button>
-        // Add this button to your render function's share section
-<button class="btn" style="background:#9b59b6;" onclick="shareAsImage(${p.rowIndex})">📸 Share as Image</button>
 
       </div>
     </div>`).join('');
