@@ -6,21 +6,6 @@
 <title>The Gooldbook</title>
 
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-<script>
-window.OneSignalDeferred = window.OneSignalDeferred || [];
-OneSignalDeferred.push(async function(OneSignal) {
-  await OneSignal.init({
-    appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064",
-    notifyButton: { enable: false }
-  });
-
-  setTimeout(() => OneSignal.Notifications.requestPermission(), 5000);
-
-  document.getElementById('user').addEventListener('blur', function () {
-    if (this.value.trim()) OneSignal.login(this.value.trim());
-  });
-});
-</script>
 
 <style>
 body { background:#e9ebee; font-family:Arial,sans-serif; margin:0; padding-bottom:50px; }
@@ -34,6 +19,7 @@ body { background:#e9ebee; font-family:Arial,sans-serif; margin:0; padding-botto
 .post-img { width:100%; margin-top:10px; border-radius:4px; background:#f0f2f5; min-height:150px; display:block; }
 .btn { background:#4267b2; color:#fff; border:none; padding:8px 12px; cursor:pointer; font-weight:bold; border-radius:3px; }
 .btn-refresh { background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; width:100%; padding:8px; margin-top:6px; font-weight:bold; }
+.comment { background:#f0f2f5; padding:6px; border-radius:6px; margin-top:4px; font-size:13px; }
 input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:4px; font-size:16px; }
 .load-more-btn { width:100%; padding:12px; border:1px solid #ddd; background:#fff; font-weight:bold; }
 @media(max-width:700px){ .container{flex-direction:column;} .sidebar{width:100%; position:static;} }
@@ -45,7 +31,6 @@ input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #
 <div class="nav">theGooldbook</div>
 
 <div class="container">
-
 <div class="sidebar">
   <div class="sidebar-card">
     <b>🔍 Search</b>
@@ -61,11 +46,7 @@ input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #
   <input type="file" id="file" accept="image/*">
   <button class="btn" onclick="upload()">Post</button>
   <button class="btn-refresh" onclick="loadFeed()">Update Feed</button>
-
-  <!-- ADMIN TOOL -->
-  <button id="fixImagesBtn" class="btn-refresh" style="display:none;" onclick="fixOldImages()">
-    🛠 Fix Old Images
-  </button>
+  <button id="fixImagesBtn" class="btn-refresh" style="display:none" onclick="fixOldImages()">🛠 Fix Old Images</button>
 </div>
 
 <div id="feed">Loading...</div>
@@ -79,11 +60,10 @@ input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #
 
 <script>
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwVAmDdU_JUs1Kd5Z_x6zvvIv8jMgu0czvNWBZ0DPD6OrDjp-hv5GuK2oNK0r8ewfQm/exec";
-let allPosts = [];
-let postsToShow = 5;
+let allPosts = [], postsToShow = 5;
 
 function timeAgo(d){
-  const s=Math.floor((new Date()-new Date(d))/1000);
+  const s=Math.floor((Date.now()-new Date(d))/1000);
   if(s<60)return"Just now";
   if(s<3600)return Math.floor(s/60)+"m ago";
   if(s<86400)return Math.floor(s/3600)+"h ago";
@@ -93,74 +73,141 @@ function timeAgo(d){
 async function loadFeed(){
   const r = await fetch(SCRIPT_URL);
   allPosts = await r.json();
-  localStorage.setItem("gb_cache",JSON.stringify(allPosts));
-  postsToShow=5;
+
+  // 🔒 Normalize legacy rows
+  allPosts.forEach(p=>{
+    if(!Array.isArray(p.likes)) p.likes=[];
+    if(!Array.isArray(p.comments)) p.comments=[];
+  });
+
+  localStorage.setItem("gb_cache", JSON.stringify(allPosts));
+  postsToShow = 5;
   render();
 }
 
 function render(loadMore=false){
   if(loadMore) postsToShow+=5;
-  const u=document.getElementById('user').value.trim();
-  const s=document.getElementById('searchBar').value.toLowerCase();
+  const u=user.value.trim();
+  const s=searchBar.value.toLowerCase();
 
   const list = allPosts.filter(p =>
     p.message?.toLowerCase().includes(s) ||
     p.user?.toLowerCase().includes(s)
   ).slice(0,postsToShow);
 
-  document.getElementById('feed').innerHTML=list.map(p=>{
-    const img = p.image ?
-      `<img src="${p.image}" class="post-img" loading="lazy" referrerpolicy="no-referrer"
-       onerror="this.style.display='none'">` : '';
+  feed.innerHTML = list.map(p=>{
+    const liked = p.likes.includes(u);
+    const img = p.image ? `
+      <img src="${p.image}" class="post-img" loading="lazy"
+       referrerpolicy="no-referrer" onerror="this.style.display='none'">` : '';
+
+    const comments = p.comments.map(c=>`
+      <div class="comment"><b>${c.user}</b>: ${c.text}</div>
+    `).join("");
 
     return `<div class="card" id="post-${p.rowIndex}">
-      <div><span class="user">${p.user}</span>
-      <span style="font-size:11px;color:#888;">${timeAgo(p.timestamp)}</span></div>
+      <div>
+        <span class="user">${p.user}</span>
+        <span style="font-size:11px;color:#888;">${timeAgo(p.timestamp)}</span>
+      </div>
       <p>${p.message}</p>
       ${img}
+
+      <button class="btn" style="margin-top:6px"
+        onclick="toggleLike(${p.rowIndex})">
+        ${liked?'❤️ Unlike':'👍 Like'} (${p.likes.length})
+      </button>
+
+      <div style="margin-top:6px">${comments}</div>
+
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <input id="c-${p.rowIndex}" placeholder="Write a comment…" style="font-size:13px">
+        <button class="btn" onclick="addComment(${p.rowIndex})">Post</button>
+      </div>
     </div>`;
   }).join("");
 
-  document.getElementById('load-more-container').style.display =
-    list.length<allPosts.length?'block':'none';
+  load-more-container.style.display =
+    list.length < allPosts.length ? 'block' : 'none';
+
+  updateTrending();
+}
+
+function toggleLike(rowIndex){
+  const u=user.value.trim();
+  if(!u) return alert("Enter your name");
+
+  const p = allPosts.find(x=>x.rowIndex===rowIndex);
+  const i = p.likes.indexOf(u);
+
+  if(i===-1) p.likes.push(u);
+  else p.likes.splice(i,1);
+
+  render();
+
+  fetch(SCRIPT_URL,{
+    method:'POST',mode:'no-cors',
+    body:JSON.stringify({action:'like',rowIndex,username:u})
+  });
+}
+
+function addComment(rowIndex){
+  const u=user.value.trim();
+  const inp=document.getElementById(`c-${rowIndex}`);
+  if(!u||!inp.value.trim()) return;
+
+  const p=allPosts.find(x=>x.rowIndex===rowIndex);
+  p.comments.push({user:u,text:inp.value});
+  render();
+
+  fetch(SCRIPT_URL,{
+    method:'POST',mode:'no-cors',
+    body:JSON.stringify({
+      action:'comment',
+      rowIndex,
+      username:u,
+      text:inp.value
+    })
+  });
+}
+
+function updateTrending(){
+  const liked=[...allPosts].sort((a,b)=>b.likes.length-a.likes.length).slice(0,5);
+  const commented=[...allPosts].sort((a,b)=>b.comments.length-a.comments.length).slice(0,5);
+
+  topLiked.innerHTML = liked.map(p=>`
+    <div class="sidebar-card" onclick="go(${p.rowIndex})">
+      ❤️ ${p.likes.length} — ${p.message.slice(0,30)}…
+    </div>`).join("");
+
+  topCommented.innerHTML = commented.map(p=>`
+    <div class="sidebar-card" onclick="go(${p.rowIndex})">
+      💬 ${p.comments.length} — ${p.message.slice(0,30)}…
+    </div>`).join("");
+}
+
+function go(i){
+  const el=document.getElementById(`post-${i}`);
+  if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
 }
 
 async function upload(){
-  const u=user.value.trim(), m=msg.value.trim(), f=file.files[0];
-  if(!u||!m) return alert("Name and message required");
-
+  if(!user.value||!msg.value) return alert("Name & message required");
   const r=new FileReader();
   r.onload=async e=>{
     await fetch(SCRIPT_URL,{
       method:'POST',mode:'no-cors',
-      body:JSON.stringify({action:'post',username:u,message:m,image:e.target.result})
+      body:JSON.stringify({
+        action:'post',
+        username:user.value,
+        message:msg.value,
+        image:e.target.result
+      })
     });
     msg.value=""; file.value="";
     loadFeed();
   };
-  if(f) r.readAsDataURL(f); else r.onload({target:{result:""}});
-}
-
-async function fixOldImages(){
-  if(!confirm("Fix old Drive image links?")) return;
-  let fixed=0;
-
-  for(const p of allPosts){
-    if(!p.image) continue;
-    const m=p.image.match(/id=([a-zA-Z0-9_-]+)/)||p.image.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    if(!m) continue;
-
-    const url=`https://drive.google.com/thumbnail?id=${m[1]}&sz=w1200`;
-    if(p.image===url) continue;
-
-    p.image=url; fixed++;
-    fetch(SCRIPT_URL,{
-      method:'POST',mode:'no-cors',
-      body:JSON.stringify({action:'fixImage',rowIndex:p.rowIndex,image:url})
-    });
-  }
-  alert(`✅ Fixed ${fixed} images`);
-  render();
+  file.files[0]?r.readAsDataURL(file.files[0]):r.onload({target:{result:""}});
 }
 
 window.onload=()=>{
@@ -172,7 +219,8 @@ window.onload=()=>{
 
 user.oninput=()=>{
   localStorage.setItem("gb_user",user.value);
-  fixImagesBtn.style.display = user.value.toLowerCase()==="admin"?"block":"none";
+  fixImagesBtn.style.display =
+    user.value.toLowerCase()==="admin"?"block":"none";
 };
 </script>
 </body>
