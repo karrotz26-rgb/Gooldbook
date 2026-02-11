@@ -14,7 +14,7 @@ body { background:#e9ebee; font-family:Arial,sans-serif; margin:0; padding-botto
 .sidebar { width:280px; position:sticky; top:70px; }
 .main-feed { flex-grow:1; max-width:550px; width:100%; }
 .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:4px; }
-.sidebar-card { background:#fff; border:1px solid #ddd; padding:12px; margin-bottom:10px; border-radius:4px; font-size:13px; }
+.sidebar-card { background:#fff; border:1px solid #ddd; padding:12px; margin-bottom:10px; border-radius:4px; font-size:13px; cursor:pointer; }
 .user { color:#365899; font-weight:bold; }
 .post-img { width:100%; margin-top:10px; border-radius:4px; background:#f0f2f5; min-height:150px; display:block; }
 .btn { background:#4267b2; color:#fff; border:none; padding:8px 12px; cursor:pointer; font-weight:bold; border-radius:3px; }
@@ -31,10 +31,11 @@ input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #
 <div class="nav">theGooldbook</div>
 
 <div class="container">
+
 <div class="sidebar">
   <div class="sidebar-card">
     <b>🔍 Search</b>
-    <input id="searchBar" placeholder="Filter posts..." oninput="postsToShow=5;render()">
+    <input id="searchBar" placeholder="Filter posts...">
   </div>
 </div>
 
@@ -59,8 +60,12 @@ input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzHTG44yW0PA3QWt_uqYEZ5dnBOZnGoxHNlO9zEQ1Egncv-qEvU91SGiqoRDdItI4dO/exec";
-let allPosts = [], postsToShow = 5;
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwVAmDdU_JUs1Kd5Z_x6zvvIv8jMgu0czvNWBZ0DPD6OrDjp-hv5GuK2oNK0r8ewfQm/exec";
+
+let allPosts = [];
+let postsToShow = 5;
+
+const el = id => document.getElementById(id);
 
 function timeAgo(d){
   const s=Math.floor((Date.now()-new Date(d))/1000);
@@ -74,7 +79,6 @@ async function loadFeed(){
   const r = await fetch(SCRIPT_URL);
   allPosts = await r.json();
 
-  // 🔒 Normalize legacy rows
   allPosts.forEach(p=>{
     if(!Array.isArray(p.likes)) p.likes=[];
     if(!Array.isArray(p.comments)) p.comments=[];
@@ -87,19 +91,21 @@ async function loadFeed(){
 
 function render(loadMore=false){
   if(loadMore) postsToShow+=5;
-  const u=user.value.trim();
-  const s=searchBar.value.toLowerCase();
+
+  const u = el('user').value.trim();
+  const s = el('searchBar').value.toLowerCase();
 
   const list = allPosts.filter(p =>
     p.message?.toLowerCase().includes(s) ||
     p.user?.toLowerCase().includes(s)
   ).slice(0,postsToShow);
 
-  feed.innerHTML = list.map(p=>{
+  el('feed').innerHTML = list.map(p=>{
     const liked = p.likes.includes(u);
     const img = p.image ? `
       <img src="${p.image}" class="post-img" loading="lazy"
-       referrerpolicy="no-referrer" onerror="this.style.display='none'">` : '';
+        referrerpolicy="no-referrer"
+        onerror="this.style.display='none'">` : '';
 
     const comments = p.comments.map(c=>`
       <div class="comment"><b>${c.user}</b>: ${c.text}</div>
@@ -127,21 +133,17 @@ function render(loadMore=false){
     </div>`;
   }).join("");
 
-  load-more-container.style.display =
+  el('load-more-container').style.display =
     list.length < allPosts.length ? 'block' : 'none';
-
-  updateTrending();
 }
 
 function toggleLike(rowIndex){
-  const u=user.value.trim();
+  const u = el('user').value.trim();
   if(!u) return alert("Enter your name");
 
   const p = allPosts.find(x=>x.rowIndex===rowIndex);
   const i = p.likes.indexOf(u);
-
-  if(i===-1) p.likes.push(u);
-  else p.likes.splice(i,1);
+  i===-1 ? p.likes.push(u) : p.likes.splice(i,1);
 
   render();
 
@@ -152,75 +154,52 @@ function toggleLike(rowIndex){
 }
 
 function addComment(rowIndex){
-  const u=user.value.trim();
-  const inp=document.getElementById(`c-${rowIndex}`);
+  const u = el('user').value.trim();
+  const inp = el(`c-${rowIndex}`);
   if(!u||!inp.value.trim()) return;
 
-  const p=allPosts.find(x=>x.rowIndex===rowIndex);
+  const p = allPosts.find(x=>x.rowIndex===rowIndex);
   p.comments.push({user:u,text:inp.value});
   render();
 
   fetch(SCRIPT_URL,{
     method:'POST',mode:'no-cors',
-    body:JSON.stringify({
-      action:'comment',
-      rowIndex,
-      username:u,
-      text:inp.value
-    })
+    body:JSON.stringify({action:'comment',rowIndex,username:u,text:inp.value})
   });
 }
 
-function updateTrending(){
-  const liked=[...allPosts].sort((a,b)=>b.likes.length-a.likes.length).slice(0,5);
-  const commented=[...allPosts].sort((a,b)=>b.comments.length-a.comments.length).slice(0,5);
-
-  topLiked.innerHTML = liked.map(p=>`
-    <div class="sidebar-card" onclick="go(${p.rowIndex})">
-      ❤️ ${p.likes.length} — ${p.message.slice(0,30)}…
-    </div>`).join("");
-
-  topCommented.innerHTML = commented.map(p=>`
-    <div class="sidebar-card" onclick="go(${p.rowIndex})">
-      💬 ${p.comments.length} — ${p.message.slice(0,30)}…
-    </div>`).join("");
-}
-
-function go(i){
-  const el=document.getElementById(`post-${i}`);
-  if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
-}
-
 async function upload(){
-  if(!user.value||!msg.value) return alert("Name & message required");
+  if(!el('user').value||!el('msg').value) return alert("Name & message required");
   const r=new FileReader();
   r.onload=async e=>{
     await fetch(SCRIPT_URL,{
       method:'POST',mode:'no-cors',
       body:JSON.stringify({
         action:'post',
-        username:user.value,
-        message:msg.value,
+        username:el('user').value,
+        message:el('msg').value,
         image:e.target.result
       })
     });
-    msg.value=""; file.value="";
+    el('msg').value=""; el('file').value="";
     loadFeed();
   };
-  file.files[0]?r.readAsDataURL(file.files[0]):r.onload({target:{result:""}});
+  el('file').files[0]
+    ? r.readAsDataURL(el('file').files[0])
+    : r.onload({target:{result:""}});
 }
 
 window.onload=()=>{
-  user.value=localStorage.getItem("gb_user")||"";
-  const c=localStorage.getItem("gb_cache");
+  el('user').value = localStorage.getItem("gb_user")||"";
+  const c = localStorage.getItem("gb_cache");
   if(c){ allPosts=JSON.parse(c); render(); }
   loadFeed();
 };
 
-user.oninput=()=>{
-  localStorage.setItem("gb_user",user.value);
-  fixImagesBtn.style.display =
-    user.value.toLowerCase()==="admin"?"block":"none";
+el('user').oninput=()=>{
+  localStorage.setItem("gb_user", el('user').value);
+  el('fixImagesBtn').style.display =
+    el('user').value.toLowerCase()==="admin"?"block":"none";
 };
 </script>
 </body>
