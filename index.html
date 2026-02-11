@@ -322,12 +322,46 @@ async function shareAsImage(rowIndex, event) {
   
   try {
     const canvas = await html2canvas(card, { useCORS: true, scale: 2 });
-    const generatedImageData = canvas.toDataURL("image/png");
-    btn.innerText = originalText; btn.disabled = false;
     document.body.removeChild(card);
-    showShareOptions(`${window.location.origin}${window.location.pathname}?post=${rowIndex}`, post, `Check out this post on theGooldbook 🦄`, generatedImageData);
+    
+    // Convert canvas to blob
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    const file = new File([blob], 'gooldbook-post.png', { type: 'image/png' });
+    
+    const shareUrl = `${window.location.origin}${window.location.pathname}?post=${rowIndex}`;
+    const shareText = `Check out this post on theGooldbook 🦄`;
+    
+    btn.innerText = originalText; 
+    btn.disabled = false;
+    
+    // Try native share with the image file
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: `${post.user} on theGooldbook`,
+          text: shareText,
+          url: shareUrl
+        });
+        return; // Success! Exit early
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          return; // User cancelled, that's fine
+        }
+        console.log('Native share failed, falling back to modal', err);
+      }
+    }
+    
+    // Fallback: show custom share modal
+    const generatedImageData = canvas.toDataURL("image/png");
+    showShareOptions(shareUrl, post, shareText, generatedImageData);
+    
   } catch (err) {
-    console.error(err); btn.innerText = originalText; btn.disabled = false; alert("Failed to generate image.");
+    console.error(err); 
+    btn.innerText = originalText; 
+    btn.disabled = false; 
+    document.body.removeChild(card);
+    alert("Failed to generate image.");
   }
 }
 
