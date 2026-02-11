@@ -11,27 +11,35 @@
         await OneSignal.init({
           appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064",
           safari_web_id: "web.onesignal.auto.35c3b21f-3634-4ed2-bd52-fd09e2637415",
-          notifyButton: { enable: true },
+          notifyButton: { enable: false }, // Cleaner UI
+        });
+
+        // Request permission after 5 seconds to not annoy the user immediately
+        setTimeout(() => { OneSignal.Notifications.requestPermission(); }, 5000);
+
+        // Link the user to OneSignal when they finish typing their name
+        document.getElementById('user').addEventListener('blur', function() {
+            const user = this.value.trim();
+            if (user) OneSignal.login(user); 
         });
       });
     </script>
     <style>
         body { background-color: #e9ebee; font-family: Arial, sans-serif; margin: 0; padding-bottom: 50px; overflow-x: hidden; }
-        .nav { background: #3b5998; color: white; padding: 15px; text-align: center; font-weight: bold; position: sticky; top: 0; z-index: 1000; }
+        .nav { background: #3b5998; color: white; padding: 15px; text-align: center; font-weight: bold; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         #pull-indicator { height: 0; overflow: hidden; background: #dfe3ee; text-align: center; line-height: 50px; font-size: 14px; color: #3b5998; font-weight: bold; transition: height 0.1s ease; }
         .container { max-width: 900px; margin: auto; display: flex; gap: 20px; padding: 10px; align-items: flex-start; }
         .sidebar { width: 280px; position: sticky; top: 70px; }
-        .main-feed { flex-grow: 1; max-width: 550px; }
-        .card { background: white; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px; position: relative; }
+        .main-feed { flex-grow: 1; max-width: 550px; width: 100%; }
+        .card { background: white; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .sidebar-card { background: white; border: 1px solid #ddd; padding: 12px; margin-bottom: 10px; border-radius: 4px; font-size: 13px; }
-        .user { color: #365899; font-weight: bold; }
-        .post-img { width: 100%; margin-top: 10px; border-radius: 4px; display: block; }
+        .user { color: #365899; font-weight: bold; text-decoration: none; }
+        .post-img { width: 100%; margin-top: 10px; border-radius: 4px; display: block; background: #f0f2f5; min-height: 150px; }
         .btn { background: #4267b2; color: white; border: none; padding: 8px 12px; cursor: pointer; font-weight: bold; border-radius: 2px; }
         
-        /* Pulse Refresh Button */
         .btn-refresh { 
             background: #f5f6f7; color: #4b4f56; border: 1px solid #ddd; 
-            margin-top: 10px; width: 50%; padding: 8px; font-size: 13px; 
+            margin-top: 10px; width: 100%; padding: 8px; font-size: 13px; 
             cursor: pointer; font-weight: bold; border-radius: 4px; transition: all 0.3s ease;
         }
         .updating { animation: pulse 1.5s infinite; background: #dfe3ee !important; color: #3b5998 !important; pointer-events: none; }
@@ -41,21 +49,8 @@
             100% { transform: scale(1); opacity: 1; }
         }
 
-        /* Unicorn & Sparkle Animations */
-        .unicorn-pop {
-            position: absolute;
-            pointer-events: none;
-            font-size: 24px;
-            animation: floatUp 1s ease-out forwards;
-            z-index: 10000;
-        }
-        .sparkle-pop {
-            position: absolute;
-            pointer-events: none;
-            font-size: 14px;
-            animation: scatter 0.6s ease-out forwards;
-            z-index: 9999;
-        }
+        .unicorn-pop { position: absolute; pointer-events: none; font-size: 24px; animation: floatUp 1s ease-out forwards; z-index: 10000; will-change: transform, opacity; }
+        .sparkle-pop { position: absolute; pointer-events: none; font-size: 14px; animation: scatter 0.6s ease-out forwards; z-index: 9999; }
         @keyframes floatUp {
             0% { transform: translateY(0) scale(0.5) rotate(0deg); opacity: 1; }
             100% { transform: translateY(-100px) scale(1.5) rotate(30deg); opacity: 0; }
@@ -72,7 +67,7 @@
         .liked-by { font-size: 12px; color: #606770; margin-top: 5px; cursor: pointer; }
         .comment-box { background: #f2f3f5; border-radius: 8px; padding: 8px; margin-top: 5px; font-size: 13px; }
         .trending-item { margin-bottom: 12px; cursor: pointer; color: #365899; display: block; text-decoration: none; border-bottom: 1px solid #f0f0f0; padding-bottom: 6px; line-height: 1.4; word-wrap: break-word; }
-        input, textarea { width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; display: block; }
+        input, textarea { width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; display: block; font-size: 16px; /* Prevents iOS zoom on focus */ }
         .load-more-btn { background: #fff; color: #4b4f56; border: 1px solid #ddd; width: 100%; padding: 12px; cursor: pointer; border-radius: 4px; font-weight: bold; }
         @media (max-width: 700px) { .container { flex-direction: column; align-items: stretch; } .sidebar { width: 100%; position: static; } }
     </style>
@@ -98,11 +93,11 @@
             <textarea id="msg" placeholder="What's on your mind?" rows="2"></textarea>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
                 <input type="file" id="file" accept="image/*" style="width: auto; border:none; margin:0; font-size:12px; display: inline-block;">
-                <button class="btn" onclick="upload()">Post</button>
+                <button class="btn" id="postBtn" onclick="upload()">Post</button>
             </div>
             <button id="refreshBtn" class="btn-refresh" onclick="loadFeed()">Update Feed</button>
         </div>
-        <div id="feed">Loading feed...</div>
+        <div id="feed">Instant loading...</div>
         <div id="load-more-container" style="display:none; margin-bottom: 20px;">
             <button class="load-more-btn" onclick="render(true)">Load More Posts</button>
         </div>
@@ -110,7 +105,7 @@
 </div>
 
 <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzA9LBdpxuJxsdkqtpCOgYEzVC89dsFyAY8rogWG1wgunKb8XaC4bNgGXetbKPMonuP/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzffkOF_PNxtfmrPWAmZmMxyw_YS4B0M75_INaCSG2Vn8YVF6jUYyvdzd3913PDCvc4/exec";
     let allPosts = [];
     let postsToShow = 5;
 
@@ -123,18 +118,16 @@
         if (minutes < 60) return `${minutes}m ago`;
         const hours = Math.round(minutes / 60);
         if (hours < 24) return `${hours}h ago`;
-        const days = Math.round(hours / 24);
-        return `${days}d ago`;
+        return `${Math.round(hours / 24)}d ago`;
     }
 
-    // Pull to Refresh Logic
+    // Pull to Refresh
     let startY = 0;
     const pullThreshold = 80;
     const indicator = document.getElementById('pull-indicator');
     window.addEventListener('touchstart', (e) => { if (window.scrollY === 0) startY = e.touches[0].pageY; }, {passive: true});
     window.addEventListener('touchmove', (e) => {
-        const y = e.touches[0].pageY;
-        const pullDistance = y - startY;
+        const pullDistance = e.touches[0].pageY - startY;
         if (window.scrollY === 0 && pullDistance > 0) {
             indicator.style.height = Math.min(pullDistance, pullThreshold) + 'px';
             indicator.innerText = pullDistance > pullThreshold ? "🚀 Release to Refresh" : "🔽 Pull to refresh";
@@ -145,23 +138,29 @@
         indicator.style.height = '0px';
     });
 
+    // LOAD FEED WITH CACHE
     async function loadFeed() {
         const btn = document.getElementById('refreshBtn');
         btn.classList.add('updating');
-        btn.innerText = "Updating...";
+        btn.innerText = "Syncing...";
         try {
             const res = await fetch(SCRIPT_URL);
             allPosts = await res.json();
+            // Cache the result for speed on next visit
+            localStorage.setItem('gb_posts_cache', JSON.stringify(allPosts));
             postsToShow = 5; 
             render();
-        } catch (e) { document.getElementById('feed').innerText = "Error loading. Pull down to try again."; }
+        } catch (e) { 
+            console.error(e);
+            if (allPosts.length === 0) document.getElementById('feed').innerText = "Offline. Pull to retry."; 
+        }
         btn.classList.remove('updating');
         btn.innerText = "Update Feed";
     }
 
     function render(loadMore = false) {
         if (loadMore) postsToShow += 5;
-        const user = document.getElementById('user').value.trim();
+        const currentUser = document.getElementById('user').value.trim();
         const search = document.getElementById('searchBar').value.toLowerCase();
         
         const filtered = allPosts.filter(p => 
@@ -179,8 +178,9 @@
                 else likedText = `Liked by ${likes[0]} and ${likes.length - 1} others`;
             }
 
-            const imageHtml = (p.image && p.image.length > 50) ? 
-                `<img src="${p.image}" class="post-img" onerror="this.style.display='none'">` : '';
+            // Optimization: lazy load images so scroll is fast
+            const imageHtml = (p.image && p.image.length > 10) ? 
+                `<img src="${p.image}" class="post-img" loading="lazy" onerror="this.style.display='none'">` : '';
 
             return `
                 <div class="card" id="post-${p.rowIndex}">
@@ -194,10 +194,10 @@
                     <p>${p.message}</p>
                     ${imageHtml}
                     <div style="border-top:1px solid #eee; padding-top:10px; margin-top:10px; font-size:13px;">
-                        <button onclick="handleAction('like', ${p.rowIndex}, event)" style="background:none; border:none; color:#365899; font-weight:bold; cursor:pointer; position:relative;">
-                            ${likes.includes(user) ? '❤️ Unlike' : '👍 Like'} (${likes.length})
+                        <button onclick="handleAction('like', ${p.rowIndex}, event)" style="background:none; border:none; color:#365899; font-weight:bold; cursor:pointer;">
+                            ${likes.includes(currentUser) ? '❤️ Unlike' : '👍 Like'} (${likes.length})
                         </button>
-                        ${user.toLowerCase() === 'admin' ? `<button onclick="handleAction('delete', ${p.rowIndex})" style="color:red; background:none; border:none; cursor:pointer; margin-left:10px;">🗑️ Delete</button>` : ''}
+                        ${currentUser.toLowerCase() === 'admin' ? `<button onclick="handleAction('delete', ${p.rowIndex})" style="color:red; background:none; border:none; cursor:pointer; margin-left:10px;">🗑️ Delete</button>` : ''}
                         ${likedText ? `<div class="liked-by" onclick="alert('Liked by:\\n${likes.join('\\n')}')">${likedText}</div>` : ''}
                     </div>
                     <div id="comments-${p.rowIndex}">
@@ -212,8 +212,8 @@
                         `).join('')}
                     </div>
                     <div style="display:flex; margin-top:10px; gap:5px;">
-                        <input type="text" id="reply-${p.rowIndex}" placeholder="Comment..." style="margin:0; font-size:12px;">
-                        <button class="btn" style="padding:4px 10px; font-size:12px;" onclick="handleAction('comment', ${p.rowIndex})">Reply</button>
+                        <input type="text" id="reply-${p.rowIndex}" placeholder="Write a comment..." style="margin:0; font-size:13px;">
+                        <button class="btn" style="padding:4px 10px; font-size:12px;" onclick="handleAction('comment', ${p.rowIndex})">Post</button>
                     </div>
                 </div>`;
         }).join('');
@@ -222,85 +222,55 @@
         updateSidebar();
     }
 
-   function updateSidebar() {
-    const liked = [...allPosts].sort((a,b) => (b.likes.length || 0) - (a.likes.length || 0)).slice(0, 5);
-    document.getElementById('top-liked').innerHTML = liked.map(p => `
-        <div class="trending-item" onclick="navigateToPost(${p.rowIndex})">
-            <b>${p.likes.length} 👍</b>: ${p.message.substring(0, 40)}...
-        </div>`).join('');
+    function updateSidebar() {
+        const liked = [...allPosts].sort((a,b) => (b.likes?.length || 0) - (a.likes?.length || 0)).slice(0, 5);
+        document.getElementById('top-liked').innerHTML = liked.map(p => `
+            <div class="trending-item" onclick="navigateToPost(${p.rowIndex})">
+                <b>${p.likes?.length || 0} 👍</b>: ${p.message.substring(0, 30)}...
+            </div>`).join('');
 
-    const commented = [...allPosts].sort((a,b) => (b.comments.length || 0) - (a.comments.length || 0)).slice(0, 5);
-    document.getElementById('top-commented').innerHTML = commented.map(p => `
-        <div class="trending-item" onclick="navigateToPost(${p.rowIndex})">
-            <b>${p.comments.length} 💬</b>: ${p.message.substring(0, 40)}...
-        </div>`).join('');
-}
-
-function navigateToPost(rowIndex) {
-    const postElement = document.getElementById(`post-${rowIndex}`);
-    if (!postElement) {
-        const postIndex = allPosts.findIndex(p => p.rowIndex === rowIndex);
-        if (postIndex !== -1) {
-            postsToShow = postIndex + 1;
-            render(); 
-        }
+        const commented = [...allPosts].sort((a,b) => (b.comments?.length || 0) - (a.comments?.length || 0)).slice(0, 5);
+        document.getElementById('top-commented').innerHTML = commented.map(p => `
+            <div class="trending-item" onclick="navigateToPost(${p.rowIndex})">
+                <b>${p.comments?.length || 0} 💬</b>: ${p.message.substring(0, 30)}...
+            </div>`).join('');
     }
-    setTimeout(() => {
+
+    function navigateToPost(rowIndex) {
         const target = document.getElementById(`post-${rowIndex}`);
-        if (target) {
-            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            target.style.transition = "background 0.5s";
-            target.style.background = "#fff9c4";
-            setTimeout(() => target.style.background = "white", 2000);
+        if (!target) {
+            postsToShow = allPosts.length; // Show all if not found
+            render();
         }
-    }, 100);
-}
-
-    // Animation Function
-    function triggerUnicornCelebration(element) {
-        const rect = element.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2 + window.scrollX;
-        const centerY = rect.top + window.scrollY;
-
-        const unicorn = document.createElement('div');
-        unicorn.innerText = '🦄';
-        unicorn.className = 'unicorn-pop';
-        unicorn.style.left = (centerX - 12) + 'px';
-        unicorn.style.top = (centerY - 20) + 'px';
-        document.body.appendChild(unicorn);
-        setTimeout(() => unicorn.remove(), 1000);
-
-        const particles = ['✨', '⭐', '🌈', '💎'];
-        for (let i = 0; i < 8; i++) {
-            const sparkle = document.createElement('div');
-            sparkle.innerText = particles[Math.floor(Math.random() * particles.length)];
-            sparkle.className = 'sparkle-pop';
-            const dx = (Math.random() - 0.5) * 150 + 'px';
-            const dy = (Math.random() - 0.5) * 150 + 'px';
-            sparkle.style.setProperty('--dx', dx);
-            sparkle.style.setProperty('--dy', dy);
-            sparkle.style.left = centerX + 'px';
-            sparkle.style.top = centerY + 'px';
-            document.body.appendChild(sparkle);
-            setTimeout(() => sparkle.remove(), 600);
-        }
+        setTimeout(() => {
+            const el = document.getElementById(`post-${rowIndex}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.style.background = "#fff9c4";
+                setTimeout(() => el.style.background = "white", 2000);
+            }
+        }, 150);
     }
 
     async function handleAction(action, rowIndex, event) {
         const user = document.getElementById('user').value.trim();
-        if (!user) return alert("Name required!");
+        if (!user) return alert("Please enter your name!");
+        
         const post = allPosts.find(p => p.rowIndex === rowIndex);
         const dot = document.querySelector(`#post-${rowIndex} .sync-dot`);
         if (dot) dot.className = "sync-dot dot-yellow";
 
         let payload = { action, rowIndex, username: user };
+        
         if (action === 'comment') {
             const inp = document.getElementById(`reply-${rowIndex}`);
             if (!inp.value.trim()) return;
             payload.text = inp.value;
+            if(!post.comments) post.comments = [];
             post.comments.push({ user, text: inp.value, time: new Date().toISOString() });
             inp.value = "";
         } else if (action === 'like') {
+            if(!post.likes) post.likes = [];
             const idx = post.likes.indexOf(user);
             if (idx === -1) {
                 post.likes.push(user);
@@ -308,41 +278,72 @@ function navigateToPost(rowIndex) {
             } else {
                 post.likes.splice(idx, 1);
             }
-        } else if (action === 'delete') {
-            if (!confirm("Delete?")) return;
-            allPosts = allPosts.filter(p => p.rowIndex !== rowIndex);
         }
-        render();
+        
+        render(); // Optimistic UI update (feels instant)
+        
         try {
             await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
-            if (document.querySelector(`#post-${rowIndex} .sync-dot`)) 
-                document.querySelector(`#post-${rowIndex} .sync-dot`).className = "sync-dot dot-green";
+            if (dot) dot.className = "sync-dot dot-green";
         } catch (e) { if (dot) dot.className = "sync-dot dot-error"; }
     }
 
+    function triggerUnicornCelebration(element) {
+        const rect = element.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2 + window.scrollX;
+        const centerY = rect.top + window.scrollY;
+        const unicorn = document.createElement('div');
+        unicorn.innerText = '🦄';
+        unicorn.className = 'unicorn-pop';
+        unicorn.style.left = (centerX - 12) + 'px';
+        unicorn.style.top = (centerY - 20) + 'px';
+        document.body.appendChild(unicorn);
+        setTimeout(() => unicorn.remove(), 1000);
+    }
+
     async function upload() {
-        const u = document.getElementById('user').value.trim(), m = document.getElementById('msg').value.trim(), f = document.getElementById('file').files[0];
-        if (!u || !m) return alert("Fill fields!");
+        const u = document.getElementById('user').value.trim(), 
+              m = document.getElementById('msg').value.trim(), 
+              f = document.getElementById('file').files[0];
+        if (!u || !m) return alert("Name and Message required!");
+        
+        const btn = document.getElementById('postBtn');
+        btn.disabled = true;
+        btn.innerText = "...";
+
         const reader = new FileReader();
         reader.onload = async (e) => {
             const imgData = f ? e.target.result : "";
-            const tempRow = Date.now();
-            allPosts.unshift({ user: u, message: m, image: imgData, likes: [], comments: [], rowIndex: tempRow, timestamp: new Date().toISOString() });
+            // Instant local update
+            allPosts.unshift({ user: u, message: m, image: imgData, likes: [], comments: [], rowIndex: Date.now(), timestamp: new Date().toISOString() });
             render();
-            await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'post', username: u, message: m, image: imgData }) });
-            document.getElementById('msg').value = "";
-            document.getElementById('file').value = "";
-            loadFeed();
+            
+            try {
+                await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'post', username: u, message: m, image: imgData }) });
+                document.getElementById('msg').value = "";
+                document.getElementById('file').value = "";
+                loadFeed(); // Refresh to get the real rowIndex from Sheets
+            } catch(err) { alert("Post failed to sync."); }
+            
+            btn.disabled = false;
+            btn.innerText = "Post";
         };
         if (f) reader.readAsDataURL(f);
         else reader.onload({ target: { result: "" } });
     }
 
-    document.getElementById('user').oninput = (e) => localStorage.setItem('gb_user', e.target.value);
     window.onload = () => {
         document.getElementById('user').value = localStorage.getItem('gb_user') || "";
+        // Load from cache first
+        const cache = localStorage.getItem('gb_posts_cache');
+        if (cache) {
+            allPosts = JSON.parse(cache);
+            render();
+        }
         loadFeed();
     };
+
+    document.getElementById('user').oninput = (e) => localStorage.setItem('gb_user', e.target.value);
 </script>
 </body>
 </html>
