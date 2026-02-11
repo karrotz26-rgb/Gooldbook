@@ -424,34 +424,22 @@ async function shareAsImage(rowIndex) {
   btn.innerText = "⌛ Generating...";
   btn.disabled = true;
 
-  // Create the hidden card for rendering (same as your current logic)
+  // 1. Setup the Card Container
   const card = document.createElement('div');
-  /* Inside the card.innerHTML string in shareAsImage function */
-
-// Update the image container and img tag to this:
-${post.image ? `
-  <div style="margin-bottom: 20px; border-radius: 12px; overflow: hidden; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 350px;">
-    <img src="${post.image}" 
-         style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;" 
-         crossorigin="anonymous">
-  </div>
-` : ''}
-
-// And ensure the card style has a defined width and auto height:
-card.style.cssText = `
-  position: fixed;
-  left: -9999px;
-  width: 600px;
-  min-height: 400px; /* Prevents squishing */
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 30px;
-  border-radius: 20px;
-  font-family: system-ui, -apple-system, sans-serif;
-  display: block; 
-`;
+  card.style.cssText = `
+    position: fixed;
+    left: -9999px;
+    width: 600px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 30px;
+    border-radius: 20px;
+    font-family: system-ui, -apple-system, sans-serif;
+    display: block;
+  `;
 
   const previewMessage = post.message.length > 200 ? post.message.substring(0, 200) + '...' : post.message;
   
+  // 2. Setup the Card Inner HTML with the fix for stretching
   card.innerHTML = `
     <div style="background: white; border-radius: 16px; padding: 25px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
       <div style="display: flex; align-items: center; margin-bottom: 20px;">
@@ -461,39 +449,53 @@ card.style.cssText = `
           <div style="font-size: 14px; color: #888;">Shared by ${post.user}</div>
         </div>
       </div>
+      
       <div style="font-size: 18px; color: #333; line-height: 1.6; margin-bottom: 20px;">${previewMessage}</div>
-      ${post.image ? `<div style="margin-bottom: 20px; border-radius: 12px; overflow: hidden;"><img src="${post.image}" style="width: 100%; max-height: 400px; object-fit: cover; display: block;" crossorigin="anonymous"></div>` : ''}
+      
+      ${post.image ? `
+        <div style="margin-bottom: 20px; border-radius: 12px; overflow: hidden; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 350px;">
+          <img src="${post.image}" 
+               style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;" 
+               crossorigin="anonymous">
+        </div>
+      ` : ''}
+      
       <div style="display: flex; gap: 20px; padding-top: 15px; border-top: 2px solid #f0f2f5; font-size: 14px; color: #666;">
         <div>❤️ ${post.likes.length} likes</div>
         <div>💬 ${post.comments.length} comments</div>
+        <div>🕐 ${timeAgo(post.timestamp)}</div>
       </div>
     </div>`;
   
   document.body.appendChild(card);
   
-  // Wait for images
+  // Wait for images to load
   const images = card.querySelectorAll('img');
   await Promise.all(Array.from(images).map(img => img.complete ? Promise.resolve() : new Promise(r => { img.onload=r; img.onerror=r; })));
   
   try {
-    const canvas = await html2canvas(card, { useCORS: true, scale: 2 });
+    const canvas = await html2canvas(card, { 
+      useCORS: true, 
+      scale: 2,
+      backgroundColor: null 
+    });
     const generatedImageData = canvas.toDataURL("image/png");
     
-    // Reset button
+    // Reset button and clean up
     btn.innerText = originalText;
     btn.disabled = false;
     document.body.removeChild(card);
 
-    // Call the shared UI but pass the NEWLY generated image as the preview
+    // Show the shared UI
     const shareUrl = `${window.location.origin}${window.location.pathname}?post=${rowIndex}`;
     const shareText = `Check out this post on theGooldbook 🦄`;
-    
     showShareOptions(shareUrl, post, shareText, generatedImageData);
 
   } catch (err) {
     console.error(err);
     btn.innerText = originalText;
     btn.disabled = false;
+    if (document.body.contains(card)) document.body.removeChild(card);
     alert("Failed to generate image.");
   }
 }
