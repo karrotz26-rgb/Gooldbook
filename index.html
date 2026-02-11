@@ -17,7 +17,7 @@
     .post-img { width:100%; max-height:500px; object-fit: cover; margin-top:10px; border-radius:4px; display:block; background:#f0f2f5; }
     .btn { background:#4267b2; color:#fff; border:none; padding:8px 12px; cursor:pointer; font-weight:bold; border-radius:4px; }
     .btn:disabled { background:#ccc; cursor:not-allowed; }
-    .btn-refresh { background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; width:100%; padding:8px; margin-top:6px; font-weight:bold; cursor:pointer; }
+    .btn-refresh { background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; width:100%; padding:8px; margin-top:6px; font-weight:bold; cursor:pointer; border-radius:4px; }
     .comment { background:#f0f2f5; padding:6px; border-radius:6px; margin-top:4px; font-size:13px; }
     input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:4px; box-sizing: border-box; }
     @media(max-width:700px){ .container{flex-direction:column;} .sidebar{width:100%; position:static;} }
@@ -50,8 +50,17 @@
 </div>
 
 <script>
-const SCRIPT_URL = "YOUR_SCRIPT_URL_HERE";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzW4ShjbuDhvTuYztumiH2vOkv9cNM87BeG8xvigd4DXve00qdzpcIxSflINlu2owUw/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]"), postsToShow = 5;
+
+// Initialize OneSignal
+window.OneSignalDeferred = window.OneSignalDeferred || [];
+OneSignalDeferred.push(async function(OneSignal) {
+  await OneSignal.init({
+    appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064",
+    allowLocalhostAsSecureOrigin: true,
+  });
+});
 
 window.onload = () => {
   document.getElementById('user').value = localStorage.getItem("gb_user") || "";
@@ -79,7 +88,7 @@ function render() {
     <div class="card" id="post-${p.rowIndex}">
       <div class="user">${p.user} <span style="font-size:11px;color:#888;">${timeAgo(p.timestamp)}</span></div>
       <p>${p.message}</p>
-      ${p.image ? `<img src="${p.image}" class="post-img" loading="lazy" onerror="this.src='https://via.placeholder.com/400x200?text=Image+Not+Found'">` : ''}
+      ${p.image ? `<img src="${p.image}" class="post-img" loading="lazy" onerror="this.style.display='none'">` : ''}
       <button class="btn" onclick="apiCall('like', ${p.rowIndex})">${p.likes.includes(u)?'❤️':'👍'} (${p.likes.length})</button>
       <div style="margin-top:10px">${p.comments.map(c => `<div class="comment"><b>${c.user}</b>: ${c.text}</div>`).join('')}</div>
       <div style="display:flex; gap:5px; margin-top:10px">
