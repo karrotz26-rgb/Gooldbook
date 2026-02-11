@@ -127,8 +127,7 @@ function render() {
       ${p.image ? `<img src="${p.image}" class="post-img" loading="lazy" onerror="this.style.display='none'">` : ''}
       <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
         <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} (${p.likes.length})</button>
-        <button class="btn" style="background:#27ae60;" onclick="sharePost(${p.rowIndex})">🔗 Share</button>
-        <button class="btn" style="background:#9b59b6;" onclick="shareAsImage(${p.rowIndex}, event)">📸 Image</button>
+        <button class="btn" style="background:#27ae60;" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
       </div>
       ${p.likes.length > 0 ? `
         <div style="margin-top:8px; font-size:12px; color:#666;">
@@ -273,13 +272,112 @@ function updateSinglePost(rowIndex, p) {
   updateTrending(); localStorage.setItem("gb_cache", JSON.stringify(allPosts));
 }
 
-function sharePost(rowIndex) {
+async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex);
   if (!post) return;
-  const shareUrl = `${window.location.origin}${window.location.pathname}?post=${rowIndex}`;
-  const shareText = `Check out this post on theGooldbook 🦄\n\n"${truncate(post.message, 100)}"\n\n- ${post.user}`;
-  if (navigator.share) navigator.share({ title: `${post.user} on theGooldbook`, text: shareText, url: shareUrl }).catch(() => {});
-  else showShareOptions(shareUrl, post, shareText);
+  
+  const btn = event?.target;
+  if (btn) {
+    const originalText = btn.innerText;
+    btn.innerText = "⌛ Generating..."; 
+    btn.disabled = true;
+  }
+
+  // Generate the image card
+  const card = document.createElement('div');
+  card.style.cssText = `position: fixed; left: -9999px; width: 600px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 20px; font-family: system-ui, -apple-system, sans-serif; display: block;`;
+  
+  const previewMessage = post.message.length > 200 ? post.message.substring(0, 200) + '...' : post.message;
+  
+  card.innerHTML = `
+    <div style="background: white; border-radius: 16px; padding: 25px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
+      <div style="display: flex; align-items: center; margin-bottom: 20px;">
+        <div style="width: 50px; height: 50px; background: #3b5998; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; margin-right: 15px;">🦄</div>
+        <div>
+          <div style="font-size: 20px; font-weight: bold; color: #3b5998;">theGooldbook</div>
+          <div style="font-size: 14px; color: #888;">Shared by ${post.user}</div>
+        </div>
+      </div>
+      <div style="font-size: 18px; color: #333; line-height: 1.6; margin-bottom: 20px;">${previewMessage}</div>
+      ${post.image ? `
+        <div style="margin-bottom: 20px; border-radius: 12px; overflow: hidden; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 350px;">
+          <img src="${post.image}" style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;" crossorigin="anonymous">
+        </div>` : ''}
+      <div style="display: flex; gap: 20px; padding-top: 15px; border-top: 2px solid #f0f2f5; font-size: 14px; color: #666;">
+        <div>❤️ ${post.likes.length} likes</div>
+        <div>💬 ${post.comments.length} comments</div>
+        <div>🕐 ${timeAgo(post.timestamp)}</div>
+      </div>
+    </div>`;
+  
+  document.body.appendChild(card);
+  const images = card.querySelectorAll('img');
+  await Promise.all(Array.from(images).map(img => img.complete ? Promise.resolve() : new Promise(r => { img.onload=r; img.onerror=r; })));
+  
+  try {
+    const canvas = await html2canvas(card, { useCORS: true, scale: 2 });
+    document.body.removeChild(card);
+    
+    // Convert canvas to blob
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    const file = new File([blob], 'gooldbook-post.png', { type: 'image/png' });
+    
+    const shareUrl = `${window.location.origin}${window.location.pathname}?post=${rowIndex}`;
+    const shareText = `Check out this post on theGooldbook 🦄\n\n"${truncate(post.message, 100)}"\n\n- ${post.user}`;
+    
+    if (btn) {
+      btn.innerText = "🔗 Share"; 
+      btn.disabled = false;
+    }
+    
+    // Try native share with the image file
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: `${post.user} on theGooldbook`,
+          text: shareText,
+          url: shareUrl
+        });
+        return; // Success! Exit early
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          return; // User cancelled, that's fine
+        }
+        console.log('Native share with image failed, trying URL only', err);
+      }
+    }
+    
+    // Try native share with just URL (fallback)
+    if (navigator.share) {
+      try {
+        await navigator.share({ 
+          title: `${post.user} on theGooldbook`, 
+          text: shareText, 
+          url: shareUrl 
+        });
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          return; // User cancelled
+        }
+        console.log('Native share failed, showing modal', err);
+      }
+    }
+    
+    // Fallback: show custom share modal
+    const generatedImageData = canvas.toDataURL("image/png");
+    showShareOptions(shareUrl, post, shareText, generatedImageData);
+    
+  } catch (err) {
+    console.error(err); 
+    if (btn) {
+      btn.innerText = "🔗 Share"; 
+      btn.disabled = false;
+    }
+    document.body.removeChild(card);
+    alert("Failed to generate share content.");
+  }
 }
 
 async function shareAsImage(rowIndex, event) {
