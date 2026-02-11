@@ -1,244 +1,165 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Gooldbook</title>
-
-<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-
-<style>
-body { background:#e9ebee; font-family:Arial,sans-serif; margin:0; padding-bottom:50px; }
-.nav { background:#3b5998; color:#fff; padding:15px; text-align:center; font-weight:bold; position:sticky; top:0; z-index:1000; }
-.container { max-width:900px; margin:auto; display:flex; gap:20px; padding:10px; }
-.sidebar { width:280px; position:sticky; top:70px; }
-.main-feed { flex-grow:1; max-width:550px; width:100%; }
-.card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:4px; position:relative; }
-.sidebar-card { background:#fff; border:1px solid #ddd; padding:10px; margin-bottom:10px; border-radius:4px; font-size:13px; cursor:pointer; }
-.user { color:#365899; font-weight:bold; }
-.post-img { width:100%; margin-top:10px; border-radius:4px; background:#f0f2f5; min-height:150px; display:block; }
-.btn { background:#4267b2; color:#fff; border:none; padding:8px 12px; cursor:pointer; font-weight:bold; border-radius:3px; }
-.btn-refresh { background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; width:100%; padding:8px; margin-top:6px; font-weight:bold; }
-.comment { background:#f0f2f5; padding:6px; border-radius:6px; margin-top:4px; font-size:13px; }
-input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:4px; font-size:16px; }
-.load-more-btn { width:100%; padding:12px; border:1px solid #ddd; background:#fff; font-weight:bold; }
-.unicorn-pop { position:absolute; pointer-events:none; font-size:24px; animation:floatUp 1s ease-out forwards; z-index:10000; }
-@keyframes floatUp {
-  0% { transform: translateY(0) scale(0.5) rotate(0deg); opacity:1; }
-  50% { transform: translateY(-50px) scale(1.2) rotate(15deg); opacity:0.8; }
-  100% { transform: translateY(-100px) scale(1.5) rotate(30deg); opacity:0; }
-}
-@media(max-width:700px){ .container{flex-direction:column;} .sidebar{width:100%; position:static;} }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Gooldbook</title>
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <style>
+    body { background:#e9ebee; font-family:system-ui, -apple-system, sans-serif; margin:0; padding-bottom:50px; }
+    .nav { background:#3b5998; color:#fff; padding:15px; text-align:center; font-weight:bold; position:sticky; top:0; z-index:1000; }
+    .container { max-width:900px; margin:auto; display:flex; gap:20px; padding:10px; }
+    .sidebar { width:280px; position:sticky; top:70px; }
+    .main-feed { flex-grow:1; max-width:550px; width:100%; }
+    .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; }
+    .sidebar-card { background:#fff; border:1px solid #ddd; padding:10px; margin-bottom:10px; border-radius:4px; font-size:13px; }
+    .user { color:#365899; font-weight:bold; }
+    .post-img { width:100%; max-height:500px; object-fit: cover; margin-top:10px; border-radius:4px; display:block; background:#f0f2f5; }
+    .btn { background:#4267b2; color:#fff; border:none; padding:8px 12px; cursor:pointer; font-weight:bold; border-radius:4px; }
+    .btn:disabled { background:#ccc; cursor:not-allowed; }
+    .btn-refresh { background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; width:100%; padding:8px; margin-top:6px; font-weight:bold; cursor:pointer; }
+    .comment { background:#f0f2f5; padding:6px; border-radius:6px; margin-top:4px; font-size:13px; }
+    input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:4px; box-sizing: border-box; }
+    @media(max-width:700px){ .container{flex-direction:column;} .sidebar{width:100%; position:static;} }
+  </style>
 </head>
 <body>
 
 <div class="nav">theGooldbook</div>
 
 <div class="container">
-
   <div class="sidebar">
     <div class="sidebar-card">
       <b>🔍 Search</b>
-      <input id="searchBar" placeholder="Filter posts..." oninput="postsToShow=5; render()">
+      <input id="searchBar" placeholder="Filter posts..." oninput="render()">
     </div>
-    <div class="sidebar-card"><b>🔥 Top Liked</b><div id="topLiked"></div></div>
-    <div class="sidebar-card"><b>💬 Top Commented</b><div id="topCommented"></div></div>
+    <div id="trending"></div>
   </div>
 
   <div class="main-feed">
-
     <div class="card">
-      <input id="user" placeholder="Your Name">
+      <input id="user" placeholder="Your Name" onchange="saveUser()">
       <textarea id="msg" rows="2" placeholder="What's on your mind?"></textarea>
       <input type="file" id="file" accept="image/*">
-      <button class="btn" onclick="upload()">Post</button>
+      <button id="postBtn" class="btn" onclick="upload()">Post</button>
       <button class="btn-refresh" onclick="loadFeed()">Update Feed</button>
-      <button id="fixImagesBtn" class="btn-refresh" style="display:none" onclick="fixOldImages()">🛠 Fix Old Images</button>
     </div>
-
-    <div id="feed">Loading...</div>
-    <div id="load-more-container" style="display:none;">
-      <button class="load-more-btn" onclick="render(true)">Load More</button>
-    </div>
-
+    <div id="feed">Loading feed...</div>
+    <button id="loadMore" class="btn-refresh" style="display:none" onclick="postsToShow+=5; render()">Load More</button>
   </div>
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzLGc4dTPwKxSj_Kr75mcelUojryif9Ft4a6_anQMXd_YAP3bI-kpaaHWmMCYIjM8ub/exec";
-let allPosts = [], postsToShow = 5;
+const SCRIPT_URL = "YOUR_SCRIPT_URL_HERE";
+let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]"), postsToShow = 5;
 
-// OneSignal Initialization
-window.OneSignalDeferred = window.OneSignalDeferred || [];
-OneSignalDeferred.push(async function(OneSignal){
-  await OneSignal.init({ appId:"4577a6bd-cd70-41d2-bf78-aba5f6211064", notifyButton:{enable:false} });
-  setTimeout(()=>OneSignal.Notifications.requestPermission(),5000);
-  document.getElementById('user').addEventListener('blur',()=>{ const u=user.value.trim(); if(u) OneSignal.login(u); });
-});
-
-function timeAgo(d){
-  const s=Math.floor((Date.now()-new Date(d))/1000);
-  if(s<60)return"Just now";
-  if(s<3600)return Math.floor(s/60)+"m ago";
-  if(s<86400)return Math.floor(s/3600)+"h ago";
-  return Math.floor(s/86400)+"d ago";
-}
-
-async function loadFeed(){
-  try {
-    const res = await fetch(SCRIPT_URL);
-    allPosts = await res.json();
-    allPosts.forEach(p => { 
-      if(!Array.isArray(p.likes)) p.likes=[]; 
-      if(!Array.isArray(p.comments)) p.comments=[]; 
-    });
-    localStorage.setItem("gb_cache", JSON.stringify(allPosts));
-    postsToShow = 5;
-    render();
-  } catch(e){
-    console.error(e);
-    document.getElementById('feed').innerHTML = "Failed to load posts.";
-  }
-}
-
-function render(loadMore=false){
-  if(loadMore) postsToShow += 5;
-  const u = document.getElementById('user').value.trim();
-  const s = document.getElementById('searchBar').value.toLowerCase();
-
-  const list = allPosts.filter(p =>
-    (p.message?.toLowerCase().includes(s)) || (p.user?.toLowerCase().includes(s))
-  ).slice(0, postsToShow);
-
-  const feedEl = document.getElementById('feed');
-  feedEl.innerHTML = list.map(p=>{
-    const liked = p.likes.includes(u);
-    const img = p.image ? `<img src="${p.image}" class="post-img" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">` : '';
-    const comments = p.comments.map(c=>`<div class="comment"><b>${c.user}</b>: ${c.text}</div>`).join('');
-
-    return `<div class="card" id="post-${p.rowIndex}">
-      <div><span class="user">${p.user}</span> <span style="font-size:11px;color:#888;">${timeAgo(p.timestamp)}</span></div>
-      <p>${p.message}</p>
-      ${img}
-      <button class="btn" style="margin-top:6px" onclick="toggleLike(${p.rowIndex}, event)">
-        ${liked?'❤️ Unlike':'👍 Like'} (${p.likes.length})
-      </button>
-      <div style="margin-top:6px">${comments}</div>
-      <div style="display:flex; gap:6px; margin-top:6px">
-        <input id="c-${p.rowIndex}" placeholder="Write a comment…" style="font-size:13px">
-        <button class="btn" onclick="addComment(${p.rowIndex})">Post</button>
-      </div>
-    </div>`;
-  }).join('');
-
-  document.getElementById('load-more-container').style.display = list.length < allPosts.length ? 'block' : 'none';
-  updateTrending();
-}
-
-function toggleLike(rowIndex, event){
-  const u = document.getElementById('user').value.trim();
-  if(!u) return alert("Enter your name");
-  const p = allPosts.find(x=>x.rowIndex===rowIndex);
-  const i = p.likes.indexOf(u);
-  if(i===-1){ p.likes.push(u); triggerUnicorn(event); }
-  else p.likes.splice(i,1);
-  render();
-  fetch(SCRIPT_URL, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({action:'like', rowIndex, username:u})
-  });
-}
-
-function addComment(rowIndex){
-  const u = document.getElementById('user').value.trim();
-  const inp = document.getElementById(`c-${rowIndex}`);
-  if(!u || !inp.value.trim()) return;
-  const p = allPosts.find(x=>x.rowIndex===rowIndex);
-  p.comments.push({user:u, text: inp.value});
-  render();
-  fetch(SCRIPT_URL, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({action:'comment', rowIndex, username:u, text: inp.value})
-  });
-  inp.value = "";
-}
-
-function updateTrending(){
-  const topLikedEl = document.getElementById('topLiked');
-  const topCommentedEl = document.getElementById('topCommented');
-  topLikedEl.innerHTML = [...allPosts].sort((a,b)=>b.likes.length-a.likes.length).slice(0,5)
-    .map(p=>`<div class="sidebar-card" onclick="go(${p.rowIndex})">❤️ ${p.likes.length} — ${p.message.slice(0,30)}…</div>`).join('');
-  topCommentedEl.innerHTML = [...allPosts].sort((a,b)=>b.comments.length-a.comments.length).slice(0,5)
-    .map(p=>`<div class="sidebar-card" onclick="go(${p.rowIndex})">💬 ${p.comments.length} — ${p.message.slice(0,30)}…</div>`).join('');
-}
-
-function go(i){
-  const el = document.getElementById(`post-${i}`);
-  if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
-}
-
-function triggerUnicorn(event){
-  const rect = event.target.getBoundingClientRect();
-  const unicorn = document.createElement('div');
-  unicorn.innerText='🦄';
-  unicorn.className='unicorn-pop';
-  unicorn.style.left = (rect.left + rect.width/2) + 'px';
-  unicorn.style.top = (rect.top + window.scrollY - 20) + 'px';
-  document.body.appendChild(unicorn);
-  setTimeout(()=>unicorn.remove(), 1000);
-}
-
-async function upload(){
-  const userInput = document.getElementById('user').value.trim();
-  const msgInput = document.getElementById('msg').value.trim();
-  const fileInput = document.getElementById('file').files[0];
-  if(!userInput || !msgInput) return alert("Name & message required");
-
-  const r = new FileReader();
-  r.onload = async e => {
-    await fetch(SCRIPT_URL, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({action:'post', username:userInput, message:msgInput, image: e.target.result})
-    });
-    document.getElementById('msg').value="";
-    document.getElementById('file').value="";
-    loadFeed();
-  };
-  fileInput ? r.readAsDataURL(fileInput) : r.onload({target:{result:""}});
-}
-
-async function fixOldImages(){
-  if(!confirm("Fix old Drive image links?")) return;
-  let fixed=0;
-  for(const p of allPosts){
-    if(!p.image) continue;
-    const m=p.image.match(/id=([a-zA-Z0-9_-]+)/)||p.image.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    if(!m) continue;
-    const url=`https://drive.google.com/uc?export=download&id=${m[1]}`;
-    if(p.image === url) continue; p.image = url; fixed++;
-    fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'fixImage', rowIndex: p.rowIndex, image: url})});
-  }
-  alert(`✅ Fixed ${fixed} images`);
-  render();
-}
-
-window.onload = ()=>{
-  const userEl = document.getElementById('user');
-  userEl.value = localStorage.getItem("gb_user") || "";
-  const cache = localStorage.getItem("gb_cache");
-  if(cache) { allPosts = JSON.parse(cache); render(); }
+window.onload = () => {
+  document.getElementById('user').value = localStorage.getItem("gb_user") || "";
+  if(allPosts.length) render();
   loadFeed();
 };
 
-document.getElementById('user').oninput = ()=>{
-  localStorage.setItem("gb_user", document.getElementById('user').value);
-  document.getElementById('fixImagesBtn').style.display = document.getElementById('user').value.toLowerCase() === "admin" ? "block" : "none";
-};
-</script>
+async function loadFeed() {
+  try {
+    const res = await fetch(SCRIPT_URL);
+    allPosts = await res.json();
+    allPosts.forEach(p => { p.likes = p.likes || []; p.comments = p.comments || []; });
+    localStorage.setItem("gb_cache", JSON.stringify(allPosts));
+    render();
+  } catch(e) { console.error("Load failed", e); }
+}
 
+function render() {
+  const u = document.getElementById('user').value.trim();
+  const s = document.getElementById('searchBar').value.toLowerCase();
+  const filtered = allPosts.filter(p => p.message?.toLowerCase().includes(s) || p.user?.toLowerCase().includes(s));
+  
+  const feedEl = document.getElementById('feed');
+  feedEl.innerHTML = filtered.slice(0, postsToShow).map(p => `
+    <div class="card" id="post-${p.rowIndex}">
+      <div class="user">${p.user} <span style="font-size:11px;color:#888;">${timeAgo(p.timestamp)}</span></div>
+      <p>${p.message}</p>
+      ${p.image ? `<img src="${p.image}" class="post-img" loading="lazy" onerror="this.src='https://via.placeholder.com/400x200?text=Image+Not+Found'">` : ''}
+      <button class="btn" onclick="apiCall('like', ${p.rowIndex})">${p.likes.includes(u)?'❤️':'👍'} (${p.likes.length})</button>
+      <div style="margin-top:10px">${p.comments.map(c => `<div class="comment"><b>${c.user}</b>: ${c.text}</div>`).join('')}</div>
+      <div style="display:flex; gap:5px; margin-top:10px">
+        <input id="c-${p.rowIndex}" placeholder="Comment..." style="margin:0; font-size:13px">
+        <button class="btn" onclick="apiCall('comment', ${p.rowIndex})">Post</button>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('loadMore').style.display = filtered.length > postsToShow ? 'block' : 'none';
+  updateTrending();
+}
+
+async function apiCall(action, rowIndex) {
+  const username = document.getElementById('user').value.trim();
+  if (!username) return alert("Enter name");
+  const text = document.getElementById(`c-${rowIndex}`)?.value;
+  
+  const p = allPosts.find(x => x.rowIndex === rowIndex);
+  if (action === 'like') {
+    const i = p.likes.indexOf(username);
+    i === -1 ? p.likes.push(username) : p.likes.splice(i, 1);
+  } else {
+    if (!text) return;
+    p.comments.push({ user: username, text });
+  }
+  render();
+  
+  await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({ action, rowIndex, username, text }) });
+  if (action === 'comment') document.getElementById(`c-${rowIndex}`).value = "";
+}
+
+async function upload() {
+  const user = document.getElementById('user').value.trim();
+  const msg = document.getElementById('msg').value.trim();
+  const file = document.getElementById('file').files[0];
+  const btn = document.getElementById('postBtn');
+
+  if (!user || !msg) return alert("Missing info");
+
+  btn.innerText = "Uploading...";
+  btn.disabled = true;
+
+  let imgBase64 = "";
+  if (file) {
+    imgBase64 = await new Promise(r => { 
+      const rd = new FileReader(); 
+      rd.onload = e => r(e.target.result); 
+      rd.readAsDataURL(file); 
+    });
+  }
+
+  try {
+    await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'post', username:user, message:msg, image:imgBase64 })});
+    document.getElementById('msg').value = "";
+    document.getElementById('file').value = "";
+    await loadFeed();
+  } catch(e) { alert("Upload failed"); } 
+  finally {
+    btn.innerText = "Post";
+    btn.disabled = false;
+  }
+}
+
+function timeAgo(d) {
+  const s = Math.floor((Date.now() - new Date(d)) / 1000);
+  if (s < 60) return "Just now";
+  if (s < 3600) return Math.floor(s/60) + "m ago";
+  if (s < 86400) return Math.floor(s/3600) + "h ago";
+  return Math.floor(s/86400) + "d ago";
+}
+
+function saveUser() { localStorage.setItem("gb_user", document.getElementById('user').value); }
+
+function updateTrending() {
+  const top = [...allPosts].sort((a,b) => b.likes.length - a.likes.length).slice(0,3);
+  document.getElementById('trending').innerHTML = `
+    <div class="sidebar-card"><b>🔥 Popular</b><br>
+    ${top.map(p => `<div style="cursor:pointer; padding:4px 0;" onclick="document.getElementById('post-${p.rowIndex}').scrollIntoView({behavior:'smooth'})">❤️ ${p.likes.length} ${p.user}</div>`).join('')}
+    </div>`;
+}
+</script>
 </body>
 </html>
