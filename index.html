@@ -2,16 +2,36 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>The Gooldbook🦄</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2250%22 fill=%22%233b5998%22/><text y=%22.9em%22 font-size=%2280%22 x=%225%22>🦄</text></svg>">
 
-<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%233b5998%22/><text y=%22.9em%22 font-size=%2280%22 x=%225%22>🦄</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2250%22 fill=%22%233b5998%22/><text y=%22.9em%22 font-size=%2280%22 x=%225%22>🦄</text></svg>">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%233b5998%22/><text y=%22.9em%22 font-size=%2280%22 x=%225%22>🦄</text></svg>">
+  
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
   <style>
     body { background:#e9ebee; font-family:system-ui, -apple-system, sans-serif; margin:0; padding-bottom:50px; }
-    .nav { background:#3b5998; color:#fff; padding:15px; text-align:center; font-weight:bold; position:sticky; top:0; z-index:1000; }
+    
+    .nav { 
+      background:#3b5998; 
+      color:#fff; 
+      padding:15px; 
+      padding-top: calc(15px + env(safe-area-inset-top)); /* Notch Support */
+      text-align:center; 
+      font-weight:bold; 
+      position:sticky; 
+      top:0; 
+      z-index:1000; 
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
     .container { max-width:900px; margin:auto; display:flex; gap:20px; padding:10px; }
     .sidebar { width:280px; position:sticky; top:70px; }
     .main-feed { flex-grow:1; max-width:550px; width:100%; }
@@ -19,21 +39,22 @@
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:10px; margin-bottom:10px; border-radius:4px; font-size:13px; }
     .user { color:#365899; font-weight:bold; }
     .post-img { width:100%; max-height:500px; object-fit: cover; margin-top:10px; border-radius:4px; display:block; background:#f0f2f5; }
+    
     .btn { background:#4267b2; color:#fff; border:none; padding:8px 12px; cursor:pointer; font-weight:bold; border-radius:4px; }
     .btn:disabled { background:#ccc; cursor:not-allowed; }
     .btn-refresh { background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; width:100%; padding:8px; margin-top:6px; font-weight:bold; cursor:pointer; border-radius:4px; }
+    
     .comment { background:#f0f2f5; padding:6px; border-radius:6px; margin-top:4px; font-size:13px; }
     input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:4px; box-sizing: border-box; }
+    
     @media(max-width:700px){ .container{flex-direction:column;} .sidebar{width:100%; position:static;} }
+
+    /* Animations */
     .unicorn { position: fixed; font-size: 60px; pointer-events: none; z-index: 9999; animation: unicornFloat 2s ease-out forwards; }
     @keyframes unicornFloat { 0% { transform: translateY(0) rotate(0deg) scale(0); opacity: 0; } 10% { opacity: 1; transform: translateY(-20px) rotate(10deg) scale(1); } 100% { transform: translateY(-300px) rotate(360deg) scale(0.5); opacity: 0; } }
     .sparkle { position: fixed; pointer-events: none; z-index: 9998; animation: sparkleFloat 1.5s ease-out forwards; }
     @keyframes sparkleFloat { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-150px) scale(0); opacity: 0; } }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-  <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
 </head>
 <body>
 
@@ -41,7 +62,6 @@
   <span style="background:white; border-radius:50%; width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center; margin-right:8px; font-size:18px;">🦄</span>
   theGooldbook
 </div>
-
 
 <div class="container">
   <div class="sidebar">
@@ -69,7 +89,7 @@
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwN_XgiqcEPQsiTNEBMTIemJA75NIgnLrlt2a9T5wq8h9b7FPM9yFSd72tUUIoeh8xu/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]"), postsToShow = 5;
 
-// OneSignal Init
+// OneSignal
 window.OneSignalDeferred = window.OneSignalDeferred || [];
 OneSignalDeferred.push(async function(OneSignal) {
   await OneSignal.init({ appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064", allowLocalhostAsSecureOrigin: true });
@@ -108,7 +128,7 @@ function render() {
       <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
         <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} (${p.likes.length})</button>
         <button class="btn" style="background:#27ae60;" onclick="sharePost(${p.rowIndex})">🔗 Share</button>
-        <button class="btn" style="background:#9b59b6;" onclick="shareAsImage(${p.rowIndex})">📸 Image</button>
+        <button class="btn" style="background:#9b59b6;" onclick="shareAsImage(${p.rowIndex}, event)">📸 Image</button>
       </div>
       ${p.likes.length > 0 ? `
         <div style="margin-top:8px; font-size:12px; color:#666;">
@@ -262,7 +282,7 @@ function sharePost(rowIndex) {
   else showShareOptions(shareUrl, post, shareText);
 }
 
-async function shareAsImage(rowIndex) {
+async function shareAsImage(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex);
   if (!post) return;
   
