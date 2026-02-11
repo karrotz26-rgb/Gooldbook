@@ -63,6 +63,7 @@
 }
 
   </style>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </head>
 <body>
 
@@ -158,6 +159,9 @@ function render() {
       <div style="display:flex; gap:5px; margin-top:10px">
         <input id="c-${p.rowIndex}" placeholder="Comment..." style="margin:0; font-size:13px">
         <button class="btn" onclick="apiCall('comment', ${p.rowIndex})">Post</button>
+        // Add this button to your render function's share section
+<button class="btn" style="background:#9b59b6;" onclick="shareAsImage(${p.rowIndex})">📸 Share as Image</button>
+
       </div>
     </div>`).join('');
 
@@ -424,37 +428,49 @@ function showShareOptions(url, post, shareText) {
     align-items: center;
     justify-content: center;
     z-index: 10000;
+    overflow-y: auto;
+    padding: 20px;
   `;
   
   // Truncate message for preview
   const previewMessage = post.message.length > 150 ? post.message.substring(0, 150) + '...' : post.message;
   
   modal.innerHTML = `
-    <div style="background: white; padding: 20px; border-radius: 8px; max-width: 500px; width: 90%;">
+    <div style="background: white; padding: 20px; border-radius: 8px; max-width: 500px; width: 100%; max-height: 90vh; overflow-y: auto;">
       <h3 style="margin-top: 0;">Share this post 🔗</h3>
       
-      <!-- Post Preview Card -->
-      <div style="border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 15px 0; background: #f9f9f9;">
-        <div style="color: #365899; font-weight: bold; margin-bottom: 8px;">${post.user}</div>
-        <div style="font-size: 14px; color: #333; margin-bottom: 10px;">${previewMessage}</div>
-        ${post.image ? `<img src="${post.image}" style="max-width: 100%; border-radius: 4px; margin-top: 10px;">` : ''}
-        <div style="font-size: 11px; color: #888; margin-top: 8px;">
-          ❤️ ${post.likes.length} likes • 💬 ${post.comments.length} comments
+      <!-- Post Preview Card with Image -->
+      <div style="border: 2px solid #ddd; border-radius: 8px; padding: 0; margin: 15px 0; background: #fff; overflow: hidden;">
+        <div style="padding: 15px; background: #f9f9f9;">
+          <div style="color: #365899; font-weight: bold; margin-bottom: 8px; font-size: 15px;">${post.user}</div>
+          <div style="font-size: 14px; color: #333; line-height: 1.4;">${previewMessage}</div>
+        </div>
+        
+        ${post.image ? `
+          <div style="background: #000; text-align: center;">
+            <img src="${post.image}" 
+                 style="max-width: 100%; max-height: 300px; width: auto; height: auto; display: block; margin: 0 auto;" 
+                 onerror="this.parentElement.style.display='none'">
+          </div>
+        ` : ''}
+        
+        <div style="padding: 10px 15px; border-top: 1px solid #e9ebee; font-size: 12px; color: #888; background: #f9f9f9;">
+          ❤️ ${post.likes.length} likes • 💬 ${post.comments.length} comments • 🕐 ${timeAgo(post.timestamp)}
         </div>
       </div>
       
       <!-- Share Text (for copy/paste) -->
       <div style="margin: 15px 0;">
-        <label style="font-size: 12px; color: #666; display: block; margin-bottom: 5px;">Share message:</label>
-        <textarea id="shareTextArea" readonly style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; resize: vertical; min-height: 80px;">${shareText}
+        <label style="font-size: 12px; color: #666; display: block; margin-bottom: 5px; font-weight: bold;">Copy message to share:</label>
+        <textarea id="shareTextArea" readonly style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; resize: vertical; min-height: 100px; font-family: system-ui, -apple-system, sans-serif;">${shareText}
 
 ${url}</textarea>
-        <button class="btn" onclick="copyShareText()" style="margin-top: 5px; width: 100%;">📋 Copy Message</button>
+        <button class="btn" onclick="copyShareText()" style="margin-top: 8px; width: 100%;">📋 Copy Full Message</button>
       </div>
       
       <!-- Social Share Buttons -->
       <div style="margin: 15px 0;">
-        <label style="font-size: 12px; color: #666; display: block; margin-bottom: 5px;">Or share directly:</label>
+        <label style="font-size: 12px; color: #666; display: block; margin-bottom: 8px; font-weight: bold;">Share directly to:</label>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}" target="_blank" class="btn" style="text-align: center; text-decoration: none;">📘 Facebook</a>
           <a href="https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(shareText)}" target="_blank" class="btn" style="text-align: center; text-decoration: none;">🐦 Twitter</a>
@@ -463,7 +479,7 @@ ${url}</textarea>
         </div>
       </div>
       
-      <button class="btn-refresh" onclick="this.parentElement.parentElement.remove()">Close</button>
+      <button class="btn-refresh" onclick="this.parentElement.parentElement.remove()" style="width: 100%;">Close</button>
     </div>
   `;
   
@@ -482,6 +498,127 @@ function copyShareText() {
   });
 }
 
+async function shareAsImage(rowIndex) {
+  const post = allPosts.find(p => p.rowIndex === rowIndex);
+  if (!post) return;
+  
+  // Create a beautiful post card
+  const card = document.createElement('div');
+  card.style.cssText = `
+    position: fixed;
+    left: -9999px;
+    width: 600px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 30px;
+    border-radius: 20px;
+    font-family: system-ui, -apple-system, sans-serif;
+  `;
+  
+  const previewMessage = post.message.length > 200 ? post.message.substring(0, 200) + '...' : post.message;
+  
+  card.innerHTML = `
+    <div style="background: white; border-radius: 16px; padding: 25px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
+      <!-- Header -->
+      <div style="display: flex; align-items: center; margin-bottom: 20px;">
+        <div style="width: 50px; height: 50px; background: #3b5998; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; margin-right: 15px;">
+          🦄
+        </div>
+        <div>
+          <div style="font-size: 20px; font-weight: bold; color: #3b5998;">theGooldbook</div>
+          <div style="font-size: 14px; color: #888;">Shared by ${post.user}</div>
+        </div>
+      </div>
+      
+      <!-- Post Content -->
+      <div style="font-size: 18px; color: #333; line-height: 1.6; margin-bottom: 20px;">
+        ${previewMessage}
+      </div>
+      
+      <!-- Image (if exists) -->
+      ${post.image ? `
+        <div style="margin-bottom: 20px; border-radius: 12px; overflow: hidden;">
+          <img src="${post.image}" style="width: 100%; max-height: 400px; object-fit: cover; display: block;" crossorigin="anonymous">
+        </div>
+      ` : ''}
+      
+      <!-- Stats -->
+      <div style="display: flex; gap: 20px; padding-top: 15px; border-top: 2px solid #f0f2f5; font-size: 14px; color: #666;">
+        <div>❤️ ${post.likes.length} likes</div>
+        <div>💬 ${post.comments.length} comments</div>
+        <div>🕐 ${timeAgo(post.timestamp)}</div>
+      </div>
+      
+      <!-- Footer -->
+      <div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #f0f2f5; text-align: center; color: #888; font-size: 13px;">
+        Join the conversation at theGooldbook 🦄
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(card);
+  
+  // Wait for images to load
+  const images = card.querySelectorAll('img');
+  await Promise.all(Array.from(images).map(img => {
+    if (img.complete) return Promise.resolve();
+    return new Promise(resolve => {
+      img.onload = resolve;
+      img.onerror = resolve;
+    });
+  }));
+  
+  // Convert to image using html2canvas
+  try {
+    const canvas = await html2canvas(card, {
+      backgroundColor: null,
+      scale: 2, // Higher quality
+      logging: false,
+      useCORS: true,
+      allowTaint: true
+    });
+    
+    // Convert canvas to blob
+    canvas.toBlob(async (blob) => {
+      const file = new File([blob], `gooldbook-${post.user}-${Date.now()}.png`, { type: 'image/png' });
+      
+      // Try to share using Web Share API
+      if (navigator.share && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: `Post by ${post.user}`,
+            text: `Check out this post on theGooldbook! 🦄`
+          });
+        } catch (err) {
+          console.log('Share cancelled or failed', err);
+          downloadImage(blob, file.name);
+        }
+      } else {
+        // Fallback: download the image
+        downloadImage(blob, file.name);
+      }
+      
+      // Clean up
+      document.body.removeChild(card);
+    });
+  } catch (err) {
+    console.error('Image generation failed', err);
+    document.body.removeChild(card);
+    alert('Failed to create image. Please try again.');
+  }
+}
+
+function downloadImage(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+  
+  // Show success message
+  alert('Image saved! You can now share it from your Photos app.');
+}
 
 </script>
 </body>
