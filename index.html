@@ -90,6 +90,16 @@ function render() {
       <p>${p.message}</p>
       ${p.image ? `<img src="${p.image}" class="post-img" loading="lazy" onerror="this.style.display='none'">` : ''}
       <button class="btn" onclick="apiCall('like', ${p.rowIndex})">${p.likes.includes(u)?'❤️':'👍'} (${p.likes.length})</button>
+      ${p.likes.length > 0 ? `
+        <div style="margin-top:8px; font-size:12px; color:#666;">
+          <span style="cursor:pointer;" onclick="toggleLikes(${p.rowIndex})">
+            👥 Liked by <b>${formatLikes(p.likes)}</b>
+          </span>
+          <div id="likes-${p.rowIndex}" style="display:none; margin-top:4px; padding:6px; background:#f0f2f5; border-radius:4px;">
+            ${p.likes.map(name => `<div style="padding:2px 0;">❤️ ${name}</div>`).join('')}
+          </div>
+        </div>
+      ` : ''}
       <div style="margin-top:10px">${p.comments.map(c => `<div class="comment"><b>${c.user}</b>: ${c.text}</div>`).join('')}</div>
       <div style="display:flex; gap:5px; margin-top:10px">
         <input id="c-${p.rowIndex}" placeholder="Comment..." style="margin:0; font-size:13px">
@@ -99,6 +109,18 @@ function render() {
 
   document.getElementById('loadMore').style.display = filtered.length > postsToShow ? 'block' : 'none';
   updateTrending();
+}
+
+function formatLikes(likes) {
+  if (likes.length === 1) return likes[0];
+  if (likes.length === 2) return `${likes[0]} and ${likes[1]}`;
+  if (likes.length === 3) return `${likes[0]}, ${likes[1]} and ${likes[2]}`;
+  return `${likes[0]}, ${likes[1]} and ${likes.length - 2} others`;
+}
+
+function toggleLikes(rowIndex) {
+  const el = document.getElementById(`likes-${rowIndex}`);
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
 async function apiCall(action, rowIndex) {
