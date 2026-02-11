@@ -130,8 +130,7 @@ function render() {
       <div class="user">${p.user} <span style="font-size:11px;color:#888;">${timeAgo(p.timestamp)}</span></div>
       <p>${p.message}</p>
       ${p.image ? `<img src="${p.image}" class="post-img" loading="lazy" onerror="this.style.display='none'">` : ''}
-      <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">
-${p.likes.includes(u)?'❤️':'👍'} (${p.likes.length})</button>
+      <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} (${p.likes.length})</button>
       ${p.likes.length > 0 ? `
         <div style="margin-top:8px; font-size:12px; color:#666;">
           <span style="cursor:pointer;" onclick="toggleLikes(${p.rowIndex})">
@@ -269,28 +268,13 @@ function updateTrending() {
       `).join('')}
     </div>`;
 }
-  
-  document.getElementById('trending').innerHTML = `
-    <div class="sidebar-card">
-      <b>🔥 Trending</b><br>
-      ${top.map(p => `
-        <div style="cursor:pointer; padding:6px 0; border-bottom:1px solid #e9ebee;" 
-             onclick="document.getElementById('post-${p.rowIndex}').scrollIntoView({behavior:'smooth'})">
-          <div style="font-weight:bold; color:#365899; font-size:12px;">${p.user}</div>
-          <div style="font-size:11px; color:#666; margin:2px 0;">${truncate(p.message, 50)}</div>
-          <div style="font-size:10px; color:#888;">
-            ❤️ ${p.likes.length} likes • 💬 ${p.comments.length} comments
-          </div>
-        </div>
-      `).join('')}
-    </div>`;
-}
 
 function truncate(str, max) {
   if (!str) return "";
   return str.length > max ? str.substring(0, max) + "..." : str;
 }
-  function triggerUnicorn(event) {
+
+function triggerUnicorn(event) {
   // Get click position
   const x = event.clientX;
   const y = event.clientY;
@@ -322,6 +306,7 @@ function truncate(str, max) {
   // Remove unicorn after animation
   setTimeout(() => unicorn.remove(), 2000);
 }
+
 function scrollToPost(rowIndex) {
   // Wait a moment for any rendering to complete
   setTimeout(() => {
@@ -349,7 +334,6 @@ function scrollToPost(rowIndex) {
     }
   }, 100);
 }
-
 </script>
 </body>
 </html>
