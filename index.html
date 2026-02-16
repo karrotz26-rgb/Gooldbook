@@ -15,8 +15,16 @@
     .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; }
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:10px; margin-bottom:10px; border-radius:4px; font-size:13px; }
     .user { color:#365899; font-weight:bold; }
+    
+    /* Media Styling */
     .post-img { width:100%; max-height:500px; object-fit: cover; margin-top:10px; border-radius:4px; display:block; background:#f0f2f5; }
-    video.post-img { background: #000; object-fit: contain; }
+    video.post-img { 
+      background: #000; 
+      object-fit: contain; 
+      aspect-ratio: 16 / 9; 
+      max-height: 400px; 
+    }
+
     .btn { background:#4267b2; color:#fff; border:none; padding:8px 12px; cursor:pointer; font-weight:bold; border-radius:4px; }
     .btn-refresh { background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; width:100%; padding:8px; margin-top:6px; font-weight:bold; cursor:pointer; border-radius:4px; }
     .progress-container { width: 100%; background: #eee; border-radius: 4px; display: none; margin: 10px 0; height: 10px; overflow: hidden; border:1px solid #ddd; }
@@ -80,9 +88,9 @@ async function loadFeed() {
 
 function renderMedia(url) {
   if (!url) return '';
-  const isVideo = url.includes("export=download") || url.match(/\.(mp4|mov|webm)$/i);
+  const isVideo = url.includes("export=download") || url.match(/\.(mp4|mov|webm|quicktime)$/i);
   return isVideo 
-    ? `<video src="${url}" class="post-img" controls playsinline preload="metadata"></video>` 
+    ? `<video src="${url}" class="post-img" controls playsinline preload="metadata" poster="https://via.placeholder.com/550x300/3b5998/FFFFFF?text=Loading+Video..."></video>` 
     : `<img src="${url}" class="post-img" loading="lazy" onerror="this.style.display='none'">`;
 }
 
@@ -139,7 +147,7 @@ async function apiCall(action, rowIndex, event) {
       post.likes.push(user);
       if (event) triggerUnicorn(event);
     } else {
-      post.likes.splice(idx, 1);
+      post.splice(idx, 1);
     }
     render(); 
   }
@@ -160,16 +168,42 @@ async function upload() {
   const pContainer = document.getElementById('pContainer');
 
   if (!user || !msg) return alert("Name and message required");
+
+  // Safety Check for Large Videos
+  if (file && file.size > 15 * 1024 * 1024) {
+    return alert("File is too large (>15MB). Please pick a shorter video! 🦄");
+  }
+
   btn.disabled = true;
   pContainer.style.display = "block";
+  pBar.style.width = "5%";
 
   let fileBase64 = "";
   if (file) {
-    fileBase64 = await new Promise(r => {
-      const rd = new FileReader();
-      rd.onload = e => r(e.target.result);
-      rd.readAsDataURL(file);
-    });
+    if (file.type.startsWith('image/')) {
+      // IMAGE COMPRESSION (Canvas Crusher)
+      fileBase64 = await new Promise(resolve => {
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX = 1200;
+          let w = img.width, h = img.height;
+          if (w > h) { if (w > MAX) { h *= MAX/w; w = MAX; } }
+          else { if (h > MAX) { w *= MAX/h; h = MAX; } }
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.7)); 
+        };
+      });
+    } else {
+      // VIDEO HANDLING (Direct Base64)
+      fileBase64 = await new Promise(r => {
+        const rd = new FileReader();
+        rd.onload = e => r(e.target.result);
+        rd.readAsDataURL(file);
+      });
+    }
   }
 
   const xhr = new XMLHttpRequest();
