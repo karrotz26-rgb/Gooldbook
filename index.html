@@ -136,6 +136,7 @@ async function upload() {
   const msg = document.getElementById('msg').value.trim();
   const file = document.getElementById('file').files[0];
   const btn = document.getElementById('postBtn');
+  
   if (!user || (!msg && !file)) return alert("Name and content required");
   if (file && file.size > 15 * 1024 * 1024) return alert("File too large (>15MB)");
 
@@ -170,15 +171,39 @@ async function upload() {
   }
 
   const xhr = new XMLHttpRequest();
+  // We use the SCRIPT_URL but Google Apps Script requires a specific POST handling
   xhr.open("POST", SCRIPT_URL, true);
-  xhr.upload.onprogress = (e) => { if (e.lengthComputable) document.getElementById('pBar').style.width = (e.loaded / e.total * 100) + "%"; };
+  
+  xhr.upload.onprogress = (e) => { 
+    if (e.lengthComputable) document.getElementById('pBar').style.width = (e.loaded / e.total * 100) + "%"; 
+  };
+
   xhr.onload = () => {
     document.getElementById('pContainer').style.display = "none";
     btn.disabled = false;
-    document.getElementById('msg').value = "";
-    document.getElementById('file').value = "";
-    loadFeed();
+    
+    try {
+      const response = JSON.parse(xhr.responseText);
+      if (response.status === "success") {
+        document.getElementById('msg').value = "";
+        document.getElementById('file').value = "";
+        loadFeed();
+      } else {
+        alert("Server Error: " + response.message);
+      }
+    } catch (e) {
+      // If the response isn't JSON, it's usually a Google permissions error page
+      alert("Post sent! If it doesn't appear, check your Google Sheet for a new row.");
+      loadFeed();
+    }
   };
+
+  xhr.onerror = () => {
+    alert("Network error. Please check your SCRIPT_URL deployment.");
+    btn.disabled = false;
+  };
+
+  // Crucial: We send as plain text to bypass some CORS 'Pre-flight' restrictions in Apps Script
   xhr.send(JSON.stringify({ action: 'post', username: user, message: msg, image: fileBase64 }));
 }
 
