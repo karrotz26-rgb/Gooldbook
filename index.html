@@ -4,58 +4,38 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>The Gooldbook🦄</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%233b5998'/%3E%3Ctext y='75' font-size='80' x='10'%3E🦄%3C/text%3E%3C/svg%3E">
-  
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-
   <style>
     body { background:#e9ebee; font-family:system-ui, -apple-system, sans-serif; margin:0; padding-bottom:50px; }
-    
-    .nav { 
-      background:#3b5998; color:#fff; padding:15px; 
-      padding-top: calc(15px + env(safe-area-inset-top)); 
-      text-align:center; font-weight:bold; position:sticky; top:0; z-index:1000; display: flex; align-items: center; justify-content: center;
-    }
-
+    .nav { background:#3b5998; color:#fff; padding:15px; text-align:center; font-weight:bold; position:sticky; top:0; z-index:1000; display: flex; align-items: center; justify-content: center;}
     .container { max-width:900px; margin:auto; display:flex; gap:20px; padding:10px; }
     .sidebar { width:280px; position:sticky; top:70px; }
     .main-feed { flex-grow:1; max-width:550px; width:100%; }
     .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; }
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:10px; margin-bottom:10px; border-radius:4px; font-size:13px; }
     .user { color:#365899; font-weight:bold; }
-    
-    /* Media Styling */
     .post-img { width:100%; max-height:500px; object-fit: cover; margin-top:10px; border-radius:4px; display:block; background:#f0f2f5; }
     video.post-img { background: #000; object-fit: contain; }
-    
-    /* Progress Bar */
-    .progress-container { width: 100%; background: #eee; border-radius: 4px; display: none; margin: 10px 0; height: 12px; overflow: hidden; border: 1px solid #ccc; }
-    .progress-bar { width: 0%; height: 100%; background: #4267b2; transition: width 0.1s; }
-
     .btn { background:#4267b2; color:#fff; border:none; padding:8px 12px; cursor:pointer; font-weight:bold; border-radius:4px; }
-    .btn:disabled { background:#ccc; cursor:not-allowed; }
     .btn-refresh { background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; width:100%; padding:8px; margin-top:6px; font-weight:bold; cursor:pointer; border-radius:4px; }
-    
+    .progress-container { width: 100%; background: #eee; border-radius: 4px; display: none; margin: 10px 0; height: 10px; overflow: hidden; border:1px solid #ddd; }
+    .progress-bar { width: 0%; height: 100%; background: #4267b2; transition: width 0.1s; }
     .comment { background:#f0f2f5; padding:6px; border-radius:6px; margin-top:4px; font-size:13px; }
     input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:4px; box-sizing: border-box; }
     
-    @media(max-width:700px){ .container{flex-direction:column;} .sidebar{width:100%; position:static;} }
-
-    /* Animations */
+    /* Unicorn & Sparkle Animations */
     .unicorn { position: fixed; font-size: 60px; pointer-events: none; z-index: 9999; animation: unicornFloat 2s ease-out forwards; }
     @keyframes unicornFloat { 0% { transform: translateY(0) rotate(0deg) scale(0); opacity: 0; } 10% { opacity: 1; transform: translateY(-20px) rotate(10deg) scale(1); } 100% { transform: translateY(-300px) rotate(360deg) scale(0.5); opacity: 0; } }
+    .sparkle { position: fixed; pointer-events: none; z-index: 9998; animation: sparkleFloat 1.5s ease-out forwards; }
+    @keyframes sparkleFloat { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-150px) scale(0); opacity: 0; } }
+
+    @media(max-width:700px){ .container{flex-direction:column;} .sidebar{width:100%; position:static;} }
   </style>
 </head>
 <body>
 
-<div class="nav">
-  <span style="background:white; border-radius:50%; width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center; margin-right:8px; font-size:18px;">🦄</span>
-  theGooldbook
-</div>
+<div class="nav"><span style="background:white; border-radius:50%; width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center; margin-right:8px; font-size:18px;">🦄</span> theGooldbook</div>
 
 <div class="container">
   <div class="sidebar">
@@ -71,22 +51,17 @@
       <input id="user" placeholder="Your Name" onchange="saveUser()">
       <textarea id="msg" rows="2" placeholder="What's on your mind?"></textarea>
       <input type="file" id="file" accept="image/*,video/*">
-      
-      <div class="progress-container" id="pContainer">
-        <div class="progress-bar" id="pBar"></div>
-      </div>
-      
+      <div class="progress-container" id="pContainer"><div class="progress-bar" id="pBar"></div></div>
       <button id="postBtn" class="btn" onclick="upload()">Post</button>
       <button class="btn-refresh" onclick="loadFeed()">Update Feed</button>
     </div>
     <div id="feed">Loading feed...</div>
-    <button id="loadMore" class="btn-refresh" style="display:none" onclick="postsToShow+=5; render()">Load More</button>
   </div>
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzrAJub1UV5WBmooxO1lp_8njlUoTEGURmAeUkrb3NMhq-Wa--cKH8qcyxrOxbjcTHO/exec"; // <--- PASTE YOUR DEPLOYMENT URL HERE
-let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]"), postsToShow = 5;
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwrcgBz4_VyTwx3mmYb4KhYlewgydqCWy4zTLNPihtgSgV3W16sVmlGTKtrBptavXPD/exec";
+let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 
 window.onload = () => {
   document.getElementById('user').value = localStorage.getItem("gb_user") || "";
@@ -98,21 +73,17 @@ async function loadFeed() {
   try {
     const res = await fetch(SCRIPT_URL);
     allPosts = await res.json();
-    allPosts.forEach(p => { p.likes = p.likes || []; p.comments = p.comments || []; });
     localStorage.setItem("gb_cache", JSON.stringify(allPosts));
     render();
-  } catch(e) { console.error("Load failed", e); }
+  } catch(e) { console.error(e); }
 }
 
 function renderMedia(url) {
   if (!url) return '';
-  // Detect video based on Google Drive download markers or extension
-  const isVideo = url.includes("export=download") || url.match(/\.(mp4|mov|webm|quicktime)$/i);
-  
-  if (isVideo) {
-    return `<video src="${url}" class="post-img" controls playsinline preload="metadata"></video>`;
-  }
-  return `<img src="${url}" class="post-img" loading="lazy" onerror="this.style.display='none'">`;
+  const isVideo = url.includes("export=download") || url.match(/\.(mp4|mov|webm)$/i);
+  return isVideo 
+    ? `<video src="${url}" class="post-img" controls playsinline preload="metadata"></video>` 
+    : `<img src="${url}" class="post-img" loading="lazy" onerror="this.style.display='none'">`;
 }
 
 function render() {
@@ -120,22 +91,64 @@ function render() {
   const s = document.getElementById('searchBar').value.toLowerCase();
   const filtered = allPosts.filter(p => p.message?.toLowerCase().includes(s) || p.user?.toLowerCase().includes(s));
   
-  const feedEl = document.getElementById('feed');
-  feedEl.innerHTML = filtered.slice(0, postsToShow).map(p => `
+  document.getElementById('feed').innerHTML = filtered.map(p => `
     <div class="card" id="post-${p.rowIndex}">
       <div class="user">${p.user} <span style="font-size:11px;color:#888;">${timeAgo(p.timestamp)}</span></div>
       <p>${p.message}</p>
       ${renderMedia(p.image)}
       <div style="margin-top:10px; display:flex; gap:10px;">
-        <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} (${p.likes.length})</button>
+        <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">${(p.likes || []).includes(u)?'❤️':'👍'} (${(p.likes || []).length})</button>
+        <button class="btn" style="background:#27ae60;" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
       </div>
-      <div style="margin-top:10px">${p.comments.map(c => `<div class="comment"><b>${c.user}</b>: ${c.text}</div>`).join('')}</div>
+      <div style="margin-top:10px">${(p.comments || []).map(c => `<div class="comment"><b>${c.user}</b>: ${c.text}</div>`).join('')}</div>
       <div style="display:flex; gap:5px; margin-top:10px">
         <input id="c-${p.rowIndex}" placeholder="Comment..." style="margin:0; font-size:13px">
         <button class="btn" onclick="apiCall('comment', ${p.rowIndex})">Post</button>
       </div>
     </div>`).join('');
-  document.getElementById('loadMore').style.display = filtered.length > postsToShow ? 'block' : 'none';
+
+  updateTrending();
+}
+
+function updateTrending() {
+  const scored = allPosts.map(p => ({ ...p, score: (p.likes?.length || 0) + (p.comments?.length || 0) }));
+  const top = scored.filter(p => p.score > 0).sort((a, b) => b.score - a.score).slice(0, 5);
+  
+  let html = `<div class="sidebar-card"><b>🔥 Most Active</b><br>`;
+  if (top.length === 0) {
+    html += `<div style="padding:8px 0; color:#888; font-size:12px;">No active posts yet</div>`;
+  } else {
+    html += top.map(p => `
+      <div style="cursor:pointer; padding:6px 0; border-bottom:1px solid #e9ebee;" onclick="document.getElementById('post-${p.rowIndex}').scrollIntoView({behavior:'smooth', block:'center'})">
+        <div style="font-weight:bold; color:#365899; font-size:12px;">${p.user}</div>
+        <div style="font-size:11px; color:#666;">${p.message.substring(0,40)}...</div>
+        <div style="font-size:10px; color:#888;">❤️ ${p.likes.length} • 💬 ${p.comments.length}</div>
+      </div>`).join('');
+  }
+  document.getElementById('trending').innerHTML = html + `</div>`;
+}
+
+async function apiCall(action, rowIndex, event) {
+  const user = document.getElementById('user').value.trim();
+  if (!user) return alert("Enter your name!");
+  
+  const post = allPosts.find(p => p.rowIndex === rowIndex);
+  if (action === 'like') {
+    const idx = post.likes.indexOf(user);
+    if (idx === -1) {
+      post.likes.push(user);
+      if (event) triggerUnicorn(event);
+    } else {
+      post.likes.splice(idx, 1);
+    }
+    render(); 
+  }
+
+  const textInput = document.getElementById(`c-${rowIndex}`);
+  const text = textInput ? textInput.value : "";
+
+  await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action, rowIndex, username: user, text }) });
+  if (action === 'comment') { textInput.value = ""; loadFeed(); }
 }
 
 async function upload() {
@@ -143,109 +156,75 @@ async function upload() {
   const msg = document.getElementById('msg').value.trim();
   const file = document.getElementById('file').files[0];
   const btn = document.getElementById('postBtn');
-  const pContainer = document.getElementById('pContainer');
   const pBar = document.getElementById('pBar');
+  const pContainer = document.getElementById('pContainer');
 
-  if (!user || !msg) return alert("Missing info");
-  
-  // Size Guard (25MB)
-  if (file && file.size > 25 * 1024 * 1024) {
-    return alert("File too big! Keep it under 25MB.");
-  }
-
-  btn.innerText = "Reading file..."; btn.disabled = true;
+  if (!user || !msg) return alert("Name and message required");
+  btn.disabled = true;
+  pContainer.style.display = "block";
 
   let fileBase64 = "";
   if (file) {
-    fileBase64 = await new Promise(r => { 
-      const rd = new FileReader(); 
-      rd.onload = e => r(e.target.result); 
-      rd.readAsDataURL(file); 
+    fileBase64 = await new Promise(r => {
+      const rd = new FileReader();
+      rd.onload = e => r(e.target.result);
+      rd.readAsDataURL(file);
     });
   }
 
-  // Use XHR to track upload progress
   const xhr = new XMLHttpRequest();
   xhr.open("POST", SCRIPT_URL, true);
-  
-  pContainer.style.display = "block";
-  pBar.style.width = "0%";
-
   xhr.upload.onprogress = (e) => {
-    if (e.lengthComputable) {
-      const percent = (e.loaded / e.total) * 100;
-      pBar.style.width = percent + "%";
-      btn.innerText = `Uploading ${Math.round(percent)}%...`;
-    }
+    if (e.lengthComputable) pBar.style.width = (e.loaded / e.total * 100) + "%";
   };
-
-  xhr.onload = function() {
+  xhr.onload = () => {
     pContainer.style.display = "none";
-    btn.innerText = "Post";
     btn.disabled = false;
-    
-    if (xhr.status === 200) {
-      document.getElementById('msg').value = "";
-      document.getElementById('file').value = "";
-      loadFeed();
-    } else {
-      alert("Upload failed. The video might be too large for the server.");
-    }
+    document.getElementById('msg').value = "";
+    document.getElementById('file').value = "";
+    loadFeed();
   };
-
-  xhr.send(JSON.stringify({ 
-    action: 'post', 
-    username: user, 
-    message: msg, 
-    image: fileBase64 
-  }));
+  xhr.send(JSON.stringify({ action: 'post', username: user, message: msg, image: fileBase64 }));
 }
 
-async function apiCall(action, rowIndex, event) {
-  const username = document.getElementById('user').value.trim();
-  if (!username) return alert("Please enter your name at the top first!");
-  
-  const textInput = document.getElementById(`c-${rowIndex}`);
-  const text = textInput ? textInput.value : "";
-  
-  // Show a little "loading" state on the button
-  const btn = event ? event.target : null;
-  if (btn) btn.style.opacity = "0.5";
+function triggerUnicorn(event) {
+  const x = event.clientX, y = event.clientY;
+  const unicorn = document.createElement('div');
+  unicorn.className = 'unicorn'; unicorn.textContent = '🦄';
+  unicorn.style.left = x + 'px'; unicorn.style.top = y + 'px';
+  document.body.appendChild(unicorn);
 
-  try {
-    const response = await fetch(SCRIPT_URL, { 
-      method: 'POST', 
-      // We send it as a simple text/plain to avoid CORS preflight issues with GAS
-      body: JSON.stringify({ 
-        action: action, 
-        rowIndex: rowIndex, 
-        username: username, 
-        text: text 
-      }) 
-    });
+  ['✨', '⭐', '💫', '🌟', '✨'].forEach((sparkle, i) => {
+    setTimeout(() => {
+      const s = document.createElement('div');
+      s.className = 'sparkle'; s.textContent = sparkle;
+      s.style.left = (x + Math.random() * 100 - 50) + 'px';
+      s.style.top = (y + Math.random() * 100 - 50) + 'px';
+      s.style.fontSize = (20 + Math.random() * 20) + 'px';
+      document.body.appendChild(s);
+      setTimeout(() => s.remove(), 1500);
+    }, i * 100);
+  });
+  setTimeout(() => unicorn.remove(), 2000);
+}
 
-    if (action === 'comment' && textInput) textInput.value = "";
-    
-    // Trigger the unicorn animation for likes
-    if (action === 'like' && event) triggerUnicorn(event);
-
-    // Refresh the feed to show the new like/comment
-    await loadFeed(); 
-  } catch (e) {
-    console.error("API Error:", e);
-  } finally {
-    if (btn) btn.style.opacity = "1";
+async function sharePost(rowIndex, event) {
+  const post = allPosts.find(p => p.rowIndex === rowIndex);
+  const shareUrl = `${window.location.origin}${window.location.pathname}?post=${rowIndex}`;
+  if (navigator.share) {
+    navigator.share({ title: 'theGooldbook', text: post.message, url: shareUrl });
+  } else {
+    prompt("Copy link:", shareUrl);
   }
 }
 
 function timeAgo(d) {
   const s = Math.floor((Date.now() - new Date(d)) / 1000);
-  if (s < 60) return "Just now";
-  if (s < 3600) return Math.floor(s/60) + "m ago";
-  if (s < 86400) return Math.floor(s/3600) + "h ago";
-  return Math.floor(s/86400) + "d ago";
+  if (s < 60) return "now";
+  if (s < 3600) return Math.floor(s/60) + "m";
+  if (s < 86400) return Math.floor(s/3600) + "h";
+  return Math.floor(s/86400) + "d";
 }
-
 function saveUser() { localStorage.setItem("gb_user", document.getElementById('user').value); }
 </script>
 </body>
