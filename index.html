@@ -4,56 +4,88 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>The Gooldbook🦄</title>
+  
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  
   <style>
     body { background:#e9ebee; font-family:system-ui, -apple-system, sans-serif; margin:0; padding-bottom:50px; }
-    .nav { background:#3b5998; color:#fff; padding:15px; text-align:center; font-weight:bold; position:sticky; top:0; z-index:1000; display: flex; align-items: center; justify-content: center;}
+    
+    .nav { 
+      background:#3b5998; color:#fff; padding:15px; 
+      text-align:center; font-weight:bold; position:sticky; top:0; z-index:1000; 
+      display: flex; align-items: center; justify-content: center;
+    }
+
     .container { max-width:900px; margin:auto; display:flex; gap:20px; padding:10px; }
     .sidebar { width:280px; position:sticky; top:70px; }
     .main-feed { flex-grow:1; max-width:550px; width:100%; }
-    .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; }
+    
+    .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; position: relative; }
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:10px; margin-bottom:10px; border-radius:4px; font-size:13px; }
-    .user { color:#365899; font-weight:bold; }
+    
+    .user { color:#365899; font-weight:bold; margin-bottom: 5px; }
     .post-img { width:100%; max-height:500px; object-fit: cover; margin-top:10px; border-radius:4px; display:block; background:#f0f2f5; }
+    video.post-img { background: #000; object-fit: contain; }
+    
     .btn { background:#4267b2; color:#fff; border:none; padding:8px 12px; cursor:pointer; font-weight:bold; border-radius:4px; }
-    .btn-refresh { background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; width:100%; padding:8px; margin-top:6px; font-weight:bold; cursor:pointer; border-radius:4px; }
-    .progress-container { width: 100%; background: #eee; border-radius: 4px; display: none; margin: 10px 0; height: 10px; overflow: hidden; border:1px solid #ddd; }
+    .btn:disabled { background:#ccc; cursor:not-allowed; }
+    
+    /* Progress Bar */
+    .progress-container { width: 100%; background: #eee; border-radius: 4px; display: none; margin: 10px 0; height: 10px; overflow: hidden; border: 1px solid #ddd; }
     .progress-bar { width: 0%; height: 100%; background: #4267b2; transition: width 0.1s; }
+    
     .comment { background:#f0f2f5; padding:6px; border-radius:6px; margin-top:4px; font-size:13px; }
     input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:4px; box-sizing: border-box; }
     
+    /* Animations */
     .unicorn { position: fixed; font-size: 60px; pointer-events: none; z-index: 9999; animation: unicornFloat 2s ease-out forwards; }
     @keyframes unicornFloat { 0% { transform: translateY(0) rotate(0deg) scale(0); opacity: 0; } 10% { opacity: 1; transform: translateY(-20px) rotate(10deg) scale(1); } 100% { transform: translateY(-300px) rotate(360deg) scale(0.5); opacity: 0; } }
     .sparkle { position: fixed; pointer-events: none; z-index: 9998; animation: sparkleFloat 1.5s ease-out forwards; }
     @keyframes sparkleFloat { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-150px) scale(0); opacity: 0; } }
+
     @media(max-width:700px){ .container{flex-direction:column;} .sidebar{width:100%; position:static;} }
   </style>
 </head>
 <body>
 
-<div class="nav">🦄 theGooldbook</div>
+<div class="nav">
+  <span style="background:white; border-radius:50%; width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center; margin-right:8px; font-size:18px;">🦄</span>
+  theGooldbook
+</div>
 
 <div class="container">
   <div class="sidebar">
-    <div class="sidebar-card"><b>🔍 Search</b><input id="searchBar" placeholder="Filter posts..." oninput="render()"></div>
+    <div class="sidebar-card">
+      <b>🔍 Search</b>
+      <input id="searchBar" placeholder="Filter posts..." oninput="render()">
+    </div>
     <div id="trending"></div>
   </div>
+
   <div class="main-feed">
     <div class="card">
       <input id="user" placeholder="Your Name" onchange="saveUser()">
       <textarea id="msg" rows="2" placeholder="What's on your mind?"></textarea>
-      <input type="file" id="file" accept="image/*">
+      <input type="file" id="file" accept="image/*,video/*">
       <div class="progress-container" id="pContainer"><div class="progress-bar" id="pBar"></div></div>
       <button id="postBtn" class="btn" onclick="upload()">Post</button>
-      <button class="btn-refresh" onclick="loadFeed()">Update Feed</button>
+      <button class="btn" style="background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; width:100%; margin-top:5px;" onclick="loadFeed()">Update Feed</button>
     </div>
     <div id="feed">Loading feed...</div>
   </div>
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxqtvM1rpsjcpP9wE9lADuoW_uuX6BIwVUdl1ZtFVGAsYzBsm2tR1R2PICmJmJZOCKa/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxDMqvUBOmRsRKQ-KUHLK-1Vr9hU8BZb4H4AAr-4zdMaT9Q4_xTWvcT-OWbqffQeO-7/exec"; // <--- PASTE YOUR DEPLOYMENT URL HERE
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
+
+// OneSignal Init
+window.OneSignalDeferred = window.OneSignalDeferred || [];
+OneSignalDeferred.push(async function(OneSignal) {
+  await OneSignal.init({
+    appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064",
+  });
+});
 
 window.onload = () => {
   document.getElementById('user').value = localStorage.getItem("gb_user") || "";
@@ -67,7 +99,16 @@ async function loadFeed() {
     allPosts = await res.json();
     localStorage.setItem("gb_cache", JSON.stringify(allPosts));
     render();
-  } catch(e) { console.error(e); }
+  } catch(e) { console.error("Load failed", e); }
+}
+
+function renderMedia(url) {
+  if (!url) return '';
+  const isVideo = url.includes("export=download") || url.match(/\.(mp4|mov|webm|quicktime)$/i);
+  if (isVideo) {
+    return `<video src="${url}" class="post-img" controls playsinline preload="metadata"></video>`;
+  }
+  return `<img src="${url}" class="post-img" loading="lazy" onerror="this.style.display='none'">`;
 }
 
 function render() {
@@ -75,14 +116,14 @@ function render() {
   const s = document.getElementById('searchBar').value.toLowerCase();
   const filtered = allPosts.filter(p => p.message?.toLowerCase().includes(s) || p.user?.toLowerCase().includes(s));
   
-  document.getElementById('feed').innerHTML = filtered.map(p => `
+  const feedEl = document.getElementById('feed');
+  feedEl.innerHTML = filtered.map(p => `
     <div class="card" id="post-${p.rowIndex}">
       <div class="user">${p.user} <span style="font-size:11px;color:#888;">${timeAgo(p.timestamp)}</span></div>
       <p>${p.message}</p>
-      ${p.image ? `<img src="${p.image}" class="post-img" loading="lazy" onerror="this.style.display='none'">` : ''}
+      ${renderMedia(p.image)}
       <div style="margin-top:10px; display:flex; gap:10px;">
         <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">${(p.likes || []).includes(u)?'❤️':'👍'} (${(p.likes || []).length})</button>
-        <button class="btn" style="background:#27ae60;" onclick="sharePost(${p.rowIndex})">🔗 Share</button>
       </div>
       <div style="margin-top:10px">${(p.comments || []).map(c => `<div class="comment"><b>${c.user}</b>: ${c.text}</div>`).join('')}</div>
       <div style="display:flex; gap:5px; margin-top:10px">
@@ -90,35 +131,32 @@ function render() {
         <button class="btn" onclick="apiCall('comment', ${p.rowIndex})">Post</button>
       </div>
     </div>`).join('');
+
   updateTrending();
 }
 
 function updateTrending() {
-  const scored = allPosts.map(p => ({ ...p, score: (p.likes?.length || 0) + (p.comments?.length || 0) }));
-  const top = scored.filter(p => p.score > 0).sort((a, b) => b.score - a.score).slice(0, 5);
-  let html = `<div class="sidebar-card"><b>🔥 Most Active</b><br>`;
-  html += top.length === 0 ? `<div style="padding:8px 0; color:#888; font-size:12px;">No active posts yet</div>` : top.map(p => `
-    <div style="cursor:pointer; padding:6px 0; border-bottom:1px solid #e9ebee;" onclick="document.getElementById('post-${p.rowIndex}').scrollIntoView({behavior:'smooth', block:'center'})">
-      <div style="font-weight:bold; color:#365899; font-size:12px;">${p.user}</div>
-      <div style="font-size:11px; color:#666;">${p.message.substring(0,40)}...</div>
-    </div>`).join('');
-  document.getElementById('trending').innerHTML = html + `</div>`;
-}
+  const top = [...allPosts]
+    .sort((a,b) => ((b.likes?.length || 0) + (b.comments?.length || 0)) - ((a.likes?.length || 0) + (a.comments?.length || 0)))
+    .slice(0,5);
 
-async function apiCall(action, rowIndex, event) {
-  const user = document.getElementById('user').value.trim();
-  if (!user) return alert("Enter your name!");
-  const post = allPosts.find(p => p.rowIndex === rowIndex);
-  if (action === 'like') {
-    const idx = post.likes.indexOf(user);
-    if (idx === -1) { post.likes.push(user); if (event) triggerUnicorn(event); }
-    else post.likes.splice(idx, 1);
-    render(); 
+  let html = `<div class="sidebar-card"><b>🔥 Trending</b><br>`;
+  if (top.length === 0) {
+    html += `<div style="color:#888; padding:5px 0;">No activity yet</div>`;
+  } else {
+    html += top.map(p => {
+      let icon = "💬";
+      if (p.image) {
+        icon = p.image.includes("export=download") ? "🎥" : "📷";
+      }
+      return `
+        <div style="font-size:11px; margin-top:8px; border-bottom:1px solid #f0f2f5; padding-bottom:4px; cursor:pointer;" onclick="document.getElementById('post-${p.rowIndex}').scrollIntoView({behavior:'smooth', block:'center'})">
+          <span style="margin-right:5px;">${icon}</span>
+          <b>${p.user}</b>: ${p.message.substring(0,25)}...
+        </div>`;
+    }).join('');
   }
-  const textInput = document.getElementById(`c-${rowIndex}`);
-  const text = textInput ? textInput.value : "";
-  await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action, rowIndex, username: user, text }) });
-  if (action === 'comment') { textInput.value = ""; loadFeed(); }
+  document.getElementById('trending').innerHTML = html + `</div>`;
 }
 
 async function upload() {
@@ -126,57 +164,86 @@ async function upload() {
   const msg = document.getElementById('msg').value.trim();
   const file = document.getElementById('file').files[0];
   const btn = document.getElementById('postBtn');
-  if (!user || (!msg && !file)) return alert("Content required");
+  const pBar = document.getElementById('pBar');
+  const pContainer = document.getElementById('pContainer');
 
+  if (!user || !msg) return alert("Missing name or message");
+  
   btn.disabled = true;
-  document.getElementById('pContainer').style.display = "block";
-  document.getElementById('pBar').style.width = "10%";
+  btn.innerText = "Reading file...";
+  pContainer.style.display = "block";
+  pBar.style.width = "0%";
 
   let fileBase64 = "";
-  if (file && file.type.startsWith('image/')) {
-    fileBase64 = await new Promise(resolve => {
-      const img = new Image();
-      img.src = URL.createObjectURL(file);
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX = 1000;
-        let w = img.width, h = img.height;
-        if (w > h) { if (w > MAX) { h *= MAX/w; w = MAX; } }
-        else { if (h > MAX) { w *= MAX/h; h = MAX; } }
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', 0.6)); 
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      fileBase64 = e.target.result;
+      
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", SCRIPT_URL);
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          pBar.style.width = percent + "%";
+          btn.innerText = `Uploading ${percent}%...`;
+        }
       };
-    });
-  }
-
-  const xhr = new XMLHttpRequest();
-  xhr.open("POST", SCRIPT_URL, true);
-  xhr.upload.onprogress = (e) => { if (e.lengthComputable) document.getElementById('pBar').style.width = (e.loaded / e.total * 100) + "%"; };
-  xhr.onload = () => {
-    document.getElementById('pContainer').style.display = "none";
-    btn.disabled = false;
+      xhr.onload = () => {
+        pContainer.style.display = "none";
+        document.getElementById('msg').value = "";
+        document.getElementById('file').value = "";
+        btn.innerText = "Post";
+        btn.disabled = false;
+        loadFeed();
+      };
+      xhr.send(JSON.stringify({ action: 'post', username: user, message: msg, image: fileBase64 }));
+    };
+    reader.readAsDataURL(file);
+  } else {
+    // Text only post
+    await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'post', username: user, message: msg, image: "" }) });
     document.getElementById('msg').value = "";
-    document.getElementById('file').value = "";
+    pContainer.style.display = "none";
+    btn.disabled = false;
+    btn.innerText = "Post";
     loadFeed();
-  };
-  xhr.send(JSON.stringify({ action: 'post', username: user, message: msg, image: fileBase64 }));
+  }
+}
+
+async function apiCall(action, rowIndex, event) {
+  const user = document.getElementById('user').value.trim();
+  const textInput = document.getElementById(`c-${rowIndex}`);
+  const text = textInput ? textInput.value : "";
+  
+  if (!user) return alert("Please enter your name!");
+
+  if (action === 'like' && event) triggerUnicorn(event);
+
+  await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action, rowIndex, username: user, text }) });
+  if (textInput) textInput.value = "";
+  loadFeed();
 }
 
 function triggerUnicorn(event) {
   const x = event.clientX, y = event.clientY;
-  const u = document.createElement('div');
-  u.className = 'unicorn'; u.textContent = '🦄';
-  u.style.left = x + 'px'; u.style.top = y + 'px';
-  document.body.appendChild(u);
-  setTimeout(() => u.remove(), 2000);
-}
+  const unicorn = document.createElement('div');
+  unicorn.className = 'unicorn'; unicorn.textContent = '🦄';
+  unicorn.style.left = x + 'px'; unicorn.style.top = y + 'px';
+  document.body.appendChild(unicorn);
 
-async function sharePost(rowIndex) {
-  const post = allPosts.find(p => p.rowIndex === rowIndex);
-  const shareUrl = `${window.location.origin}${window.location.pathname}?post=${rowIndex}`;
-  if (navigator.share) navigator.share({ title: 'theGooldbook', text: post.message, url: shareUrl });
-  else prompt("Copy link:", shareUrl);
+  ['✨', '⭐', '💫', '🌟', '✨'].forEach((sparkle, i) => {
+    setTimeout(() => {
+      const s = document.createElement('div');
+      s.className = 'sparkle'; s.textContent = sparkle;
+      s.style.left = (x + Math.random() * 100 - 50) + 'px';
+      s.style.top = (y + Math.random() * 100 - 50) + 'px';
+      s.style.fontSize = (20 + Math.random() * 20) + 'px';
+      document.body.appendChild(s);
+      setTimeout(() => s.remove(), 1500);
+    }, i * 100);
+  });
+  setTimeout(() => unicorn.remove(), 2000);
 }
 
 function timeAgo(d) {
@@ -186,6 +253,7 @@ function timeAgo(d) {
   if (s < 86400) return Math.floor(s/3600) + "h";
   return Math.floor(s/86400) + "d";
 }
+
 function saveUser() { localStorage.setItem("gb_user", document.getElementById('user').value); }
 </script>
 </body>
