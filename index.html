@@ -5,53 +5,52 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>The Gooldbook🦄</title>
   
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%233b5998'/%3E%3Ctext y='75' font-size='80' x='10'%3E🦄%3C/text%3E%3C/svg%3E">
-  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%233b5998'/%3E%3Ctext y='75' font-size='80' x='10'%3E🦄%3C/text%3E%3C/svg%3E">
-  
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
   <style>
-    :root { --gb-blue: #3b5998; --gb-hover: #4267b2; --gb-bg: #e9ebee; }
-    
-    body { background: var(--gb-bg); font-family: system-ui, -apple-system, sans-serif; margin:0; padding-bottom:50px; }
+    body { background:#e9ebee; font-family:system-ui, -apple-system, sans-serif; margin:0; padding-bottom:50px; }
     
     .nav { 
-      background: var(--gb-blue); color:#fff; padding:15px; 
-      padding-top: calc(15px + env(safe-area-inset-top));
+      background:#3b5998; color:#fff; padding:15px; 
       text-align:center; font-weight:bold; position:sticky; top:0; z-index:1000; 
       display: flex; align-items: center; justify-content: center;
     }
 
     .container { max-width:900px; margin:auto; display:flex; gap:20px; padding:10px; }
-    .sidebar { width:280px; position:sticky; top:70px; height: fit-content; }
+    .sidebar { width:280px; position:sticky; top:70px; }
     .main-feed { flex-grow:1; max-width:550px; width:100%; }
     
-    .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-    .sidebar-card { background:#fff; border:1px solid #ddd; padding:12px; margin-bottom:10px; border-radius:8px; font-size:13px; }
+    .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; }
+    .sidebar-card { background:#fff; border:1px solid #ddd; padding:10px; margin-bottom:10px; border-radius:4px; font-size:13px; }
     
-    .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .user-name { color: var(--gb-blue); font-weight:bold; }
-    .time-stamp { font-size:11px; color:#888; }
+    .user { color:#365899; font-weight:bold; display: flex; align-items: center; justify-content: space-between; }
+    .time-stamp { font-size:11px; font-weight:normal; color:#888; }
     
     .post-img { width:100%; max-height:500px; object-fit: cover; margin-top:10px; border-radius:4px; display:block; background:#f0f2f5; }
     
-    .btn { background: var(--gb-hover); color:#fff; border:none; padding:8px 14px; cursor:pointer; font-weight:bold; border-radius:4px; transition: transform 0.1s; }
-    .btn:active { transform: scale(0.96); }
-    .btn:disabled { background:#ccc; cursor:not-allowed; }
-    .btn-alt { background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; }
-    
-    .comment-box { background:#f0f2f5; padding:8px; border-radius:8px; margin-top:6px; font-size:13px; }
-    input, textarea { width:100%; padding:10px; margin-bottom:8px; border:1px solid #ddd; border-radius:6px; box-sizing: border-box; font-family: inherit; }
+    .btn { background:#4267b2; color:#fff; border:none; padding:8px 12px; cursor:pointer; font-weight:bold; border-radius:4px; margin-top:5px; }
+    .btn:disabled { background:#ccc; }
+    .btn-refresh { background:#f5f6f7; color:#333; width:100%; margin-top:5px; border:1px solid #ddd; }
 
-    /* Animations */
-    .unicorn { position: fixed; font-size: 50px; pointer-events: none; z-index: 9999; animation: unicornFloat 2s ease-out forwards; }
-    @keyframes unicornFloat { 0% { transform: translateY(0) scale(0); opacity: 0; } 20% { opacity: 1; transform: translateY(-20px) scale(1.2); } 100% { transform: translateY(-300px) scale(0.5); opacity: 0; } }
+    input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:4px; box-sizing: border-box; font-family: inherit; }
     
-    @media(max-width:700px){ .container { flex-direction:column; } .sidebar { width:100%; position:static; } }
+    .comment-section { margin-top:10px; border-top: 1px solid #eee; padding-top: 10px; }
+    .comment { background:#f0f2f5; padding:8px; border-radius:8px; margin-top:5px; font-size:13px; }
+    .comment-time { font-size:9px; color:#999; margin-top:2px; }
+
+    /* Unicorn Animation */
+    .unicorn { position: fixed; font-size: 50px; pointer-events: none; z-index: 9999; animation: unicornFloat 2s ease-out forwards; }
+    @keyframes unicornFloat { 
+      0% { transform: translateY(0) scale(0); opacity: 0; } 
+      20% { opacity: 1; transform: translateY(-20px) scale(1.2); } 
+      100% { transform: translateY(-300px) scale(0.5); opacity: 0; } 
+    }
+
+    @media(max-width:700px){ 
+      .container { flex-direction:column; } 
+      .sidebar { width:100%; position:static; } 
+    }
   </style>
 </head>
 <body>
@@ -62,42 +61,36 @@
   <div class="sidebar">
     <div class="sidebar-card">
       <b>🔍 Search Feed</b>
-      <input id="searchBar" placeholder="Filter posts..." oninput="render()">
+      <input id="searchBar" placeholder="Filter by name or message..." oninput="render()">
     </div>
     <div id="trending"></div>
   </div>
 
   <div class="main-feed">
     <div class="card">
-      <input id="user" placeholder="Your Name" onchange="saveUser()">
+      <input id="user" placeholder="Your Name" onchange="localStorage.setItem('gb_user', this.value)">
       <textarea id="msg" rows="2" placeholder="What's on your mind?"></textarea>
       <input type="file" id="file" accept="image/*">
-      <div style="display: flex; gap: 5px;">
-        <button id="postBtn" class="btn" style="flex: 2;" onclick="upload()">Post Update</button>
-        <button class="btn btn-alt" style="flex: 1;" onclick="loadFeed()">🔄 Refresh</button>
-      </div>
+      <button id="postBtn" class="btn" onclick="upload()">Post Update</button>
+      <button class="btn btn-refresh" onclick="loadFeed()">Update Feed</button>
     </div>
-    <div id="feed">Loading your world...</div>
-    <button id="loadMore" class="btn btn-alt" style="width:100%; display:none; margin-bottom:20px;" onclick="postsToShow+=5; render()">Load More</button>
+    <div id="feed">Loading latest posts...</div>
   </div>
 </div>
 
 <script>
-// CONFIGURATION - Replace with your active Apps Script URL
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyqcBN9iOo1PD0pHl2ZcuuqWJhnI7qa4OVcoTwrxQm_GqLvDw8TXh6Uivok2mqdSgEY/exec";
+// IMPORTANT: Ensure this matches your active script URL
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyF9L-xcjvpDp-ch2U26FUfPo9EHo7zBdSLeAbimg1iskiiaiOeU1DQ1JzbZmiwxB1v/exec"; 
+let allPosts = [];
 
-let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
-let postsToShow = 5;
-
-// OneSignal Setup
+// OneSignal
 window.OneSignalDeferred = window.OneSignalDeferred || [];
-OneSignalDeferred.push(async (OneSignal) => {
+OneSignalDeferred.push(async function(OneSignal) {
   await OneSignal.init({ appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064" });
 });
 
 window.onload = () => {
   document.getElementById('user').value = localStorage.getItem("gb_user") || "";
-  if(allPosts.length) render();
   loadFeed();
 };
 
@@ -105,100 +98,69 @@ async function loadFeed() {
   try {
     const res = await fetch(SCRIPT_URL);
     allPosts = await res.json();
-    // Sanitize data
-    allPosts.forEach(p => { p.likes = p.likes || []; p.comments = p.comments || []; });
-    localStorage.setItem("gb_cache", JSON.stringify(allPosts));
     render();
-  } catch(e) { console.error("Load failed", e); }
+  } catch(e) { 
+    document.getElementById('feed').innerText = "Connection error. Please refresh.";
+  }
 }
 
 function render() {
   const u = document.getElementById('user').value.trim();
   const s = document.getElementById('searchBar').value.toLowerCase();
-  const filtered = allPosts.filter(p => (p.message||"").toLowerCase().includes(s) || (p.user||"").toLowerCase().includes(s));
   
-  const feedEl = document.getElementById('feed');
-  feedEl.innerHTML = filtered.slice(0, postsToShow).map(p => `
+  const filtered = allPosts.filter(p => 
+    (p.message || "").toLowerCase().includes(s) || 
+    (p.user || "").toLowerCase().includes(s)
+  );
+  
+  document.getElementById('feed').innerHTML = filtered.map(p => `
     <div class="card" id="post-${p.rowIndex}">
-      <div class="user-header">
-        <span class="user-name">${p.user}</span>
+      <div class="user">
+        <span>${p.user}</span>
         <span class="time-stamp">${timeAgo(p.timestamp)}</span>
       </div>
-      <p>${p.message}</p>
+      <p style="margin: 10px 0;">${p.message}</p>
       ${p.image ? `<img src="${p.image}" class="post-img" loading="lazy">` : ''}
       
-      <div style="margin-top:12px; display:flex; gap:8px;">
+      <div style="margin-top:12px; display:flex; gap:10px;">
         <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">
-          ${p.likes.includes(u)?'❤️':'👍'} (${p.likes.length})
+          ${(p.likes || []).includes(u) ? '❤️' : '👍'} (${(p.likes || []).length})
         </button>
         <button class="btn" style="background:#27ae60;" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
       </div>
 
-      <div id="comment-list-${p.rowIndex}" style="margin-top:10px;">
-        ${p.comments.map(c => `<div class="comment-box"><b>${c.user}</b>: ${c.text}</div>`).join('')}
+      <div class="comment-section">
+        ${(p.comments || []).map(c => `
+          <div class="comment">
+            <b>${c.user}</b>: ${c.text}
+            <div class="comment-time">${timeAgo(c.time)}</div>
+          </div>
+        `).join('')}
       </div>
 
       <div style="display:flex; gap:5px; margin-top:10px">
-        <input id="c-${p.rowIndex}" placeholder="Write a comment..." style="margin:0; font-size:13px">
+        <input id="c-${p.rowIndex}" placeholder="Write a comment..." style="margin:0;">
         <button class="btn" onclick="apiCall('comment', ${p.rowIndex})">Reply</button>
       </div>
     </div>`).join('');
     
-  document.getElementById('loadMore').style.display = filtered.length > postsToShow ? 'block' : 'none';
   updateTrending();
 }
 
-// Logic: Trending based on activity (Likes + Comments)
 function updateTrending() {
   const top = [...allPosts]
     .sort((a,b) => ((b.likes?.length || 0) + (b.comments?.length || 0)) - ((a.likes?.length || 0) + (a.comments?.length || 0)))
-    .slice(0,5);
+    .slice(0,3);
 
   document.getElementById('trending').innerHTML = `
     <div class="sidebar-card">
-      <b style="color: #e67e22;">🔥 Trending Activity</b><br>
-      ${top.length ? top.map(p => `
-        <div style="cursor:pointer; padding:8px 0; border-bottom:1px solid #eee;" onclick="scrollToPost(${p.rowIndex})">
-          <div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div>
-          <div style="font-size:11px; color:#666;">${p.message.substring(0,40)}...</div>
+      <b>🔥 Trending Now</b><br>
+      ${top.map(p => `
+        <div style="font-size:11px; margin-top:8px; border-bottom:1px solid #eee; padding-bottom:4px; cursor:pointer;" onclick="scrollToPost(${p.rowIndex})">
+          <b>${p.user}</b>: ${(p.message || "").substring(0,25)}...
         </div>
-      `).join('') : '<div style="color:#999; margin-top:5px;">No activity yet</div>'}
+      `).join('')}
     </div>`;
-}
-
-async function apiCall(action, rowIndex, event) {
-  const user = document.getElementById('user').value.trim();
-  if (!user) return alert("Enter your name first!");
-  
-  const p = allPosts.find(x => x.rowIndex === rowIndex);
-  const textInput = document.getElementById(`c-${rowIndex}`);
-  const text = textInput ? textInput.value : "";
-
-  // Optimistic Update
-  if (action === 'like') {
-    const i = p.likes.indexOf(user);
-    if (i === -1) { 
-        p.likes.push(user); 
-        if(event) triggerUnicorn(event); 
-    } else { 
-        p.likes.splice(i, 1); 
-    }
-  } else if (action === 'comment' && text) {
-    p.comments.push({ user, text, time: new Date().toISOString() });
-    textInput.value = "";
-  } else if (action === 'comment' && !text) return;
-
-  render(); // Instant visual feedback
-
-  // Background Sync
-  try {
-    fetch(SCRIPT_URL, { 
-      method: 'POST', 
-      mode: 'no-cors', 
-      body: JSON.stringify({ action, rowIndex, username: user, text }) 
-    });
-    localStorage.setItem("gb_cache", JSON.stringify(allPosts));
-  } catch(e) { console.error("Sync failed", e); }
 }
 
 async function upload() {
@@ -207,7 +169,7 @@ async function upload() {
   const file = document.getElementById('file').files[0];
   const btn = document.getElementById('postBtn');
 
-  if (!user || !msg) return alert("Fill in your name and message!");
+  if (!user || !msg) return alert("Please enter name and message.");
   btn.innerText = "Uploading..."; btn.disabled = true;
 
   let imgBase64 = "";
@@ -218,54 +180,73 @@ async function upload() {
   }
 
   try {
-    await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'post', username:user, message:msg, image:imgBase64 })});
+    await fetch(SCRIPT_URL, { 
+      method: 'POST', 
+      body: JSON.stringify({ action: 'post', username: user, message: msg, image: imgBase64 }) 
+    });
     document.getElementById('msg').value = "";
     document.getElementById('file').value = "";
-    await loadFeed();
-  } catch(e) { alert("Upload failed. Image might be too large."); } 
-  finally { btn.innerText = "Post Update"; btn.disabled = false; }
+    loadFeed();
+  } catch(e) {
+    alert("Upload failed.");
+  } finally {
+    btn.innerText = "Post Update"; btn.disabled = false;
+  }
 }
 
-function triggerUnicorn(event) {
-  const u = document.createElement('div');
-  u.className = 'unicorn'; u.textContent = '🦄';
-  u.style.left = (event.clientX - 25) + 'px';
-  u.style.top = (event.clientY - 25) + 'px';
-  document.body.appendChild(u);
-  setTimeout(() => u.remove(), 2000);
+async function apiCall(action, rowIndex, event) {
+  const user = document.getElementById('user').value.trim();
+  if (!user) return alert("Please enter your name first!");
+  
+  const textInput = document.getElementById(`c-${rowIndex}`);
+  const text = textInput ? textInput.value : "";
+  
+  if (action === 'like' && event) {
+    const u = document.createElement('div');
+    u.className = 'unicorn'; u.textContent = '🦄';
+    u.style.left = (event.clientX - 25) + 'px';
+    u.style.top = (event.clientY - 25) + 'px';
+    document.body.appendChild(u);
+    setTimeout(() => u.remove(), 2000);
+  }
+  
+  await fetch(SCRIPT_URL, { 
+    method: 'POST', 
+    body: JSON.stringify({ action, rowIndex, username: user, text }) 
+  });
+  
+  if (action === 'comment') textInput.value = "";
+  loadFeed();
 }
 
 function timeAgo(date) {
-  if (!date) return "Long ago";
+  if (!date) return "";
   const s = Math.floor((Date.now() - new Date(date)) / 1000);
-  if (s < 60) return "Just now";
+  if (s < 60) return "just now";
   if (s < 3600) return Math.floor(s/60) + "m ago";
   if (s < 86400) return Math.floor(s/3600) + "h ago";
   return Math.floor(s/86400) + "d ago";
 }
-
-function saveUser() { localStorage.setItem("gb_user", document.getElementById('user').value); }
 
 function scrollToPost(idx) {
   const el = document.getElementById(`post-${idx}`);
   if(el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-// Share Logic from V1
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex);
   if (!post) return;
   const btn = event.target;
-  btn.innerText = "⏳ Wait..."; btn.disabled = true;
+  btn.innerText = "Generating..."; btn.disabled = true;
 
   const card = document.createElement('div');
   card.style.cssText = `position: fixed; left: -9999px; width: 500px; background: linear-gradient(135deg, #3b5998 0%, #8b9dc3 100%); padding: 25px; border-radius: 15px;`;
   card.innerHTML = `
-    <div style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);">
+    <div style="background: white; border-radius: 12px; padding: 20px;">
       <div style="color:#3b5998; font-weight:bold; font-size:18px;">🦄 theGooldbook</div>
       <div style="margin: 10px 0; font-size:16px;">${post.message}</div>
       ${post.image ? `<img src="${post.image}" style="width:100%; border-radius:8px;">` : ''}
-      <div style="margin-top:10px; font-size:12px; color:#888;">Post by ${post.user}</div>
+      <div style="margin-top:10px; font-size:12px; color:#888;">Shared by ${post.user}</div>
     </div>`;
   
   document.body.appendChild(card);
@@ -278,7 +259,6 @@ async function sharePost(rowIndex, event) {
   if (navigator.share && navigator.canShare({ files: [file] })) {
     await navigator.share({ files: [file], title: 'theGooldbook', text: post.message });
   } else {
-    alert("Sharing not supported on this browser. Long-press the image to save if on mobile.");
     window.open(canvas.toDataURL());
   }
   btn.innerText = "🔗 Share"; btn.disabled = false;
