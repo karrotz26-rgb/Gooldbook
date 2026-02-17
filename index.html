@@ -21,6 +21,11 @@
     .progress-bar { width: 0%; height: 100%; background: #4267b2; transition: width 0.1s; }
     .comment { background:#f0f2f5; padding:6px; border-radius:6px; margin-top:4px; font-size:13px; }
     input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:4px; box-sizing: border-box; }
+    
+    .unicorn { position: fixed; font-size: 60px; pointer-events: none; z-index: 9999; animation: unicornFloat 2s ease-out forwards; }
+    @keyframes unicornFloat { 0% { transform: translateY(0) rotate(0deg) scale(0); opacity: 0; } 10% { opacity: 1; transform: translateY(-20px) rotate(10deg) scale(1); } 100% { transform: translateY(-300px) rotate(360deg) scale(0.5); opacity: 0; } }
+    .sparkle { position: fixed; pointer-events: none; z-index: 9998; animation: sparkleFloat 1.5s ease-out forwards; }
+    @keyframes sparkleFloat { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-150px) scale(0); opacity: 0; } }
     @media(max-width:700px){ .container{flex-direction:column;} .sidebar{width:100%; position:static;} }
   </style>
 </head>
@@ -47,7 +52,7 @@
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw15rYu-wx30xBrbSE8Yt8LVJxPuHdkidk5QBCpXHcKRhyAYRu76bCbgaGuQydFleRi/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxqtvM1rpsjcpP9wE9lADuoW_uuX6BIwVUdl1ZtFVGAsYzBsm2tR1R2PICmJmJZOCKa/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 
 window.onload = () => {
@@ -62,12 +67,7 @@ async function loadFeed() {
     allPosts = await res.json();
     localStorage.setItem("gb_cache", JSON.stringify(allPosts));
     render();
-  } catch(e) { console.error("Feed Error:", e); }
-}
-
-function renderMedia(url) {
-  if (!url) return '';
-  return `<img src="${url}" class="post-img" loading="lazy" onerror="this.style.display='none'">`;
+  } catch(e) { console.error(e); }
 }
 
 function render() {
@@ -79,9 +79,10 @@ function render() {
     <div class="card" id="post-${p.rowIndex}">
       <div class="user">${p.user} <span style="font-size:11px;color:#888;">${timeAgo(p.timestamp)}</span></div>
       <p>${p.message}</p>
-      ${renderMedia(p.image)}
+      ${p.image ? `<img src="${p.image}" class="post-img" loading="lazy" onerror="this.style.display='none'">` : ''}
       <div style="margin-top:10px; display:flex; gap:10px;">
-        <button class="btn" onclick="apiCall('like', ${p.rowIndex})">${(p.likes || []).includes(u)?'❤️':'👍'} (${(p.likes || []).length})</button>
+        <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">${(p.likes || []).includes(u)?'❤️':'👍'} (${(p.likes || []).length})</button>
+        <button class="btn" style="background:#27ae60;" onclick="sharePost(${p.rowIndex})">🔗 Share</button>
       </div>
       <div style="margin-top:10px">${(p.comments || []).map(c => `<div class="comment"><b>${c.user}</b>: ${c.text}</div>`).join('')}</div>
       <div style="display:flex; gap:5px; margin-top:10px">
@@ -104,13 +105,13 @@ function updateTrending() {
   document.getElementById('trending').innerHTML = html + `</div>`;
 }
 
-async function apiCall(action, rowIndex) {
+async function apiCall(action, rowIndex, event) {
   const user = document.getElementById('user').value.trim();
   if (!user) return alert("Enter your name!");
   const post = allPosts.find(p => p.rowIndex === rowIndex);
   if (action === 'like') {
     const idx = post.likes.indexOf(user);
-    if (idx === -1) { post.likes.push(user); }
+    if (idx === -1) { post.likes.push(user); if (event) triggerUnicorn(event); }
     else post.likes.splice(idx, 1);
     render(); 
   }
@@ -125,7 +126,7 @@ async function upload() {
   const msg = document.getElementById('msg').value.trim();
   const file = document.getElementById('file').files[0];
   const btn = document.getElementById('postBtn');
-  if (!user || (!msg && !file)) return alert("Name and content required");
+  if (!user || (!msg && !file)) return alert("Content required");
 
   btn.disabled = true;
   document.getElementById('pContainer').style.display = "block";
@@ -155,13 +156,27 @@ async function upload() {
   xhr.onload = () => {
     document.getElementById('pContainer').style.display = "none";
     btn.disabled = false;
-    if (xhr.status === 200) {
-      document.getElementById('msg').value = "";
-      document.getElementById('file').value = "";
-      loadFeed();
-    } else { alert("Error uploading. Check your Script URL."); }
+    document.getElementById('msg').value = "";
+    document.getElementById('file').value = "";
+    loadFeed();
   };
   xhr.send(JSON.stringify({ action: 'post', username: user, message: msg, image: fileBase64 }));
+}
+
+function triggerUnicorn(event) {
+  const x = event.clientX, y = event.clientY;
+  const u = document.createElement('div');
+  u.className = 'unicorn'; u.textContent = '🦄';
+  u.style.left = x + 'px'; u.style.top = y + 'px';
+  document.body.appendChild(u);
+  setTimeout(() => u.remove(), 2000);
+}
+
+async function sharePost(rowIndex) {
+  const post = allPosts.find(p => p.rowIndex === rowIndex);
+  const shareUrl = `${window.location.origin}${window.location.pathname}?post=${rowIndex}`;
+  if (navigator.share) navigator.share({ title: 'theGooldbook', text: post.message, url: shareUrl });
+  else prompt("Copy link:", shareUrl);
 }
 
 function timeAgo(d) {
