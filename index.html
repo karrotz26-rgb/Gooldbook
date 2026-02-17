@@ -38,7 +38,7 @@
     
     input, textarea { width:100%; padding:10px; margin-bottom:8px; border:1px solid #ddd; border-radius:6px; box-sizing: border-box; font-family: inherit; }
     
-    .trend-item { cursor:pointer; padding:8px 0; border-bottom:1px solid #eee; }
+    .trend-item { cursor:pointer; padding:10px 0; border-bottom:1px solid #eee; }
     .leader-item { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #eee; }
 
     /* Magic Animations */
@@ -88,6 +88,11 @@ window.onload = () => {
   document.getElementById('user').value = localStorage.getItem("gb_user") || "";
   if(allPosts.length) render();
   loadFeed();
+  
+  // URL logic to jump to shared post
+  const urlParams = new URLSearchParams(window.location.search);
+  const postId = urlParams.get('post');
+  if (postId) setTimeout(() => scrollToPost(parseInt(postId)), 1000);
 };
 
 async function loadFeed() {
@@ -142,11 +147,9 @@ function render() {
 }
 
 function updateSidebar() {
-  // Trending Posts
   const topPosts = [...allPosts].sort((a,b) => ((b.likes?.length||0)+(b.comments?.length||0)) - ((a.likes?.length||0)+(a.comments?.length||0))).slice(0,5);
   document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b><br>${topPosts.map(p => `<div class="trend-item" onclick="scrollToPost(${p.rowIndex})"><div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div><div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div><div style="font-size:11px; color:#999;">❤️ ${p.likes.length}  💬 ${p.comments.length}</div></div>`).join('')}</div>`;
 
-  // Like Leaderboard
   const counts = {};
   allPosts.forEach(p => p.likes.forEach(name => counts[name] = (counts[name] || 0) + 1));
   const topLikers = Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0,3);
@@ -238,17 +241,51 @@ async function compressImage(file) {
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); if (!post) return;
   const btn = event.target; const old = btn.innerText; btn.innerText = "⏳ Wait...";
-  const card = document.createElement('div'); card.style.cssText = `position: fixed; left: -9999px; width: 400px; background: white; padding: 20px; border-radius: 12px;`;
-  card.innerHTML = `<div style="display:flex; align-items:center; gap:8px; color:#3b5998; font-weight:bold; margin-bottom:10px;"><div style="background:#3b5998; color:white; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; font-size:14px;">🦄</div>theGooldbook</div><div style="font-size:16px; margin-bottom:10px;">${post.message}</div>${post.image ? `<img src="${post.image}" style="width:100%; border-radius:8px;">` : ''}<div style="margin-top:10px; font-size:11px; color:#888;">Post by ${post.user}</div>`;
+  
+  const card = document.createElement('div'); 
+  card.style.cssText = `position: fixed; left: -9999px; width: 400px; background: white; padding: 25px; border-radius: 12px; border: 1px solid #ddd; font-family: system-ui, sans-serif;`;
+  
+  // Generating the Image Content with Likes/Comments
+  card.innerHTML = `
+    <div style="display:flex; align-items:center; gap:8px; color:#3b5998; font-weight:bold; margin-bottom:12px;">
+      <div style="background:#3b5998; color:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-size:16px;">🦄</div>
+      theGooldbook
+    </div>
+    <div style="font-size:16px; margin-bottom:10px; color:#1c1e21; line-height:1.4;">${post.message}</div>
+    ${post.image ? `<img src="${post.image}" style="width:100%; border-radius:8px; margin-bottom:10px;">` : ''}
+    <div style="display:flex; justify-content:space-between; align-items:center; padding-top:10px; border-top:1px solid #eee;">
+      <div style="font-size:13px; color:#65676b;">❤️ ${post.likes.length} &nbsp; 💬 ${post.comments.length}</div>
+      <div style="font-size:11px; color:#888;">Post by ${post.user}</div>
+    </div>`;
+    
   document.body.appendChild(card);
+  
   try {
     const canvas = await html2canvas(card, { useCORS: true, allowTaint: true });
     document.body.removeChild(card);
     const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-    const file = new File([blob], 'share.png', { type: 'image/png' });
-    if (navigator.share && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: 'theGooldbook', text: post.message });
-    else window.open(canvas.toDataURL());
-  } catch(e) { alert("Share failed."); } finally { btn.innerText = old; }
+    const file = new File([blob], 'gooldbook-post.png', { type: 'image/png' });
+    
+    // Create direct URL to the post
+    const postUrl = `${window.location.origin}${window.location.pathname}?post=${rowIndex}`;
+    const shareText = `Check out this post on theGooldbook! 🦄\n\n"${post.message.substring(0, 50)}..."\n\n- ${post.user}\n\nView here: ${postUrl}`;
+
+    if (navigator.share && navigator.canShare({ files: [file] })) {
+      await navigator.share({ 
+        files: [file], 
+        title: 'theGooldbook', 
+        text: shareText
+      });
+    } else {
+      // Fallback: Copy link and open image
+      navigator.clipboard.writeText(shareText);
+      alert("Link copied to clipboard! Opening shared image...");
+      window.open(canvas.toDataURL());
+    }
+  } catch(e) { 
+    console.error(e);
+    alert("Share failed. Try again."); 
+  } finally { btn.innerText = old; }
 }
 
 function timeAgo(date) {
