@@ -7,13 +7,11 @@
 
   <!-- PWA tags -->
   <link rel="manifest" href="/Gooldbook/manifest.json">
-  <link rel="apple-touch-icon" href="/Gooldbook/Icon.PNG">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="theGooldbook">
   <link rel="apple-touch-icon" href="/Gooldbook/icon.png">
 
- 
   <!-- html2canvas -->
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
@@ -23,6 +21,12 @@
     
     .nav { background: var(--gb-blue); color:#fff; padding:12px; padding-top: calc(12px + env(safe-area-inset-top)); text-align:center; font-weight:bold; position:sticky; top:0; z-index:1000; display: flex; align-items: center; justify-content: center; gap: 10px; }
     .nav-icon { background: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    .nav-badge { background: #e74c3c; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 11px; display: none; align-items: center; justify-content: center; font-weight: bold; margin-left: -8px; margin-top: -16px; }
+
+    /* In-app notification banner */
+    .notif-banner { position: fixed; top: calc(60px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); background: #1c1e21; color: white; padding: 12px 20px; border-radius: 12px; font-size: 14px; z-index: 9000; display: none; align-items: center; gap: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); max-width: 90vw; cursor: pointer; animation: slideDown 0.3s ease; }
+    .notif-banner.show { display: flex; }
+    @keyframes slideDown { from { transform: translateX(-50%) translateY(-20px); opacity: 0; } to { transform: translateX(-50%) translateY(0); opacity: 1; } }
 
     .container { max-width:900px; margin:auto; display:flex; gap:20px; padding:10px; }
     .sidebar { width:280px; position:sticky; top:70px; height: fit-content; }
@@ -70,7 +74,18 @@
 </head>
 <body>
 
-<div class="nav"><div class="nav-icon">🦄</div>theGooldbook</div>
+<!-- In-app notification banner -->
+<div class="notif-banner" id="notifBanner" onclick="dismissNotif()">
+  <span style="font-size:20px;">🦄</span>
+  <span id="notifText"></span>
+  <span style="margin-left:auto; font-size:18px; opacity:0.6;">✕</span>
+</div>
+
+<div class="nav">
+  <div class="nav-icon">🦄</div>
+  theGooldbook
+  <div class="nav-badge" id="navBadge"></div>
+</div>
 
 <div class="container">
   <div class="sidebar">
@@ -102,12 +117,113 @@ let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let postsToShow = 5;
 let filterType = null; 
 let filterVal = null;
+let lastPostCount = 0;
+let lastCommentSnapshot = {};
+let notifTimeout = null;
+let newPostCount = 0;
 
 window.onload = () => {
   document.getElementById('user').value = localStorage.getItem("gb_user") || "";
-  if(allPosts.length) render();
+  if(allPosts.length) {
+    render();
+    lastPostCount = allPosts.length;
+    allPosts.forEach(p => { lastCommentSnapshot[p.rowIndex] = p.comments.length; });
+  }
   loadFeed();
+  setInterval(pollForUpdates, 30000);
 };
+
+async function pollForUpdates() {
+  try {
+    const res = await fetch(SCRIPT_URL);
+    const data = await res.json();
+    const newPosts = data.map(p => ({ ...p, likes: p.likes || [], comments: p.comments || [] }));
+
+    if (lastPostCount === 0) {
+      lastPostCount = newPosts.length;
+      newPosts.forEach(p => { lastCommentSnapshot[p.rowIndex] = p.comments.length; });
+      allPosts = newPosts;
+      localStorage.setItem("gb_cache", JSON.stringify(allPosts));
+      render();
+      return;
+    }
+
+    const myName = document.getElementById('user').value.trim();
+    let notifMessage = "";
+
+    if (newPosts.length > lastPostCount) {
+      const diff = newPosts.length - lastPostCount;
+      const newestPost = newPosts[0];
+      if (newestPost.user !== myName) {
+        notifMessage = diff === 1
+          ? `${newestPost.user} just posted! 📝`
+          : `${diff} new posts appeared! 📝`;
+        newPostCount += diff;
+      }
+    }
+
+    if (!notifMessage) {
+      for (const post of newPosts) {
+        const prevCount = lastCommentSnapshot[post.rowIndex] || 0;
+        if (post.comments.length > prevCount) {
+          const newComment = post.comments[post.comments.length - 1];
+          if (newComment.user !== myName) {
+            notifMessage = `${newComment.user} commented on ${post.user}'s post 💬`;
+            newPostCount++;
+            break;
+          }
+        }
+      }
+    }
+
+    lastPostCount = newPosts.length;
+    newPosts.forEach(p => { lastCommentSnapshot[p.rowIndex] = p.comments.length; });
+    allPosts = newPosts;
+    localStorage.setItem("gb_cache", JSON.stringify(allPosts));
+    render();
+
+    if (notifMessage) showNotif(notifMessage);
+
+  } catch(e) { console.error("Poll failed", e); }
+}
+
+function showNotif(message) {
+  const banner = document.getElementById('notifBanner');
+  const text = document.getElementById('notifText');
+  const badge = document.getElementById('navBadge');
+
+  text.textContent = message;
+  banner.classList.add('show');
+
+  badge.textContent = newPostCount;
+  badge.style.display = 'flex';
+
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.frequency.setValueAtTime(520, ctx.currentTime);
+    o.frequency.setValueAtTime(660, ctx.currentTime + 0.1);
+    g.gain.setValueAtTime(0.1, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    o.start(ctx.currentTime);
+    o.stop(ctx.currentTime + 0.4);
+  } catch(e) {}
+
+  clearTimeout(notifTimeout);
+  notifTimeout = setTimeout(dismissNotif, 5000);
+}
+
+function dismissNotif() {
+  const banner = document.getElementById('notifBanner');
+  const badge = document.getElementById('navBadge');
+  banner.classList.remove('show');
+  badge.style.display = 'none';
+  newPostCount = 0;
+  clearTimeout(notifTimeout);
+}
 
 async function loadFeed() {
   try {
@@ -115,6 +231,8 @@ async function loadFeed() {
     const data = await res.json();
     allPosts = data.map(p => ({ ...p, likes: p.likes || [], comments: p.comments || [] }));
     localStorage.setItem("gb_cache", JSON.stringify(allPosts));
+    lastPostCount = allPosts.length;
+    allPosts.forEach(p => { lastCommentSnapshot[p.rowIndex] = p.comments.length; });
     render();
   } catch(e) { console.error("Load failed", e); }
 }
@@ -139,13 +257,8 @@ function formatLikes(likes) {
 
 function highlightHashtags(text) {
   if (!text) return "";
-  
-  // 1. Make URLs in the text clickable
   let formatted = text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:var(--gb-hover); text-decoration:none;">$1</a>');
-  
-  // 2. Make Hashtags clickable
   formatted = formatted.replace(/#(\w+)/g, '<span style="color:var(--gb-hover); font-weight:bold; cursor:pointer;" onclick="setFilter(\'hashtag\', \'#$1\'); event.stopPropagation();">#$1</span>');
-  
   return formatted;
 }
 
@@ -153,7 +266,6 @@ function renderLinkPreview(text) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const match = text.match(urlRegex);
   if (!match) return "";
-  
   const url = match[0];
   try {
     const domain = new URL(url).hostname;
@@ -212,9 +324,7 @@ function render() {
         </button>
         <button class="btn" style="background:#27ae60;" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
       </div>
-
       ${p.likes.length > 0 ? `<div class="liked-by">❤️ ${formatLikes(p.likes)}</div>` : ''}
-
       <div class="comment-section">
         ${p.comments.map(c => `<div class="comment-box"><b style="cursor:pointer" onclick="setFilter('author', '${c.user}')">${c.user}</b>: ${highlightHashtags(c.text)} ${renderLinkPreview(c.text)}<span class="comment-time">${timeAgo(c.time || p.timestamp)}</span></div>`).join('')}
       </div>
@@ -310,7 +420,7 @@ async function upload() {
   try {
     await fetch(SCRIPT_URL, { 
       method: 'POST', 
-      mode: 'no-cors',   // ← THIS WAS MISSING
+      mode: 'no-cors',
       body: JSON.stringify({ action:'post', username:user, message:msg, image:imgBase64 })
     });
     document.getElementById('msg').value = ""; 
