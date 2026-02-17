@@ -8,6 +8,37 @@
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  window.OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064",
+      promptOptions: {
+        slidedown: {
+          prompts: [{
+            type: "push",
+            autoPrompt: true,
+            text: {
+              actionMessage: "Get notified when someone posts or comments on theGooldbook! 🦄",
+              acceptButton: "Allow",
+              cancelButton: "No Thanks"
+            },
+            delay: {
+              pageViews: 1,
+              timeDelay: 3
+            }
+          }]
+        }
+      },
+      welcomeNotification: {
+        title: "theGooldbook 🦄",
+        message: "You're subscribed to Gooldbook notifications!"
+      }
+    });
+  });
+</script>
+
+  
   <style>
     :root { --gb-blue: #3b5998; --gb-hover: #4267b2; --gb-bg: #e9ebee; }
     body { background: var(--gb-bg); font-family: system-ui, -apple-system, sans-serif; margin:0; padding-bottom:50px; scroll-behavior: smooth; overflow-x: hidden; }
@@ -89,7 +120,7 @@
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwN_XgiqcEPQsiTNEBMTIemJA75NIgnLrlt2a9T5wq8h9b7FPM9yFSd72tUUIoeh8xu/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzUisbCDKO0k7B8N4z3a-0lE7zWT8iTAVa7S1LM-P7olTbIS-Ph4a8VHMkhmWZwKO26/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let postsToShow = 5;
 let filterType = null; 
