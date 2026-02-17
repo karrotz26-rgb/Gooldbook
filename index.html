@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>The Gooldbook🦄</title>
   <style>
     body { background:#e9ebee; font-family:system-ui, -apple-system, sans-serif; margin:0; padding-bottom:50px; }
@@ -14,14 +14,11 @@
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:10px; margin-bottom:10px; border-radius:4px; font-size:13px; }
     .user { color:#365899; font-weight:bold; }
     .post-img { width:100%; max-height:500px; object-fit: cover; margin-top:10px; border-radius:4px; display:block; background:#f0f2f5; }
-    .btn { background:#4267b2; color:#fff; border:none; padding:8px 12px; cursor:pointer; font-weight:bold; border-radius:4px; }
+    .btn { background:#4267b2; color:#fff; border:none; padding:8px 12px; cursor:pointer; font-weight:bold; border-radius:4px; margin-top:5px; }
     input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:4px; box-sizing: border-box; }
     .comment { background:#f0f2f5; padding:6px; border-radius:6px; margin-top:4px; font-size:13px; }
-    
-    /* Unicorn Animation */
     .unicorn { position: fixed; font-size: 60px; pointer-events: none; z-index: 9999; animation: unicornFloat 2s ease-out forwards; }
     @keyframes unicornFloat { 0% { transform: translateY(0) scale(0); opacity: 0; } 10% { opacity: 1; transform: translateY(-20px) scale(1); } 100% { transform: translateY(-300px) scale(0.5); opacity: 0; } }
-    
     @media(max-width:700px){ .container{flex-direction:column;} .sidebar{width:100%; position:static;} }
   </style>
 </head>
@@ -48,7 +45,7 @@
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxv0HPO52V57-05fD5gztDbb_NdiTE3JX6U-JPHgVu0mZ5AKvUOkK8Cmqv50dOnr9gj/exec"; 
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwlDa4GbVm_03AXJjrpc4p52B_CBG_RV11PAoyrf1Z_QJrpGpMUOsvIXPfQNJBNyeov/exec"; 
 let allPosts = [];
 
 window.onload = () => {
@@ -57,15 +54,20 @@ window.onload = () => {
 };
 
 async function loadFeed() {
-  const res = await fetch(SCRIPT_URL);
-  allPosts = await res.json();
-  render();
+  try {
+    const res = await fetch(SCRIPT_URL);
+    const data = await res.json();
+    allPosts = Array.isArray(data) ? data : [];
+    render();
+  } catch(e) { 
+    document.getElementById('feed').innerText = "Failed to load feed. Check SCRIPT_URL.";
+  }
 }
 
 function render() {
   const u = document.getElementById('user').value.trim();
   const s = document.getElementById('searchBar').value.toLowerCase();
-  const filtered = allPosts.filter(p => p.message?.toLowerCase().includes(s) || p.user?.toLowerCase().includes(s));
+  const filtered = allPosts.filter(p => (p.message || "").toLowerCase().includes(s) || (p.user || "").toLowerCase().includes(s));
   
   document.getElementById('feed').innerHTML = filtered.map(p => `
     <div class="card">
@@ -86,7 +88,7 @@ function render() {
 
 function updateTrending() {
   const top = [...allPosts].sort((a,b) => ((b.likes?.length || 0) + (b.comments?.length || 0)) - ((a.likes?.length || 0) + (a.comments?.length || 0))).slice(0,3);
-  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b>🔥 Trending</b><br>` + top.map(p => `<div style="font-size:11px; margin-top:8px;"><b>${p.user}</b>: ${p.message.substring(0,25)}...</div>`).join('') + `</div>`;
+  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b>🔥 Trending</b><br>` + top.map(p => `<div style="font-size:11px; margin-top:8px;"><b>${p.user}</b>: ${(p.message || "").substring(0,25)}...</div>`).join('') + `</div>`;
 }
 
 async function upload() {
@@ -110,24 +112,31 @@ async function upload() {
 }
 
 async function sendPost(user, msg, img) {
-  await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'post', username: user, message: msg, image: img }) });
-  document.getElementById('msg').value = "";
-  document.getElementById('file').value = "";
-  document.getElementById('postBtn').innerText = "Post";
-  document.getElementById('postBtn').disabled = false;
-  loadFeed();
+  try {
+    await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'post', username: user, message: msg, image: img }) });
+    document.getElementById('msg').value = "";
+    document.getElementById('file').value = "";
+    loadFeed();
+  } finally {
+    document.getElementById('postBtn').innerText = "Post";
+    document.getElementById('postBtn').disabled = false;
+  }
 }
 
 async function apiCall(action, rowIndex, event) {
   const user = document.getElementById('user').value;
-  const text = document.getElementById(`c-${rowIndex}`)?.value || "";
+  if (!user) return alert("Enter name!");
+  const textInput = document.getElementById(`c-${rowIndex}`);
+  const text = textInput ? textInput.value : "";
+  
   if (action === 'like' && event) {
     const u = document.createElement('div'); u.className = 'unicorn'; u.textContent = '🦄';
     u.style.left = event.clientX + 'px'; u.style.top = event.clientY + 'px';
     document.body.appendChild(u); setTimeout(() => u.remove(), 2000);
   }
+  
   await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action, rowIndex, username: user, text }) });
-  if (action === 'comment') document.getElementById(`c-${rowIndex}`).value = "";
+  if (action === 'comment') textInput.value = "";
   loadFeed();
 }
 </script>
