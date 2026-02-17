@@ -22,7 +22,7 @@
     .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:12px; margin-bottom:10px; border-radius:8px; font-size:13px; }
     
-    .filter-badge { background: #fff9c4; border: 1px solid #fbc02d; padding: 10px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .filter-badge { background: #fff9c4; border: 1px solid #fbc02d; padding: 10px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
 
     .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .user-name { color: var(--gb-blue); font-weight:bold; cursor: pointer; }
@@ -34,17 +34,16 @@
     .btn:active { transform: scale(0.96); }
     .btn-alt { background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; }
     
-    .liked-by { font-size: 12px; color: #65676b; margin: 10px 0; }
     .comment-box { background:#f0f2f5; padding:8px; border-radius:8px; margin-top:6px; font-size:13px; }
     .comment-time { font-size: 10px; color: #999; margin-top: 2px; display: block; }
     
     input, textarea { width:100%; padding:10px; margin-bottom:8px; border:1px solid #ddd; border-radius:6px; box-sizing: border-box; font-family: inherit; }
     
-    .trend-item { cursor:pointer; padding:10px 0; border-bottom:1px solid #eee; }
-    .leader-item { display: flex; justify-content: space-between; padding: 8px 5px; border-bottom: 1px dashed #eee; cursor: pointer; transition: background 0.2s; }
-    .leader-item:hover { background: #f0f2f5; }
-    .leader-item.active { background: #e7f3ff; border-left: 3px solid var(--gb-blue); font-weight: bold; }
+    .sidebar-item { cursor:pointer; padding:8px 0; border-bottom:1px solid #eee; transition: background 0.2s; }
+    .sidebar-item:hover { background: #f0f2f5; }
+    .sidebar-item.active { background: #e7f3ff; font-weight: bold; border-left: 3px solid var(--gb-blue); padding-left: 5px; }
 
+    /* Magic Animations */
     .unicorn-pop { position: fixed; font-size: 40px; pointer-events: none; z-index: 9999; animation: unicornFloat 1.5s ease-out forwards; }
     .sparkle { position: fixed; font-size: 15px; pointer-events: none; z-index: 9998; animation: sparkleBurst 1s ease-out forwards; }
     .global-sparkle { position: fixed; font-size: 30px; pointer-events: none; z-index: 10001; animation: globalFall 3s linear forwards; }
@@ -64,6 +63,7 @@
   <div class="sidebar">
     <div class="sidebar-card"><b>🔍 Search Feed</b><input id="searchBar" placeholder="Filter posts..." oninput="render()"></div>
     <div id="leaderboard"></div>
+    <div id="hashtags"></div>
     <div id="trending"></div>
   </div>
 
@@ -71,7 +71,7 @@
     <div id="filterStatus"></div>
     <div class="card" id="postComposer">
       <input id="user" placeholder="Your Name" onchange="saveUser()">
-      <textarea id="msg" rows="2" placeholder="What's on your mind?"></textarea>
+      <textarea id="msg" rows="2" placeholder="What's on your mind? (Use #hashtags!)"></textarea>
       <input type="file" id="file" accept="image/*">
       <div style="display: flex; gap: 5px;">
         <button id="postBtn" class="btn" style="flex: 2;" onclick="upload()">Post Update</button>
@@ -87,16 +87,13 @@
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwN_XgiqcEPQsiTNEBMTIemJA75NIgnLrlt2a9T5wq8h9b7FPM9yFSd72tUUIoeh8xu/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let postsToShow = 5;
-let currentLikerFilter = null;
-let currentAuthorFilter = null;
+let filterType = null; // 'likes', 'author', or 'hashtag'
+let filterVal = null;
 
 window.onload = () => {
   document.getElementById('user').value = localStorage.getItem("gb_user") || "";
   if(allPosts.length) render();
   loadFeed();
-  const urlParams = new URLSearchParams(window.location.search);
-  const postId = urlParams.get('post');
-  if (postId) setTimeout(() => scrollToPost(parseInt(postId)), 1000);
 };
 
 async function loadFeed() {
@@ -109,22 +106,11 @@ async function loadFeed() {
   } catch(e) { console.error("Load failed", e); }
 }
 
-function formatLikes(likes) {
-  if (!likes || likes.length === 0) return "";
-  const count = likes.length;
-  if (count === 1) return `Liked by <b>${likes[0]}</b>`;
-  if (count === 2) return `Liked by <b>${likes[0]}</b> and <b>${likes[1]}</b>`;
-  return `Liked by <b>${likes[0]}</b>, <b>${likes[1]}</b> and ${count - 2} others`;
-}
-
-function setFilter(type, name) {
-  // Clear previous filters first
-  currentLikerFilter = null;
-  currentAuthorFilter = null;
-  
-  if (name) {
-    if (type === 'likes') currentLikerFilter = name;
-    if (type === 'author') currentAuthorFilter = name;
+function setFilter(type, val) {
+  if (filterVal === val && filterType === type) {
+    filterVal = null; filterType = null;
+  } else {
+    filterVal = val; filterType = type;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   render();
@@ -138,20 +124,20 @@ function render() {
   
   let filtered = allPosts.filter(p => (p.message||"").toLowerCase().includes(s) || (p.user||"").toLowerCase().includes(s));
   
-  // Handle UI when filtered
-  if (currentLikerFilter || currentAuthorFilter) {
-    composer.style.display = "none"; // Hide post box while browsing a profile
-    const name = currentLikerFilter || currentAuthorFilter;
-    const typeText = currentLikerFilter ? "everything they liked" : "only their posts";
-    
-    statusEl.innerHTML = `
-      <div class="filter-badge">
-        <span>✨ Showing <b>${typeText}</b> for <b>${name}</b></span>
-        <button class="btn" style="padding: 4px 8px; font-size: 12px;" onclick="setFilter(null, null)">Clear</button>
-      </div>`;
-    
-    if (currentLikerFilter) filtered = filtered.filter(p => p.likes.includes(currentLikerFilter));
-    if (currentAuthorFilter) filtered = filtered.filter(p => p.user === currentAuthorFilter);
+  if (filterVal) {
+    composer.style.display = "none";
+    let label = "";
+    if (filterType === 'likes') {
+        filtered = filtered.filter(p => p.likes.includes(filterVal));
+        label = `✨ Everything <b>${filterVal}</b> liked`;
+    } else if (filterType === 'author') {
+        filtered = filtered.filter(p => p.user === filterVal);
+        label = `📝 Posts by <b>${filterVal}</b>`;
+    } else if (filterType === 'hashtag') {
+        filtered = filtered.filter(p => p.message.toLowerCase().includes(filterVal.toLowerCase()));
+        label = `#️⃣ Posts tagged with <b>${filterVal}</b>`;
+    }
+    statusEl.innerHTML = `<div class="filter-badge"><span>${label}</span><button class="btn" style="padding:4px 8px; font-size:12px;" onclick="setFilter(null, null)">Clear</button></div>`;
   } else {
     composer.style.display = "block";
     statusEl.innerHTML = "";
@@ -164,7 +150,7 @@ function render() {
         <span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span>
         <span class="time-stamp">${timeAgo(p.timestamp)}</span>
       </div>
-      <p>${p.message}</p>
+      <p>${highlightHashtags(p.message)}</p>
       ${p.image ? `<img src="${p.image}" class="post-img" crossorigin="anonymous">` : ''}
       <div style="margin-top:12px; display:flex; gap:8px;">
         <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">
@@ -172,13 +158,8 @@ function render() {
         </button>
         <button class="btn" style="background:#27ae60;" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
       </div>
-      ${p.likes.length > 0 ? `<div class="liked-by">❤️ ${formatLikes(p.likes)}</div>` : ''}
       <div class="comment-section">
-        ${p.comments.map(c => `
-          <div class="comment-box">
-            <b style="cursor:pointer" onclick="setFilter('author', '${c.user}')">${c.user}</b>: ${c.text}
-            <span class="comment-time">${timeAgo(c.time || p.timestamp)}</span>
-          </div>`).join('')}
+        ${p.comments.map(c => `<div class="comment-box"><b style="cursor:pointer" onclick="setFilter('author', '${c.user}')">${c.user}</b>: ${c.text}<span class="comment-time">${timeAgo(c.time || p.timestamp)}</span></div>`).join('')}
       </div>
       <div style="display:flex; gap:5px; margin-top:10px">
         <input id="c-${p.rowIndex}" placeholder="Write a comment..." style="margin:0; font-size:13px">
@@ -189,22 +170,29 @@ function render() {
   updateSidebar();
 }
 
-function updateSidebar() {
-  const topPosts = [...allPosts].sort((a,b) => ((b.likes?.length||0)+(b.comments?.length||0)) - ((a.likes?.length||0)+(a.comments?.length||0))).slice(0,5);
-  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b><br>${topPosts.map(p => `<div class="trend-item" onclick="scrollToPost(${p.rowIndex})"><div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div><div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div><div style="font-size:11px; color:#999;">❤️ ${p.likes.length}  💬 ${p.comments.length}</div></div>`).join('')}</div>`;
+function highlightHashtags(text) {
+  return text.replace(/#(\w+)/g, '<span style="color:var(--gb-hover); cursor:pointer;" onclick="setFilter(\'hashtag\', \'#$1\')">#$1</span>');
+}
 
-  const counts = {};
-  allPosts.forEach(p => p.likes.forEach(name => counts[name] = (counts[name] || 0) + 1));
-  const topLikers = Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0,5);
-  document.getElementById('leaderboard').innerHTML = `
-    <div class="sidebar-card">
-      <b style="color: #9b59b6;">🏆 Top Likers (Click to filter likes)</b><br>
-      ${topLikers.map(([name, count], i) => `
-        <div class="leader-item ${currentLikerFilter === name ? 'active' : ''}" onclick="setFilter('likes', '${name}')">
-          <span>${i===0?'🥇':i===1?'🥈':i===2?'🥉':'👤'} ${name}</span>
-          <b>${count} ❤️</b>
-        </div>`).join('') || '<div style="color:#999; margin-top:5px;">No likes yet</div>'}
-    </div>`;
+function updateSidebar() {
+  // Trending Posts
+  const topPosts = [...allPosts].sort((a,b) => ((b.likes?.length||0)+(b.comments?.length||0)) - ((a.likes?.length||0)+(a.comments?.length||0))).slice(0,3);
+  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b><br>${topPosts.map(p => `<div class="sidebar-item" onclick="scrollToPost(${p.rowIndex})"><div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div><div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div><div style="font-size:11px; color:#999;">❤️ ${p.likes.length}  💬 ${p.comments.length}</div></div>`).join('')}</div>`;
+
+  // Leaderboard
+  const lCounts = {};
+  allPosts.forEach(p => p.likes.forEach(name => lCounts[name] = (lCounts[name] || 0) + 1));
+  const topLikers = Object.entries(lCounts).sort((a,b) => b[1] - a[1]).slice(0,3);
+  document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b style="color: #9b59b6;">🏆 Top Likers</b><br>${topLikers.map(([name, count], i) => `<div class="sidebar-item leader-item ${ (filterVal === name && filterType === 'likes') ? 'active' : ''}" onclick="setFilter('likes', '${name}')"><span>${i===0?'🥇':i===1?'🥈':'🥉'} ${name}</span><b>${count} ❤️</b></div>`).join('')}</div>`;
+
+  // Hashtags
+  const hCounts = {};
+  allPosts.forEach(p => {
+    const tags = p.message.match(/#(\w+)/g);
+    if(tags) tags.forEach(t => hCounts[t.toLowerCase()] = (hCounts[t.toLowerCase()] || 0) + 1);
+  });
+  const topTags = Object.entries(hCounts).sort((a,b) => b[1] - a[1]).slice(0,5);
+  document.getElementById('hashtags').innerHTML = `<div class="sidebar-card"><b style="color: #27ae60;">#️⃣ Trending Tags</b><br>${topTags.map(([tag, count]) => `<div class="sidebar-item ${ (filterVal === tag && filterType === 'hashtag') ? 'active' : ''}" onclick="setFilter('hashtag', '${tag}')"><span>${tag}</span><b style="color:#999; float:right;">${count}</b></div>`).join('') || '<div style="color:#999; margin-top:5px;">No tags yet</div>'}</div>`;
 }
 
 async function apiCall(action, rowIndex, event) {
@@ -301,14 +289,8 @@ async function sharePost(rowIndex, event) {
     const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
     const file = new File([blob], 'gooldbook-post.png', { type: 'image/png' });
     const postUrl = `${window.location.origin}${window.location.pathname}?post=${rowIndex}`;
-    const shareText = `Check out this post on theGooldbook! 🦄\n\n- ${post.user}\n\nView here: ${postUrl}`;
-    if (navigator.share && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: 'theGooldbook', text: shareText });
-    } else {
-      navigator.clipboard.writeText(shareText);
-      alert("Link copied! Opening image...");
-      window.open(canvas.toDataURL());
-    }
+    if (navigator.share) await navigator.share({ files: [file], title: 'theGooldbook', text: `View post: ${postUrl}` });
+    else window.open(canvas.toDataURL());
   } catch(e) { alert("Share failed."); } finally { btn.innerText = old; }
 }
 
