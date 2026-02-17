@@ -34,6 +34,7 @@
     .btn:active { transform: scale(0.96); }
     .btn-alt { background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; }
     
+    .liked-by { font-size: 12px; color: #65676b; margin: 10px 0; display: flex; align-items: center; gap: 5px; }
     .comment-box { background:#f0f2f5; padding:8px; border-radius:8px; margin-top:6px; font-size:13px; }
     .comment-time { font-size: 10px; color: #999; margin-top: 2px; display: block; }
     
@@ -87,7 +88,7 @@
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwN_XgiqcEPQsiTNEBMTIemJA75NIgnLrlt2a9T5wq8h9b7FPM9yFSd72tUUIoeh8xu/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let postsToShow = 5;
-let filterType = null; // 'likes', 'author', or 'hashtag'
+let filterType = null; 
 let filterVal = null;
 
 window.onload = () => {
@@ -116,6 +117,14 @@ function setFilter(type, val) {
   render();
 }
 
+function formatLikes(likes) {
+  if (!likes || likes.length === 0) return "";
+  const count = likes.length;
+  if (count === 1) return `Liked by <b>${likes[0]}</b>`;
+  if (count === 2) return `Liked by <b>${likes[0]}</b> and <b>${likes[1]}</b>`;
+  return `Liked by <b>${likes[0]}</b>, <b>${likes[1]}</b> and ${count - 2} others`;
+}
+
 function highlightHashtags(text) {
   if (!text) return "";
   return text.replace(/#(\w+)/g, '<span style="color:var(--gb-hover); font-weight:bold; cursor:pointer;" onclick="setFilter(\'hashtag\', \'#$1\'); event.stopPropagation();">#$1</span>');
@@ -132,7 +141,6 @@ function render() {
   if (filterVal) {
     composer.style.display = "none";
     let label = "";
-    const cleanTag = filterVal.toLowerCase();
     if (filterType === 'likes') {
         filtered = filtered.filter(p => p.likes.includes(filterVal));
         label = `✨ Everything <b>${filterVal}</b> liked`;
@@ -140,11 +148,9 @@ function render() {
         filtered = filtered.filter(p => p.user === filterVal);
         label = `📝 Posts by <b>${filterVal}</b>`;
     } else if (filterType === 'hashtag') {
-        filtered = filtered.filter(p => 
-            p.message.toLowerCase().includes(cleanTag) || 
-            p.comments.some(c => c.text.toLowerCase().includes(cleanTag))
-        );
-        label = `#️⃣ Conversations mentioning <b>${filterVal}</b>`;
+        const tag = filterVal.toLowerCase();
+        filtered = filtered.filter(p => p.message.toLowerCase().includes(tag) || p.comments.some(c => c.text.toLowerCase().includes(tag)));
+        label = `#️⃣ Posts tagged with <b>${filterVal}</b>`;
     }
     statusEl.innerHTML = `<div class="filter-badge"><span>${label}</span><button class="btn" style="padding:4px 8px; font-size:12px;" onclick="setFilter(null, null)">Clear</button></div>`;
   } else {
@@ -167,6 +173,9 @@ function render() {
         </button>
         <button class="btn" style="background:#27ae60;" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
       </div>
+
+      ${p.likes.length > 0 ? `<div class="liked-by">❤️ ${formatLikes(p.likes)}</div>` : ''}
+
       <div class="comment-section">
         ${p.comments.map(c => `<div class="comment-box"><b style="cursor:pointer" onclick="setFilter('author', '${c.user}')">${c.user}</b>: ${highlightHashtags(c.text)}<span class="comment-time">${timeAgo(c.time || p.timestamp)}</span></div>`).join('')}
       </div>
@@ -186,7 +195,7 @@ function updateSidebar() {
   const lCounts = {};
   allPosts.forEach(p => p.likes.forEach(name => lCounts[name] = (lCounts[name] || 0) + 1));
   const topLikers = Object.entries(lCounts).sort((a,b) => b[1] - a[1]).slice(0,3);
-  document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b style="color: #9b59b6;">🏆 Top Likers</b><br>${topLikers.map(([name, count], i) => `<div class="sidebar-item leader-item ${ (filterVal === name && filterType === 'likes') ? 'active' : ''}" onclick="setFilter('likes', '${name}')"><span>${i===0?'🥇':i===1?'🥈':'🥉'} ${name}</span><b>${count} ❤️</b></div>`).join('')}</div>`;
+  document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b style="color: #9b59b6;">🏆 Top Likers</b><br>${topLikers.map(([name, count], i) => `<div class="sidebar-item ${ (filterVal === name && filterType === 'likes') ? 'active' : ''}" onclick="setFilter('likes', '${name}')"><span>${i===0?'🥇':i===1?'🥈':'🥉'} ${name}</span><b>${count} ❤️</b></div>`).join('')}</div>`;
 
   const hCounts = {};
   allPosts.forEach(p => {
@@ -198,7 +207,7 @@ function updateSidebar() {
     });
   });
   const topTags = Object.entries(hCounts).sort((a,b) => b[1] - a[1]).slice(0,5);
-  document.getElementById('hashtags').innerHTML = `<div class="sidebar-card"><b style="color: #27ae60;">#️⃣ Trending Tags (Posts + Comments)</b><br>${topTags.map(([tag, count]) => `<div class="sidebar-item ${ (filterVal === tag && filterType === 'hashtag') ? 'active' : ''}" onclick="setFilter('hashtag', '${tag}')"><span>${tag}</span><b style="color:#999; float:right;">${count}</b></div>`).join('') || '<div style="color:#999; margin-top:5px;">No tags yet</div>'}</div>`;
+  document.getElementById('hashtags').innerHTML = `<div class="sidebar-card"><b style="color: #27ae60;">#️⃣ Trending Tags</b><br>${topTags.map(([tag, count]) => `<div class="sidebar-item ${ (filterVal === tag && filterType === 'hashtag') ? 'active' : ''}" onclick="setFilter('hashtag', '${tag}')"><span>${tag}</span><b style="color:#999; float:right;">${count}</b></div>`).join('') || '<div style="color:#999; margin-top:5px;">No tags yet</div>'}</div>`;
 }
 
 async function apiCall(action, rowIndex, event) {
