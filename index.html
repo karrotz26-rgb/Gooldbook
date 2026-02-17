@@ -19,9 +19,9 @@
     .sidebar { width:280px; position:sticky; top:70px; height: fit-content; }
     .main-feed { flex-grow:1; max-width:550px; width:100%; }
     
-    .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: background-color 0.5s ease; }
+    .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:12px; margin-bottom:10px; border-radius:8px; font-size:13px; }
-    .highlight-post { background-color: #fff9c4 !important; border: 1px solid #fbc02d !important; transform: scale(1.01); }
+    .highlight-post { background-color: #fff9c4 !important; border: 1px solid #fbc02d !important; transform: scale(1.01); transition: all 0.3s ease; }
     
     .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .user-name { color: var(--gb-blue); font-weight:bold; }
@@ -32,15 +32,14 @@
     .btn:active { transform: scale(0.96); }
     .btn-alt { background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; }
     
-    /* Comment Styling */
-    .comment-box { background:#f0f2f5; padding:8px; border-radius:8px; margin-top:6px; font-size:13px; position: relative; }
+    .liked-by { font-size: 12px; color: #65676b; margin: 10px 0; display: flex; align-items: center; gap: 5px; }
+    .comment-box { background:#f0f2f5; padding:8px; border-radius:8px; margin-top:6px; font-size:13px; }
     .comment-time { font-size: 10px; color: #999; margin-top: 2px; display: block; }
     
     input, textarea { width:100%; padding:10px; margin-bottom:8px; border:1px solid #ddd; border-radius:6px; box-sizing: border-box; font-family: inherit; }
     
-    .trend-item { cursor:pointer; padding:10px 0; border-bottom:1px solid #eee; transition: background 0.2s; }
-    .trend-item:hover { background: #f9f9f9; }
-    .trend-meta { display: flex; gap: 10px; font-size: 11px; color: #777; margin-top: 3px; }
+    .trend-item { cursor:pointer; padding:8px 0; border-bottom:1px solid #eee; }
+    .leader-item { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #eee; }
 
     /* Magic Animations */
     .unicorn-pop { position: fixed; font-size: 40px; pointer-events: none; z-index: 9999; animation: unicornFloat 1.5s ease-out forwards; }
@@ -61,6 +60,7 @@
 <div class="container">
   <div class="sidebar">
     <div class="sidebar-card"><b>🔍 Search Feed</b><input id="searchBar" placeholder="Filter posts..." oninput="render()"></div>
+    <div id="leaderboard"></div>
     <div id="trending"></div>
   </div>
 
@@ -83,7 +83,6 @@
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwN_XgiqcEPQsiTNEBMTIemJA75NIgnLrlt2a9T5wq8h9b7FPM9yFSd72tUUIoeh8xu/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let postsToShow = 5;
-let celebratedPosts = new Set();
 
 window.onload = () => {
   document.getElementById('user').value = localStorage.getItem("gb_user") || "";
@@ -101,19 +100,21 @@ async function loadFeed() {
   } catch(e) { console.error("Load failed", e); }
 }
 
+function formatLikes(likes) {
+  if (!likes || likes.length === 0) return "";
+  const count = likes.length;
+  if (count === 1) return `Liked by <b>${likes[0]}</b>`;
+  if (count === 2) return `Liked by <b>${likes[0]}</b> and <b>${likes[1]}</b>`;
+  return `Liked by <b>${likes[0]}</b>, <b>${likes[1]}</b> and ${count - 2} others`;
+}
+
 function render() {
   const u = document.getElementById('user').value.trim();
   const s = document.getElementById('searchBar').value.toLowerCase();
   const filtered = allPosts.filter(p => (p.message||"").toLowerCase().includes(s) || (p.user||"").toLowerCase().includes(s));
   
   const feedEl = document.getElementById('feed');
-  feedEl.innerHTML = filtered.slice(0, postsToShow).map(p => {
-    if (p.likes.length >= 3 && !celebratedPosts.has(p.rowIndex)) {
-      triggerGlobalCelebration();
-      celebratedPosts.add(p.rowIndex);
-    }
-
-    return `
+  feedEl.innerHTML = filtered.slice(0, postsToShow).map(p => `
     <div class="card" id="post-${p.rowIndex}">
       <div class="user-header">
         <span class="user-name">${p.user}</span>
@@ -127,34 +128,77 @@ function render() {
         </button>
         <button class="btn" style="background:#27ae60;" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
       </div>
+      ${p.likes.length > 0 ? `<div class="liked-by">❤️ ${formatLikes(p.likes)}</div>` : ''}
       <div class="comment-section">
-        ${p.comments.map(c => `
-          <div class="comment-box">
-            <b>${c.user}</b>: ${c.text}
-            <span class="comment-time">${timeAgo(c.time || p.timestamp)}</span>
-          </div>`).join('')}
+        ${p.comments.map(c => `<div class="comment-box"><b>${c.user}</b>: ${c.text}<span class="comment-time">${timeAgo(c.time || p.timestamp)}</span></div>`).join('')}
       </div>
       <div style="display:flex; gap:5px; margin-top:10px">
         <input id="c-${p.rowIndex}" placeholder="Write a comment..." style="margin:0; font-size:13px">
         <button class="btn" onclick="apiCall('comment', ${p.rowIndex})">Reply</button>
       </div>
-    </div>`;
-  }).join('');
+    </div>`).join('');
   document.getElementById('loadMore').style.display = filtered.length > postsToShow ? 'block' : 'none';
-  updateTrending();
+  updateSidebar();
 }
 
-function updateTrending() {
-  const top = [...allPosts].sort((a,b) => ((b.likes?.length||0)+(b.comments?.length||0)) - ((a.likes?.length||0)+(a.comments?.length||0))).slice(0,5);
-  document.getElementById('trending').innerHTML = `
-    <div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b><br>
-      ${top.map(p => `
-        <div class="trend-item" onclick="scrollToPost(${p.rowIndex})">
-          <div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div>
-          <div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div>
-          <div class="trend-meta"><span>❤️ ${p.likes.length}</span><span>💬 ${p.comments.length}</span></div>
-        </div>`).join('')}
-    </div>`;
+function updateSidebar() {
+  // Trending Posts
+  const topPosts = [...allPosts].sort((a,b) => ((b.likes?.length||0)+(b.comments?.length||0)) - ((a.likes?.length||0)+(a.comments?.length||0))).slice(0,5);
+  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b><br>${topPosts.map(p => `<div class="trend-item" onclick="scrollToPost(${p.rowIndex})"><div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div><div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div><div style="font-size:11px; color:#999;">❤️ ${p.likes.length}  💬 ${p.comments.length}</div></div>`).join('')}</div>`;
+
+  // Like Leaderboard
+  const counts = {};
+  allPosts.forEach(p => p.likes.forEach(name => counts[name] = (counts[name] || 0) + 1));
+  const topLikers = Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0,3);
+  document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b style="color: #9b59b6;">🏆 Top Likers</b><br>${topLikers.map(([name, count], i) => `<div class="leader-item"><span>${i===0?'🥇':i===1?'🥈':'🥉'} ${name}</span><b>${count} ❤️</b></div>`).join('') || '<div style="color:#999; margin-top:5px;">No likes yet</div>'}</div>`;
+}
+
+async function apiCall(action, rowIndex, event) {
+  const user = document.getElementById('user').value.trim();
+  if (!user) return alert("Enter your name first!");
+  const p = allPosts.find(x => x.rowIndex === rowIndex);
+  if (action === 'like') {
+    const i = p.likes.indexOf(user);
+    if (i === -1) { 
+      p.likes.push(user); 
+      if(event) triggerMagic(event); 
+      if (p.likes.length === 3) triggerGlobalCelebration();
+    } else { p.likes.splice(i, 1); }
+  } else if (action === 'comment') {
+    const input = document.getElementById(`c-${rowIndex}`);
+    if(!input.value) return;
+    p.comments.push({ user, text: input.value, time: new Date().toISOString() });
+    input.value = "";
+  }
+  render();
+  fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, rowIndex, username: user, text: action==='comment'?p.comments[p.comments.length-1].text:"" }) });
+}
+
+function triggerMagic(event) {
+  const x = event.clientX, y = event.clientY;
+  const u = document.createElement('div'); u.className = 'unicorn-pop'; u.textContent = '🦄';
+  u.style.left = (x - 20) + 'px'; u.style.top = (y - 20) + 'px';
+  document.body.appendChild(u); setTimeout(() => u.remove(), 1500);
+  const particles = ['✨', '⭐', '💫', '🌟'];
+  for (let i = 0; i < 8; i++) {
+    const s = document.createElement('div'); s.className = 'sparkle'; s.textContent = particles[Math.floor(Math.random()*4)];
+    s.style.left = x + 'px'; s.style.top = y + 'px';
+    const tx = (Math.random()-0.5)*200, ty = (Math.random()-0.5)*200;
+    s.style.setProperty('--tx', `${tx}px`); s.style.setProperty('--ty', `${ty}px`);
+    document.body.appendChild(s); setTimeout(() => s.remove(), 1000);
+  }
+}
+
+function triggerGlobalCelebration() {
+  const items = ['✨', '⭐', '🦄', '🌈', '💫', '🌟'];
+  for (let i = 0; i < 40; i++) {
+    setTimeout(() => {
+      const s = document.createElement('div'); s.className = 'global-sparkle';
+      s.textContent = items[Math.floor(Math.random()*6)];
+      s.style.left = Math.random()*100+'vw'; s.style.fontSize = (Math.random()*20+20)+'px';
+      document.body.appendChild(s); setTimeout(() => s.remove(), 3000);
+    }, i * 80);
+  }
 }
 
 async function upload() {
@@ -189,50 +233,6 @@ async function compressImage(file) {
       };
     };
   });
-}
-
-async function apiCall(action, rowIndex, event) {
-  const user = document.getElementById('user').value.trim();
-  if (!user) return alert("Enter your name first!");
-  const p = allPosts.find(x => x.rowIndex === rowIndex);
-  if (action === 'like') {
-    const i = p.likes.indexOf(user);
-    if (i === -1) { p.likes.push(user); if(event) triggerMagic(event); } else { p.likes.splice(i, 1); }
-  } else if (action === 'comment') {
-    const input = document.getElementById(`c-${rowIndex}`);
-    if(!input.value) return;
-    p.comments.push({ user, text: input.value, time: new Date().toISOString() });
-    input.value = "";
-  }
-  render();
-  fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, rowIndex, username: user, text: action==='comment'?p.comments[p.comments.length-1].text:"" }) });
-}
-
-function triggerMagic(event) {
-  const x = event.clientX, y = event.clientY;
-  const u = document.createElement('div'); u.className = 'unicorn-pop'; u.textContent = '🦄';
-  u.style.left = (x - 20) + 'px'; u.style.top = (y - 20) + 'px';
-  document.body.appendChild(u); setTimeout(() => u.remove(), 1500);
-  const particles = ['✨', '⭐', '💫', '🌟'];
-  for (let i = 0; i < 8; i++) {
-    const s = document.createElement('div'); s.className = 'sparkle'; s.textContent = particles[Math.floor(Math.random()*4)];
-    s.style.left = x + 'px'; s.style.top = y + 'px';
-    const tx = (Math.random()-0.5)*200, ty = (Math.random()-0.5)*200;
-    s.style.setProperty('--tx', `${tx}px`); s.style.setProperty('--ty', `${ty}px`);
-    document.body.appendChild(s); setTimeout(() => s.remove(), 1000);
-  }
-}
-
-function triggerGlobalCelebration() {
-  const items = ['✨', '⭐', '🦄', '🌈', '💫', '🌟'];
-  for (let i = 0; i < 30; i++) {
-    setTimeout(() => {
-      const s = document.createElement('div'); s.className = 'global-sparkle';
-      s.textContent = items[Math.floor(Math.random()*6)];
-      s.style.left = Math.random()*100+'vw'; s.style.fontSize = (Math.random()*20+20)+'px';
-      document.body.appendChild(s); setTimeout(() => s.remove(), 3000);
-    }, i * 100);
-  }
 }
 
 async function sharePost(rowIndex, event) {
