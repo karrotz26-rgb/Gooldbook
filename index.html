@@ -331,10 +331,16 @@ async function upload() {
   allPosts.unshift(tempPost);
   render();
   try {
-    await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'post', username:user, message:msg, image:imgBase64 })});
-    document.getElementById('msg').value = ""; document.getElementById('file').value = "";
+    await fetch(SCRIPT_URL, { 
+      method: 'POST', 
+      mode: 'no-cors',   // ← THIS WAS MISSING
+      body: JSON.stringify({ action:'post', username:user, message:msg, image:imgBase64 })
+    });
+    document.getElementById('msg').value = ""; 
+    document.getElementById('file').value = "";
     loadFeed();
-  } catch(e) { alert("Upload failed."); } finally { document.getElementById('postBtn').innerText = "Post Update"; }
+  } catch(e) { alert("Upload failed."); } 
+  finally { document.getElementById('postBtn').innerText = "Post Update"; }
 }
 
 async function compressImage(file) {
