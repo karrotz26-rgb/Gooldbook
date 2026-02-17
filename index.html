@@ -21,10 +21,12 @@
     
     .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:12px; margin-bottom:10px; border-radius:8px; font-size:13px; }
-    .highlight-post { background-color: #fff9c4 !important; border: 1px solid #fbc02d !important; transform: scale(1.01); transition: all 0.3s ease; }
     
+    .filter-badge { background: #fff9c4; border: 1px solid #fbc02d; padding: 10px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+
     .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .user-name { color: var(--gb-blue); font-weight:bold; }
+    .user-name { color: var(--gb-blue); font-weight:bold; cursor: pointer; }
+    .user-name:hover { text-decoration: underline; }
     .time-stamp { font-size:11px; color:#888; }
     .post-img { width:100%; max-height:500px; object-fit: cover; margin-top:10px; border-radius:4px; display:block; background:#f0f2f5; }
     
@@ -32,16 +34,17 @@
     .btn:active { transform: scale(0.96); }
     .btn-alt { background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; }
     
-    .liked-by { font-size: 12px; color: #65676b; margin: 10px 0; display: flex; align-items: center; gap: 5px; }
+    .liked-by { font-size: 12px; color: #65676b; margin: 10px 0; }
     .comment-box { background:#f0f2f5; padding:8px; border-radius:8px; margin-top:6px; font-size:13px; }
     .comment-time { font-size: 10px; color: #999; margin-top: 2px; display: block; }
     
     input, textarea { width:100%; padding:10px; margin-bottom:8px; border:1px solid #ddd; border-radius:6px; box-sizing: border-box; font-family: inherit; }
     
     .trend-item { cursor:pointer; padding:10px 0; border-bottom:1px solid #eee; }
-    .leader-item { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dashed #eee; }
+    .leader-item { display: flex; justify-content: space-between; padding: 8px 5px; border-bottom: 1px dashed #eee; cursor: pointer; transition: background 0.2s; }
+    .leader-item:hover { background: #f0f2f5; }
+    .leader-item.active { background: #e7f3ff; border-left: 3px solid var(--gb-blue); font-weight: bold; }
 
-    /* Magic Animations */
     .unicorn-pop { position: fixed; font-size: 40px; pointer-events: none; z-index: 9999; animation: unicornFloat 1.5s ease-out forwards; }
     .sparkle { position: fixed; font-size: 15px; pointer-events: none; z-index: 9998; animation: sparkleBurst 1s ease-out forwards; }
     .global-sparkle { position: fixed; font-size: 30px; pointer-events: none; z-index: 10001; animation: globalFall 3s linear forwards; }
@@ -65,7 +68,8 @@
   </div>
 
   <div class="main-feed">
-    <div class="card">
+    <div id="filterStatus"></div>
+    <div class="card" id="postComposer">
       <input id="user" placeholder="Your Name" onchange="saveUser()">
       <textarea id="msg" rows="2" placeholder="What's on your mind?"></textarea>
       <input type="file" id="file" accept="image/*">
@@ -83,13 +87,13 @@
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwN_XgiqcEPQsiTNEBMTIemJA75NIgnLrlt2a9T5wq8h9b7FPM9yFSd72tUUIoeh8xu/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let postsToShow = 5;
+let currentLikerFilter = null;
+let currentAuthorFilter = null;
 
 window.onload = () => {
   document.getElementById('user').value = localStorage.getItem("gb_user") || "";
   if(allPosts.length) render();
   loadFeed();
-  
-  // URL logic to jump to shared post
   const urlParams = new URLSearchParams(window.location.search);
   const postId = urlParams.get('post');
   if (postId) setTimeout(() => scrollToPost(parseInt(postId)), 1000);
@@ -113,16 +117,51 @@ function formatLikes(likes) {
   return `Liked by <b>${likes[0]}</b>, <b>${likes[1]}</b> and ${count - 2} others`;
 }
 
+function setFilter(type, name) {
+  // Clear previous filters first
+  currentLikerFilter = null;
+  currentAuthorFilter = null;
+  
+  if (name) {
+    if (type === 'likes') currentLikerFilter = name;
+    if (type === 'author') currentAuthorFilter = name;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  render();
+}
+
 function render() {
   const u = document.getElementById('user').value.trim();
   const s = document.getElementById('searchBar').value.toLowerCase();
-  const filtered = allPosts.filter(p => (p.message||"").toLowerCase().includes(s) || (p.user||"").toLowerCase().includes(s));
+  const statusEl = document.getElementById('filterStatus');
+  const composer = document.getElementById('postComposer');
+  
+  let filtered = allPosts.filter(p => (p.message||"").toLowerCase().includes(s) || (p.user||"").toLowerCase().includes(s));
+  
+  // Handle UI when filtered
+  if (currentLikerFilter || currentAuthorFilter) {
+    composer.style.display = "none"; // Hide post box while browsing a profile
+    const name = currentLikerFilter || currentAuthorFilter;
+    const typeText = currentLikerFilter ? "everything they liked" : "only their posts";
+    
+    statusEl.innerHTML = `
+      <div class="filter-badge">
+        <span>✨ Showing <b>${typeText}</b> for <b>${name}</b></span>
+        <button class="btn" style="padding: 4px 8px; font-size: 12px;" onclick="setFilter(null, null)">Clear</button>
+      </div>`;
+    
+    if (currentLikerFilter) filtered = filtered.filter(p => p.likes.includes(currentLikerFilter));
+    if (currentAuthorFilter) filtered = filtered.filter(p => p.user === currentAuthorFilter);
+  } else {
+    composer.style.display = "block";
+    statusEl.innerHTML = "";
+  }
   
   const feedEl = document.getElementById('feed');
   feedEl.innerHTML = filtered.slice(0, postsToShow).map(p => `
     <div class="card" id="post-${p.rowIndex}">
       <div class="user-header">
-        <span class="user-name">${p.user}</span>
+        <span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span>
         <span class="time-stamp">${timeAgo(p.timestamp)}</span>
       </div>
       <p>${p.message}</p>
@@ -135,14 +174,18 @@ function render() {
       </div>
       ${p.likes.length > 0 ? `<div class="liked-by">❤️ ${formatLikes(p.likes)}</div>` : ''}
       <div class="comment-section">
-        ${p.comments.map(c => `<div class="comment-box"><b>${c.user}</b>: ${c.text}<span class="comment-time">${timeAgo(c.time || p.timestamp)}</span></div>`).join('')}
+        ${p.comments.map(c => `
+          <div class="comment-box">
+            <b style="cursor:pointer" onclick="setFilter('author', '${c.user}')">${c.user}</b>: ${c.text}
+            <span class="comment-time">${timeAgo(c.time || p.timestamp)}</span>
+          </div>`).join('')}
       </div>
       <div style="display:flex; gap:5px; margin-top:10px">
         <input id="c-${p.rowIndex}" placeholder="Write a comment..." style="margin:0; font-size:13px">
         <button class="btn" onclick="apiCall('comment', ${p.rowIndex})">Reply</button>
       </div>
     </div>`).join('');
-  document.getElementById('loadMore').style.display = filtered.length > postsToShow ? 'block' : 'none';
+  document.getElementById('loadMore').style.display = (filtered.length > postsToShow) ? 'block' : 'none';
   updateSidebar();
 }
 
@@ -152,8 +195,16 @@ function updateSidebar() {
 
   const counts = {};
   allPosts.forEach(p => p.likes.forEach(name => counts[name] = (counts[name] || 0) + 1));
-  const topLikers = Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0,3);
-  document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b style="color: #9b59b6;">🏆 Top Likers</b><br>${topLikers.map(([name, count], i) => `<div class="leader-item"><span>${i===0?'🥇':i===1?'🥈':'🥉'} ${name}</span><b>${count} ❤️</b></div>`).join('') || '<div style="color:#999; margin-top:5px;">No likes yet</div>'}</div>`;
+  const topLikers = Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0,5);
+  document.getElementById('leaderboard').innerHTML = `
+    <div class="sidebar-card">
+      <b style="color: #9b59b6;">🏆 Top Likers (Click to filter likes)</b><br>
+      ${topLikers.map(([name, count], i) => `
+        <div class="leader-item ${currentLikerFilter === name ? 'active' : ''}" onclick="setFilter('likes', '${name}')">
+          <span>${i===0?'🥇':i===1?'🥈':i===2?'🥉':'👤'} ${name}</span>
+          <b>${count} ❤️</b>
+        </div>`).join('') || '<div style="color:#999; margin-top:5px;">No likes yet</div>'}
+    </div>`;
 }
 
 async function apiCall(action, rowIndex, event) {
@@ -241,51 +292,24 @@ async function compressImage(file) {
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); if (!post) return;
   const btn = event.target; const old = btn.innerText; btn.innerText = "⏳ Wait...";
-  
-  const card = document.createElement('div'); 
-  card.style.cssText = `position: fixed; left: -9999px; width: 400px; background: white; padding: 25px; border-radius: 12px; border: 1px solid #ddd; font-family: system-ui, sans-serif;`;
-  
-  // Generating the Image Content with Likes/Comments
-  card.innerHTML = `
-    <div style="display:flex; align-items:center; gap:8px; color:#3b5998; font-weight:bold; margin-bottom:12px;">
-      <div style="background:#3b5998; color:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-size:16px;">🦄</div>
-      theGooldbook
-    </div>
-    <div style="font-size:16px; margin-bottom:10px; color:#1c1e21; line-height:1.4;">${post.message}</div>
-    ${post.image ? `<img src="${post.image}" style="width:100%; border-radius:8px; margin-bottom:10px;">` : ''}
-    <div style="display:flex; justify-content:space-between; align-items:center; padding-top:10px; border-top:1px solid #eee;">
-      <div style="font-size:13px; color:#65676b;">❤️ ${post.likes.length} &nbsp; 💬 ${post.comments.length}</div>
-      <div style="font-size:11px; color:#888;">Post by ${post.user}</div>
-    </div>`;
-    
+  const card = document.createElement('div'); card.style.cssText = `position: fixed; left: -9999px; width: 400px; background: white; padding: 25px; border-radius: 12px; border: 1px solid #ddd; font-family: system-ui, sans-serif;`;
+  card.innerHTML = `<div style="display:flex; align-items:center; gap:8px; color:#3b5998; font-weight:bold; margin-bottom:12px;"><div style="background:#3b5998; color:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-size:16px;">🦄</div>theGooldbook</div><div style="font-size:16px; margin-bottom:10px; color:#1c1e21; line-height:1.4;">${post.message}</div>${post.image ? `<img src="${post.image}" style="width:100%; border-radius:8px; margin-bottom:10px;">` : ''}<div style="display:flex; justify-content:space-between; align-items:center; padding-top:10px; border-top:1px solid #eee;"><div style="font-size:13px; color:#65676b;">❤️ ${post.likes.length} &nbsp; 💬 ${post.comments.length}</div><div style="font-size:11px; color:#888;">Post by ${post.user}</div></div>`;
   document.body.appendChild(card);
-  
   try {
     const canvas = await html2canvas(card, { useCORS: true, allowTaint: true });
     document.body.removeChild(card);
     const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
     const file = new File([blob], 'gooldbook-post.png', { type: 'image/png' });
-    
-    // Create direct URL to the post
     const postUrl = `${window.location.origin}${window.location.pathname}?post=${rowIndex}`;
-    const shareText = `Check out this post on theGooldbook! 🦄\n\n"${post.message.substring(0, 50)}..."\n\n- ${post.user}\n\nView here: ${postUrl}`;
-
+    const shareText = `Check out this post on theGooldbook! 🦄\n\n- ${post.user}\n\nView here: ${postUrl}`;
     if (navigator.share && navigator.canShare({ files: [file] })) {
-      await navigator.share({ 
-        files: [file], 
-        title: 'theGooldbook', 
-        text: shareText
-      });
+      await navigator.share({ files: [file], title: 'theGooldbook', text: shareText });
     } else {
-      // Fallback: Copy link and open image
       navigator.clipboard.writeText(shareText);
-      alert("Link copied to clipboard! Opening shared image...");
+      alert("Link copied! Opening image...");
       window.open(canvas.toDataURL());
     }
-  } catch(e) { 
-    console.error(e);
-    alert("Share failed. Try again."); 
-  } finally { btn.innerText = old; }
+  } catch(e) { alert("Share failed."); } finally { btn.innerText = old; }
 }
 
 function timeAgo(date) {
