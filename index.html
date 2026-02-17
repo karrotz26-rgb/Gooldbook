@@ -12,7 +12,6 @@
     :root { --gb-blue: #3b5998; --gb-hover: #4267b2; --gb-bg: #e9ebee; }
     body { background: var(--gb-bg); font-family: system-ui, -apple-system, sans-serif; margin:0; padding-bottom:50px; scroll-behavior: smooth; overflow-x: hidden; }
     
-    /* Nav with circular logo */
     .nav { background: var(--gb-blue); color:#fff; padding:12px; padding-top: calc(12px + env(safe-area-inset-top)); text-align:center; font-weight:bold; position:sticky; top:0; z-index:1000; display: flex; align-items: center; justify-content: center; gap: 10px; }
     .nav-icon { background: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
 
@@ -20,7 +19,7 @@
     .sidebar { width:280px; position:sticky; top:70px; height: fit-content; }
     .main-feed { flex-grow:1; max-width:550px; width:100%; }
     
-    .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: background-color 0.5s ease, transform 0.3s ease; }
+    .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: background-color 0.5s ease; }
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:12px; margin-bottom:10px; border-radius:8px; font-size:13px; }
     .highlight-post { background-color: #fff9c4 !important; border: 1px solid #fbc02d !important; transform: scale(1.01); }
     
@@ -33,49 +32,35 @@
     .btn:active { transform: scale(0.96); }
     .btn-alt { background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; }
     
-    .comment-box { background:#f0f2f5; padding:8px; border-radius:8px; margin-top:6px; font-size:13px; }
+    /* Comment Styling */
+    .comment-box { background:#f0f2f5; padding:8px; border-radius:8px; margin-top:6px; font-size:13px; position: relative; }
+    .comment-time { font-size: 10px; color: #999; margin-top: 2px; display: block; }
+    
     input, textarea { width:100%; padding:10px; margin-bottom:8px; border:1px solid #ddd; border-radius:6px; box-sizing: border-box; font-family: inherit; }
     
     .trend-item { cursor:pointer; padding:10px 0; border-bottom:1px solid #eee; transition: background 0.2s; }
     .trend-item:hover { background: #f9f9f9; }
     .trend-meta { display: flex; gap: 10px; font-size: 11px; color: #777; margin-top: 3px; }
-    .trend-msg { font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* Magic Animations */
     .unicorn-pop { position: fixed; font-size: 40px; pointer-events: none; z-index: 9999; animation: unicornFloat 1.5s ease-out forwards; }
     .sparkle { position: fixed; font-size: 15px; pointer-events: none; z-index: 9998; animation: sparkleBurst 1s ease-out forwards; }
     .global-sparkle { position: fixed; font-size: 30px; pointer-events: none; z-index: 10001; animation: globalFall 3s linear forwards; }
 
-    @keyframes unicornFloat { 
-      0% { transform: translateY(0) scale(0) rotate(0); opacity: 0; } 
-      30% { opacity: 1; transform: translateY(-40px) scale(1.2) rotate(10deg); } 
-      100% { transform: translateY(-120px) scale(0.5) rotate(-10deg); opacity: 0; } 
-    }
-    @keyframes sparkleBurst {
-      0% { transform: translate(0,0) scale(1); opacity: 1; }
-      100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
-    }
-    @keyframes globalFall {
-      0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
-      100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
-    }
+    @keyframes unicornFloat { 0% { transform: translateY(0) scale(0); opacity: 0; } 30% { opacity: 1; transform: translateY(-40px) scale(1.2); } 100% { transform: translateY(-120px) scale(0); opacity: 0; } }
+    @keyframes sparkleBurst { 0% { transform: translate(0,0) scale(1); opacity: 1; } 100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; } }
+    @keyframes globalFall { 0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(360deg); opacity: 0; } }
 
     @media(max-width:700px){ .container { flex-direction:column; } .sidebar { width:100%; position:static; } }
   </style>
 </head>
 <body>
 
-<div class="nav">
-  <div class="nav-icon">🦄</div>
-  theGooldbook
-</div>
+<div class="nav"><div class="nav-icon">🦄</div>theGooldbook</div>
 
 <div class="container">
   <div class="sidebar">
-    <div class="sidebar-card">
-      <b>🔍 Search Feed</b>
-      <input id="searchBar" placeholder="Filter posts..." oninput="render()">
-    </div>
+    <div class="sidebar-card"><b>🔍 Search Feed</b><input id="searchBar" placeholder="Filter posts..." oninput="render()"></div>
     <div id="trending"></div>
   </div>
 
@@ -96,10 +81,9 @@
 
 <script>
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwN_XgiqcEPQsiTNEBMTIemJA75NIgnLrlt2a9T5wq8h9b7FPM9yFSd72tUUIoeh8xu/exec";
-
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let postsToShow = 5;
-let celebratedPosts = new Set(); // Keep track of posts that already triggered global sparkles in this session
+let celebratedPosts = new Set();
 
 window.onload = () => {
   document.getElementById('user').value = localStorage.getItem("gb_user") || "";
@@ -124,7 +108,6 @@ function render() {
   
   const feedEl = document.getElementById('feed');
   feedEl.innerHTML = filtered.slice(0, postsToShow).map(p => {
-    // Check for Milestone
     if (p.likes.length >= 3 && !celebratedPosts.has(p.rowIndex)) {
       triggerGlobalCelebration();
       celebratedPosts.add(p.rowIndex);
@@ -145,7 +128,11 @@ function render() {
         <button class="btn" style="background:#27ae60;" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
       </div>
       <div class="comment-section">
-        ${p.comments.map(c => `<div class="comment-box"><b>${c.user}</b>: ${c.text}</div>`).join('')}
+        ${p.comments.map(c => `
+          <div class="comment-box">
+            <b>${c.user}</b>: ${c.text}
+            <span class="comment-time">${timeAgo(c.time || p.timestamp)}</span>
+          </div>`).join('')}
       </div>
       <div style="display:flex; gap:5px; margin-top:10px">
         <input id="c-${p.rowIndex}" placeholder="Write a comment..." style="margin:0; font-size:13px">
@@ -160,18 +147,13 @@ function render() {
 function updateTrending() {
   const top = [...allPosts].sort((a,b) => ((b.likes?.length||0)+(b.comments?.length||0)) - ((a.likes?.length||0)+(a.comments?.length||0))).slice(0,5);
   document.getElementById('trending').innerHTML = `
-    <div class="sidebar-card">
-      <b style="color: #e67e22;">🔥 Trending Activity</b><br>
+    <div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b><br>
       ${top.map(p => `
         <div class="trend-item" onclick="scrollToPost(${p.rowIndex})">
           <div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div>
-          <div class="trend-msg">${p.message}</div>
-          <div class="trend-meta">
-            <span>❤️ ${p.likes.length}</span>
-            <span>💬 ${p.comments.length}</span>
-          </div>
-        </div>
-      `).join('')}
+          <div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div>
+          <div class="trend-meta"><span>❤️ ${p.likes.length}</span><span>💬 ${p.comments.length}</span></div>
+        </div>`).join('')}
     </div>`;
 }
 
@@ -179,36 +161,26 @@ async function upload() {
   const user = document.getElementById('user').value.trim();
   const msg = document.getElementById('msg').value.trim();
   const file = document.getElementById('file').files[0];
-  const btn = document.getElementById('postBtn');
   if (!user || !msg) return alert("Fill in name and message!");
-
-  btn.innerText = "Processing..."; btn.disabled = true;
-  let imgBase64 = "";
-  if (file) imgBase64 = await compressImage(file);
-
+  document.getElementById('postBtn').innerText = "Processing...";
+  let imgBase64 = file ? await compressImage(file) : "";
   const tempPost = { user, message: msg, image: imgBase64, timestamp: new Date().toISOString(), likes: [], comments: [], rowIndex: -1 };
   allPosts.unshift(tempPost);
   render();
-
   try {
     await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'post', username:user, message:msg, image:imgBase64 })});
-    document.getElementById('msg').value = "";
-    document.getElementById('file').value = "";
+    document.getElementById('msg').value = ""; document.getElementById('file').value = "";
     loadFeed();
-  } catch(e) { alert("Upload failed."); } 
-  finally { btn.innerText = "Post Update"; btn.disabled = false; }
+  } catch(e) { alert("Upload failed."); } finally { document.getElementById('postBtn').innerText = "Post Update"; }
 }
 
 async function compressImage(file) {
   return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
+    const reader = new FileReader(); reader.readAsDataURL(file);
     reader.onload = (e) => {
-      const img = new Image();
-      img.src = e.target.result;
+      const img = new Image(); img.src = e.target.result;
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX = 800;
+        const canvas = document.createElement('canvas'); const MAX = 800;
         let w = img.width, h = img.height;
         if (w > MAX) { h *= MAX/w; w = MAX; }
         canvas.width = w; canvas.height = h;
@@ -223,20 +195,13 @@ async function apiCall(action, rowIndex, event) {
   const user = document.getElementById('user').value.trim();
   if (!user) return alert("Enter your name first!");
   const p = allPosts.find(x => x.rowIndex === rowIndex);
-  
   if (action === 'like') {
     const i = p.likes.indexOf(user);
-    if (i === -1) { 
-      p.likes.push(user); 
-      if(event) triggerMagic(event); 
-    } else { 
-      p.likes.splice(i, 1); 
-    }
+    if (i === -1) { p.likes.push(user); if(event) triggerMagic(event); } else { p.likes.splice(i, 1); }
   } else if (action === 'comment') {
     const input = document.getElementById(`c-${rowIndex}`);
-    const text = input.value;
-    if(!text) return;
-    p.comments.push({ user, text });
+    if(!input.value) return;
+    p.comments.push({ user, text: input.value, time: new Date().toISOString() });
     input.value = "";
   }
   render();
@@ -244,26 +209,17 @@ async function apiCall(action, rowIndex, event) {
 }
 
 function triggerMagic(event) {
-  const x = event.clientX;
-  const y = event.clientY;
-  const u = document.createElement('div');
-  u.className = 'unicorn-pop'; u.textContent = '🦄';
+  const x = event.clientX, y = event.clientY;
+  const u = document.createElement('div'); u.className = 'unicorn-pop'; u.textContent = '🦄';
   u.style.left = (x - 20) + 'px'; u.style.top = (y - 20) + 'px';
-  document.body.appendChild(u);
-  setTimeout(() => u.remove(), 1500);
-
+  document.body.appendChild(u); setTimeout(() => u.remove(), 1500);
   const particles = ['✨', '⭐', '💫', '🌟'];
   for (let i = 0; i < 8; i++) {
-    const s = document.createElement('div');
-    s.className = 'sparkle';
-    s.textContent = particles[Math.floor(Math.random() * particles.length)];
+    const s = document.createElement('div'); s.className = 'sparkle'; s.textContent = particles[Math.floor(Math.random()*4)];
     s.style.left = x + 'px'; s.style.top = y + 'px';
-    const tx = (Math.random() - 0.5) * 200;
-    const ty = (Math.random() - 0.5) * 200;
-    s.style.setProperty('--tx', `${tx}px`);
-    s.style.setProperty('--ty', `${ty}px`);
-    document.body.appendChild(s);
-    setTimeout(() => s.remove(), 1000);
+    const tx = (Math.random()-0.5)*200, ty = (Math.random()-0.5)*200;
+    s.style.setProperty('--tx', `${tx}px`); s.style.setProperty('--ty', `${ty}px`);
+    document.body.appendChild(s); setTimeout(() => s.remove(), 1000);
   }
 }
 
@@ -271,42 +227,28 @@ function triggerGlobalCelebration() {
   const items = ['✨', '⭐', '🦄', '🌈', '💫', '🌟'];
   for (let i = 0; i < 30; i++) {
     setTimeout(() => {
-      const s = document.createElement('div');
-      s.className = 'global-sparkle';
-      s.textContent = items[Math.floor(Math.random() * items.length)];
-      s.style.left = Math.random() * 100 + 'vw';
-      s.style.fontSize = (Math.random() * 20 + 20) + 'px';
-      document.body.appendChild(s);
-      setTimeout(() => s.remove(), 3000);
+      const s = document.createElement('div'); s.className = 'global-sparkle';
+      s.textContent = items[Math.floor(Math.random()*6)];
+      s.style.left = Math.random()*100+'vw'; s.style.fontSize = (Math.random()*20+20)+'px';
+      document.body.appendChild(s); setTimeout(() => s.remove(), 3000);
     }, i * 100);
   }
 }
 
 async function sharePost(rowIndex, event) {
-  const post = allPosts.find(p => p.rowIndex === rowIndex);
-  if (!post) return;
-  const btn = event.target;
-  const old = btn.innerText;
-  btn.innerText = "⏳ Wait..."; btn.disabled = true;
-
-  const card = document.createElement('div');
-  card.style.cssText = `position: fixed; left: -9999px; width: 400px; background: white; padding: 20px; border-radius: 12px;`;
+  const post = allPosts.find(p => p.rowIndex === rowIndex); if (!post) return;
+  const btn = event.target; const old = btn.innerText; btn.innerText = "⏳ Wait...";
+  const card = document.createElement('div'); card.style.cssText = `position: fixed; left: -9999px; width: 400px; background: white; padding: 20px; border-radius: 12px;`;
   card.innerHTML = `<div style="display:flex; align-items:center; gap:8px; color:#3b5998; font-weight:bold; margin-bottom:10px;"><div style="background:#3b5998; color:white; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; font-size:14px;">🦄</div>theGooldbook</div><div style="font-size:16px; margin-bottom:10px;">${post.message}</div>${post.image ? `<img src="${post.image}" style="width:100%; border-radius:8px;">` : ''}<div style="margin-top:10px; font-size:11px; color:#888;">Post by ${post.user}</div>`;
   document.body.appendChild(card);
-
   try {
     const canvas = await html2canvas(card, { useCORS: true, allowTaint: true });
     document.body.removeChild(card);
     const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
     const file = new File([blob], 'share.png', { type: 'image/png' });
-
-    if (navigator.share && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: 'theGooldbook', text: post.message });
-    } else {
-      window.open(canvas.toDataURL());
-    }
-  } catch(e) { alert("Share failed."); }
-  finally { btn.innerText = old; btn.disabled = false; }
+    if (navigator.share && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: 'theGooldbook', text: post.message });
+    else window.open(canvas.toDataURL());
+  } catch(e) { alert("Share failed."); } finally { btn.innerText = old; }
 }
 
 function timeAgo(date) {
