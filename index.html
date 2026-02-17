@@ -2,24 +2,53 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>The Gooldbook🦄</title>
+  
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  
   <style>
     body { background:#e9ebee; font-family:system-ui, -apple-system, sans-serif; margin:0; padding-bottom:50px; }
-    .nav { background:#3b5998; color:#fff; padding:15px; text-align:center; font-weight:bold; position:sticky; top:0; z-index:1000; display: flex; align-items: center; justify-content: center;}
+    
+    .nav { 
+      background:#3b5998; color:#fff; padding:15px; 
+      text-align:center; font-weight:bold; position:sticky; top:0; z-index:1000; 
+      display: flex; align-items: center; justify-content: center;
+    }
+
     .container { max-width:900px; margin:auto; display:flex; gap:20px; padding:10px; }
     .sidebar { width:280px; position:sticky; top:70px; }
     .main-feed { flex-grow:1; max-width:550px; width:100%; }
+    
     .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; }
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:10px; margin-bottom:10px; border-radius:4px; font-size:13px; }
-    .user { color:#365899; font-weight:bold; }
+    
+    .user { color:#365899; font-weight:bold; display: flex; align-items: center; justify-content: space-between; }
+    .time-stamp { font-size:11px; font-weight:normal; color:#888; }
+    
     .post-img { width:100%; max-height:500px; object-fit: cover; margin-top:10px; border-radius:4px; display:block; background:#f0f2f5; }
+    
     .btn { background:#4267b2; color:#fff; border:none; padding:8px 12px; cursor:pointer; font-weight:bold; border-radius:4px; margin-top:5px; }
-    input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:4px; box-sizing: border-box; }
-    .comment { background:#f0f2f5; padding:6px; border-radius:6px; margin-top:4px; font-size:13px; }
-    .unicorn { position: fixed; font-size: 60px; pointer-events: none; z-index: 9999; animation: unicornFloat 2s ease-out forwards; }
-    @keyframes unicornFloat { 0% { transform: translateY(0) scale(0); opacity: 0; } 10% { opacity: 1; transform: translateY(-20px) scale(1); } 100% { transform: translateY(-300px) scale(0.5); opacity: 0; } }
-    @media(max-width:700px){ .container{flex-direction:column;} .sidebar{width:100%; position:static;} }
+    .btn:disabled { background:#ccc; }
+
+    input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:4px; box-sizing: border-box; font-family: inherit; }
+    
+    .comment-section { margin-top:10px; border-top: 1px solid #eee; padding-top: 10px; }
+    .comment { background:#f0f2f5; padding:8px; border-radius:8px; margin-top:5px; font-size:13px; }
+    .comment-time { font-size:9px; color:#999; margin-top:2px; }
+
+    /* Unicorn Sparkle Animation */
+    .unicorn { position: fixed; font-size: 50px; pointer-events: none; z-index: 9999; animation: unicornFloat 2s ease-out forwards; }
+    @keyframes unicornFloat { 
+      0% { transform: translateY(0) scale(0); opacity: 0; } 
+      20% { opacity: 1; transform: translateY(-20px) scale(1.2); } 
+      100% { transform: translateY(-300px) scale(0.5); opacity: 0; } 
+    }
+
+    @media(max-width:700px){ 
+      .container { flex-direction:column; } 
+      .sidebar { width:100%; position:static; } 
+    }
   </style>
 </head>
 <body>
@@ -28,7 +57,10 @@
 
 <div class="container">
   <div class="sidebar">
-    <div class="sidebar-card"><b>🔍 Search</b><input id="searchBar" placeholder="Filter..." oninput="render()"></div>
+    <div class="sidebar-card">
+      <b>🔍 Search Feed</b>
+      <input id="searchBar" placeholder="Filter by name or message..." oninput="render()">
+    </div>
     <div id="trending"></div>
   </div>
 
@@ -37,16 +69,22 @@
       <input id="user" placeholder="Your Name" onchange="localStorage.setItem('gb_user', this.value)">
       <textarea id="msg" rows="2" placeholder="What's on your mind?"></textarea>
       <input type="file" id="file" accept="image/*">
-      <button id="postBtn" class="btn" onclick="upload()">Post</button>
-      <button class="btn" style="background:#f5f6f7; color:#333; width:100%; margin-top:5px;" onclick="loadFeed()">Update Feed</button>
+      <button id="postBtn" class="btn" onclick="upload()">Post Update</button>
+      <button class="btn" style="background:#f5f6f7; color:#333; width:100%; margin-top:5px; border:1px solid #ddd;" onclick="loadFeed()">Update Feed</button>
     </div>
-    <div id="feed">Loading feed...</div>
+    <div id="feed">Loading latest posts...</div>
   </div>
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwlDa4GbVm_03AXJjrpc4p52B_CBG_RV11PAoyrf1Z_QJrpGpMUOsvIXPfQNJBNyeov/exec"; 
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyF9L-xcjvpDp-ch2U26FUfPo9EHo7zBdSLeAbimg1iskiiaiOeU1DQ1JzbZmiwxB1v/exec"; // <--- Update this!
 let allPosts = [];
+
+// OneSignal Init
+window.OneSignalDeferred = window.OneSignalDeferred || [];
+OneSignalDeferred.push(async function(OneSignal) {
+  await OneSignal.init({ appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064" });
+});
 
 window.onload = () => {
   document.getElementById('user').value = localStorage.getItem("gb_user") || "";
@@ -56,49 +94,82 @@ window.onload = () => {
 async function loadFeed() {
   try {
     const res = await fetch(SCRIPT_URL);
-    const data = await res.json();
-    allPosts = Array.isArray(data) ? data : [];
+    allPosts = await res.json();
     render();
   } catch(e) { 
-    document.getElementById('feed').innerText = "Failed to load feed. Check SCRIPT_URL.";
+    document.getElementById('feed').innerText = "Connection error. Please refresh.";
   }
 }
 
 function render() {
   const u = document.getElementById('user').value.trim();
   const s = document.getElementById('searchBar').value.toLowerCase();
-  const filtered = allPosts.filter(p => (p.message || "").toLowerCase().includes(s) || (p.user || "").toLowerCase().includes(s));
+  
+  // Filter logic
+  const filtered = allPosts.filter(p => 
+    (p.message || "").toLowerCase().includes(s) || 
+    (p.user || "").toLowerCase().includes(s)
+  );
   
   document.getElementById('feed').innerHTML = filtered.map(p => `
     <div class="card">
-      <div class="user">${p.user}</div>
-      <p>${p.message}</p>
-      ${p.image ? `<img src="${p.image}" class="post-img" loading="lazy">` : ''}
-      <div style="margin-top:10px;">
-        <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">${(p.likes || []).includes(u)?'❤️':'👍'} (${(p.likes || []).length})</button>
+      <div class="user">
+        <span>${p.user}</span>
+        <span class="time-stamp">${timeAgo(p.timestamp)}</span>
       </div>
-      <div style="margin-top:10px">${(p.comments || []).map(c => `<div class="comment"><b>${c.user}</b>: ${c.text}</div>`).join('')}</div>
+      <p style="margin: 10px 0;">${p.message}</p>
+      ${p.image ? `<img src="${p.image}" class="post-img" loading="lazy">` : ''}
+      
+      <div style="margin-top:12px;">
+        <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">
+          ${(p.likes || []).includes(u) ? '❤️' : '👍'} (${(p.likes || []).length})
+        </button>
+      </div>
+
+      <div class="comment-section">
+        ${(p.comments || []).map(c => `
+          <div class="comment">
+            <b>${c.user}</b>: ${c.text}
+            <div class="comment-time">${timeAgo(c.time)}</div>
+          </div>
+        `).join('')}
+      </div>
+
       <div style="display:flex; gap:5px; margin-top:10px">
-        <input id="c-${p.rowIndex}" placeholder="Comment..." style="margin:0;">
-        <button class="btn" onclick="apiCall('comment', ${p.rowIndex})">Post</button>
+        <input id="c-${p.rowIndex}" placeholder="Write a comment..." style="margin:0;">
+        <button class="btn" onclick="apiCall('comment', ${p.rowIndex})">Reply</button>
       </div>
     </div>`).join('');
+    
   updateTrending();
 }
 
 function updateTrending() {
-  const top = [...allPosts].sort((a,b) => ((b.likes?.length || 0) + (b.comments?.length || 0)) - ((a.likes?.length || 0) + (a.comments?.length || 0))).slice(0,3);
-  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b>🔥 Trending</b><br>` + top.map(p => `<div style="font-size:11px; margin-top:8px;"><b>${p.user}</b>: ${(p.message || "").substring(0,25)}...</div>`).join('') + `</div>`;
+  // Logic: Sort by most likes + comments
+  const top = [...allPosts]
+    .sort((a,b) => ((b.likes?.length || 0) + (b.comments?.length || 0)) - ((a.likes?.length || 0) + (a.comments?.length || 0)))
+    .slice(0,3);
+
+  document.getElementById('trending').innerHTML = `
+    <div class="sidebar-card">
+      <b>🔥 Trending Now</b><br>
+      ${top.map(p => `
+        <div style="font-size:11px; margin-top:8px; border-bottom:1px solid #eee; padding-bottom:4px;">
+          <b>${p.user}</b>: ${(p.message || "").substring(0,25)}...
+        </div>
+      `).join('')}
+    </div>`;
 }
 
 async function upload() {
-  const user = document.getElementById('user').value;
-  const msg = document.getElementById('msg').value;
+  const user = document.getElementById('user').value.trim();
+  const msg = document.getElementById('msg').value.trim();
   const file = document.getElementById('file').files[0];
   const btn = document.getElementById('postBtn');
-  if (!user || !msg) return alert("Missing info");
+
+  if (!user || !msg) return alert("Please enter your name and a message.");
   
-  btn.innerText = "Posting..."; btn.disabled = true;
+  btn.innerText = "Uploading..."; btn.disabled = true;
 
   if (file) {
     const reader = new FileReader();
@@ -113,31 +184,55 @@ async function upload() {
 
 async function sendPost(user, msg, img) {
   try {
-    await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'post', username: user, message: msg, image: img }) });
+    await fetch(SCRIPT_URL, { 
+      method: 'POST', 
+      body: JSON.stringify({ action: 'post', username: user, message: msg, image: img }) 
+    });
     document.getElementById('msg').value = "";
     document.getElementById('file').value = "";
     loadFeed();
+  } catch(e) {
+    alert("Upload failed. Try a smaller photo.");
   } finally {
-    document.getElementById('postBtn').innerText = "Post";
+    document.getElementById('postBtn').innerText = "Post Update";
     document.getElementById('postBtn').disabled = false;
   }
 }
 
 async function apiCall(action, rowIndex, event) {
-  const user = document.getElementById('user').value;
-  if (!user) return alert("Enter name!");
+  const user = document.getElementById('user').value.trim();
+  if (!user) return alert("Please enter your name first!");
+  
   const textInput = document.getElementById(`c-${rowIndex}`);
   const text = textInput ? textInput.value : "";
   
+  // Unicorn Animation Trigger
   if (action === 'like' && event) {
-    const u = document.createElement('div'); u.className = 'unicorn'; u.textContent = '🦄';
-    u.style.left = event.clientX + 'px'; u.style.top = event.clientY + 'px';
-    document.body.appendChild(u); setTimeout(() => u.remove(), 2000);
+    const u = document.createElement('div');
+    u.className = 'unicorn';
+    u.textContent = '🦄';
+    u.style.left = (event.clientX - 25) + 'px';
+    u.style.top = (event.clientY - 25) + 'px';
+    document.body.appendChild(u);
+    setTimeout(() => u.remove(), 2000);
   }
   
-  await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action, rowIndex, username: user, text }) });
+  await fetch(SCRIPT_URL, { 
+    method: 'POST', 
+    body: JSON.stringify({ action, rowIndex, username: user, text }) 
+  });
+  
   if (action === 'comment') textInput.value = "";
   loadFeed();
+}
+
+function timeAgo(date) {
+  if (!date) return "";
+  const s = Math.floor((Date.now() - new Date(date)) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.floor(s/60) + "m ago";
+  if (s < 86400) return Math.floor(s/3600) + "h ago";
+  return Math.floor(s/86400) + "d ago";
 }
 </script>
 </body>
