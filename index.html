@@ -1,16 +1,37 @@
-<!DOCTYPE html>
+<!DOCTYPE html><!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>The Gooldbook🦄</title>
-  
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='50' fill='%233b5998'/%3E%3Ctext y='75' font-size='80' x='10'%3E🦄%3C/text%3E%3C/svg%3E">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%233b5998'/%3E%3Ctext y='75' font-size='80' x='10'%3E🦄%3C/text%3E%3C/svg%3E">
+  <link rel="shortcut icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%233b5998'/%3E%3Ctext y='75' font-size='70' x='15'%3E🦄%3C/text%3E%3C/svg%3E">
+ 
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
   <style>
     body { background:#e9ebee; font-family:system-ui, -apple-system, sans-serif; margin:0; padding-bottom:50px; }
-    .nav { background:#3b5998; color:#fff; padding:15px; text-align:center; font-weight:bold; position:sticky; top:0; z-index:1000; display: flex; align-items: center; justify-content: center; padding-top: calc(15px + env(safe-area-inset-top)); }
+    
+    .nav { 
+      background:#3b5998; 
+      color:#fff; 
+      padding:15px; 
+      padding-top: calc(15px + env(safe-area-inset-top)); /* Notch Support */
+      text-align:center; 
+      font-weight:bold; 
+      position:sticky; 
+      top:0; 
+      z-index:1000; 
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
     .container { max-width:900px; margin:auto; display:flex; gap:20px; padding:10px; }
     .sidebar { width:280px; position:sticky; top:70px; }
     .main-feed { flex-grow:1; max-width:550px; width:100%; }
@@ -18,21 +39,34 @@
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:10px; margin-bottom:10px; border-radius:4px; font-size:13px; }
     .user { color:#365899; font-weight:bold; }
     .post-img { width:100%; max-height:500px; object-fit: cover; margin-top:10px; border-radius:4px; display:block; background:#f0f2f5; }
+    
     .btn { background:#4267b2; color:#fff; border:none; padding:8px 12px; cursor:pointer; font-weight:bold; border-radius:4px; }
-    .btn:active { transform: scale(0.95); opacity: 0.8; }
-    .btn:disabled { background:#ccc; }
+    .btn:disabled { background:#ccc; cursor:not-allowed; }
+    .btn-refresh { background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; width:100%; padding:8px; margin-top:6px; font-weight:bold; cursor:pointer; border-radius:4px; }
+    .btn:active {
+  transform: scale(0.95);
+  opacity: 0.8;
+}
+
     .comment { background:#f0f2f5; padding:6px; border-radius:6px; margin-top:4px; font-size:13px; }
     input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:4px; box-sizing: border-box; }
     
     @media(max-width:700px){ .container{flex-direction:column;} .sidebar{width:100%; position:static;} }
 
+    /* Animations */
     .unicorn { position: fixed; font-size: 60px; pointer-events: none; z-index: 9999; animation: unicornFloat 2s ease-out forwards; }
-    @keyframes unicornFloat { 0% { transform: translateY(0) scale(0); opacity: 0; } 10% { opacity: 1; transform: translateY(-20px) scale(1); } 100% { transform: translateY(-300px) scale(0.5); opacity: 0; } }
+    @keyframes unicornFloat { 0% { transform: translateY(0) rotate(0deg) scale(0); opacity: 0; } 10% { opacity: 1; transform: translateY(-20px) rotate(10deg) scale(1); } 100% { transform: translateY(-300px) rotate(360deg) scale(0.5); opacity: 0; } }
+    .sparkle { position: fixed; pointer-events: none; z-index: 9998; animation: sparkleFloat 1.5s ease-out forwards; }
+    @keyframes sparkleFloat { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-150px) scale(0); opacity: 0; } }
+
   </style>
 </head>
 <body>
 
-<div class="nav">🦄 theGooldbook</div>
+<div class="nav">
+  <span style="background:white; border-radius:50%; width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center; margin-right:8px; font-size:18px;">🦄</span>
+  theGooldbook
+</div>
 
 <div class="container">
   <div class="sidebar">
@@ -45,30 +79,41 @@
 
   <div class="main-feed">
     <div class="card">
-      <input id="user" placeholder="Your Name" onchange="localStorage.setItem('gb_user', this.value)">
+      <input id="user" placeholder="Your Name" onchange="saveUser()">
       <textarea id="msg" rows="2" placeholder="What's on your mind?"></textarea>
       <input type="file" id="file" accept="image/*">
       <button id="postBtn" class="btn" onclick="upload()">Post</button>
-      <button class="btn" style="background:#f5f6f7; color:#333; width:100%; margin-top:5px; border:1px solid #ddd;" onclick="loadFeed()">Update Feed</button>
+      <button class="btn-refresh" onclick="loadFeed()">Update Feed</button>
     </div>
     <div id="feed">Loading feed...</div>
+    <button id="loadMore" class="btn-refresh" style="display:none" onclick="postsToShow+=5; render()">Load More</button>
   </div>
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyF9L-xcjvpDp-ch2U26FUfPo9EHo7zBdSLeAbimg1iskiiaiOeU1DQ1JzbZmiwxB1v/exec";
-let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwN_XgiqcEPQsiTNEBMTIemJA75NIgnLrlt2a9T5wq8h9b7FPM9yFSd72tUUIoeh8xu/exec";
+let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]"), postsToShow = 5;
+
+// OneSignal
+window.OneSignalDeferred = window.OneSignalDeferred || [];
+OneSignalDeferred.push(async function(OneSignal) {
+  await OneSignal.init({ appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064", allowLocalhostAsSecureOrigin: true });
+});
 
 window.onload = () => {
   document.getElementById('user').value = localStorage.getItem("gb_user") || "";
   if(allPosts.length) render();
   loadFeed();
+  const urlParams = new URLSearchParams(window.location.search);
+  const postId = urlParams.get('post');
+  if (postId) setTimeout(() => scrollToPost(parseInt(postId)), 1000);
 };
 
 async function loadFeed() {
   try {
     const res = await fetch(SCRIPT_URL);
     allPosts = await res.json();
+    allPosts.forEach(p => { p.likes = p.likes || []; p.comments = p.comments || []; });
     localStorage.setItem("gb_cache", JSON.stringify(allPosts));
     render();
   } catch(e) { console.error("Load failed", e); }
@@ -77,57 +122,103 @@ async function loadFeed() {
 function render() {
   const u = document.getElementById('user').value.trim();
   const s = document.getElementById('searchBar').value.toLowerCase();
-  const filtered = allPosts.filter(p => (p.message||"").toLowerCase().includes(s) || (p.user||"").toLowerCase().includes(s));
+  const filtered = allPosts.filter(p => p.message?.toLowerCase().includes(s) || p.user?.toLowerCase().includes(s));
   
-  document.getElementById('feed').innerHTML = filtered.map(p => `
+  const feedEl = document.getElementById('feed');
+  feedEl.innerHTML = filtered.slice(0, postsToShow).map(p => `
     <div class="card" id="post-${p.rowIndex}">
-      <div class="user">${p.user} <span style="font-size:11px;color:#888;font-weight:normal;">${timeAgo(p.timestamp)}</span></div>
+      <div class="user">${p.user} <span style="font-size:11px;color:#888;">${timeAgo(p.timestamp)}</span></div>
       <p>${p.message}</p>
-      ${p.image ? `<img src="${p.image}" class="post-img" loading="lazy">` : ''}
-      <div style="margin-top:10px; display:flex; gap:10px;">
-        <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">
-          ${(p.likes || []).includes(u) ? '❤️' : '👍'} (${(p.likes || []).length})
-        </button>
+      ${p.image ? `<img src="${p.image}" class="post-img" loading="lazy" onerror="this.style.display='none'">` : ''}
+      <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} (${p.likes.length})</button>
+        <button class="btn" style="background:#27ae60;" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
       </div>
-      <div style="margin-top:10px">${(p.comments || []).map(c => `<div class="comment"><b>${c.user}</b>: ${c.text}</div>`).join('')}</div>
+      ${p.likes.length > 0 ? `
+        <div style="margin-top:8px; font-size:12px; color:#666;">
+          <span style="cursor:pointer;" onclick="toggleLikes(${p.rowIndex})">👥 Liked by <b>${formatLikes(p.likes)}</b></span>
+          <div id="likes-${p.rowIndex}" style="display:none; margin-top:4px; padding:6px; background:#f0f2f5; border-radius:4px;">
+            ${p.likes.map(name => `<div style="padding:2px 0;">❤️ ${name}</div>`).join('')}
+          </div>
+        </div>
+      ` : ''}
+      <div style="margin-top:10px">${p.comments.map(c => `<div class="comment"><b>${c.user}</b>: ${c.text}</div>`).join('')}</div>
       <div style="display:flex; gap:5px; margin-top:10px">
         <input id="c-${p.rowIndex}" placeholder="Comment..." style="margin:0; font-size:13px">
         <button class="btn" onclick="apiCall('comment', ${p.rowIndex})">Post</button>
       </div>
     </div>`).join('');
+  document.getElementById('loadMore').style.display = filtered.length > postsToShow ? 'block' : 'none';
   updateTrending();
+}
+
+function formatLikes(likes) {
+  if (likes.length === 1) return likes[0];
+  if (likes.length === 2) return `${likes[0]} and ${likes[1]}`;
+  if (likes.length === 3) return `${likes[0]}, ${likes[1]} and ${likes[2]}`;
+  return `${likes[0]}, ${likes[1]} and ${likes.length - 2} others`;
+}
+
+function toggleLikes(rowIndex) {
+  const el = document.getElementById(`likes-${rowIndex}`);
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
 async function apiCall(action, rowIndex, event) {
   const username = document.getElementById('user').value.trim();
-  if (!username) return alert("Enter name");
+  if (!username) return alert("Please enter your name!");
 
+  // 1. FIND the post in our local cache
   const p = allPosts.find(x => x.rowIndex === rowIndex);
-  const textInput = document.getElementById(`c-${rowIndex}`);
-  const text = textInput ? textInput.value : "";
+  if (!p) return;
 
-  // OPTIMISTIC UPDATE
+  const textInput = document.getElementById(`c-${rowIndex}`);
+  const commentText = textInput ? textInput.value : "";
+
+  // 2. OPTIMISTIC UPDATE (Update the UI immediately)
   if (action === 'like') {
     p.likes = p.likes || [];
     const i = p.likes.indexOf(username);
-    if (i === -1) { p.likes.push(username); if(event) triggerUnicorn(event); } 
-    else { p.likes.splice(i, 1); }
-  } else if (action === 'comment') {
-    if (!text) return;
+    
+    if (i === -1) {
+      p.likes.push(username);
+      if (event) triggerUnicorn(event); // Instant sparkle!
+    } else {
+      p.likes.splice(i, 1);
+    }
+  } 
+  else if (action === 'comment') {
+    if (!commentText) return;
     p.comments = p.comments || [];
-    p.comments.push({ user: username, text: text });
-    textInput.value = "";
+    p.comments.push({ 
+      user: username, 
+      text: commentText, 
+      time: new Date().toISOString() 
+    });
+    textInput.value = ""; // Clear the box immediately
   }
 
-  render(); // Update UI immediately
-  localStorage.setItem("gb_cache", JSON.stringify(allPosts));
+  // Refresh the display right now
+  render(); 
 
-  // BACKGROUND SYNC
-  fetch(SCRIPT_URL, { 
-    method: 'POST', 
-    mode: 'no-cors', 
-    body: JSON.stringify({ action, rowIndex, username, text }) 
-  });
+  // 3. BACKGROUND SYNC (Tell the database what happened)
+  try {
+    await fetch(SCRIPT_URL, { 
+      method: 'POST', 
+      mode: 'no-cors', // Optimization: don't wait for a full response
+      body: JSON.stringify({ 
+        action, 
+        rowIndex, 
+        username, 
+        text: commentText 
+      }) 
+    });
+    // Save to local storage so it persists if they refresh
+    localStorage.setItem("gb_cache", JSON.stringify(allPosts));
+  } catch(e) {
+    console.error("Sync failed in background", e);
+    // Optional: You could roll back the change here if it strictly fails
+  }
 }
 
 async function upload() {
@@ -136,7 +227,6 @@ async function upload() {
   const file = document.getElementById('file').files[0];
   const btn = document.getElementById('postBtn');
   if (!user || !msg) return alert("Missing info");
-  
   btn.innerText = "Uploading..."; btn.disabled = true;
   let imgBase64 = "";
   if (file) {
@@ -144,7 +234,6 @@ async function upload() {
       const rd = new FileReader(); rd.onload = e => r(e.target.result); rd.readAsDataURL(file); 
     });
   }
-  
   try {
     await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'post', username:user, message:msg, image:imgBase64 })});
     document.getElementById('msg').value = "";
@@ -155,7 +244,6 @@ async function upload() {
 }
 
 function timeAgo(d) {
-  if (!d) return "Just now";
   const s = Math.floor((Date.now() - new Date(d)) / 1000);
   if (s < 60) return "Just now";
   if (s < 3600) return Math.floor(s/60) + "m ago";
@@ -163,17 +251,538 @@ function timeAgo(d) {
   return Math.floor(s/86400) + "d ago";
 }
 
+function saveUser() { localStorage.setItem("gb_user", document.getElementById('user').value); }
+
 function updateTrending() {
-  const top = [...allPosts].sort((a,b) => ((b.likes?.length||0)+(b.comments?.length||0)) - ((a.likes?.length||0)+(a.comments?.length||0))).slice(0,3);
-  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b>🔥 Trending</b><br>${top.map(p => `<div style="font-size:11px; margin-top:5px;"><b>${p.user}</b>: ${(p.message||"").substring(0,20)}...</div>`).join('')}</div>`;
+  const scored = allPosts.map(p => ({ ...p, score: p.likes.length + p.comments.length }));
+  const top = scored.filter(p => p.score > 0).sort((a, b) => b.score - a.score).slice(0, 5);
+  if (top.length === 0) {
+    document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b>🔥 Most Active</b><br><div style="padding:8px 0; color:#888; font-size:12px;">No active posts yet</div></div>`;
+    return;
+  }
+  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b>🔥 Most Active</b><br>${top.map(p => `
+    <div style="cursor:pointer; padding:6px 0; border-bottom:1px solid #e9ebee;" onclick="scrollToPost(${p.rowIndex})">
+      <div style="font-weight:bold; color:#365899; font-size:12px;">${p.user}</div>
+      <div style="font-size:11px; color:#666; margin:2px 0;">${truncate(p.message, 50)}</div>
+      <div style="font-size:10px; color:#888;">❤️ ${p.likes.length} likes • 💬 ${p.comments.length} comments</div>
+    </div>`).join('')}</div>`;
 }
 
+function truncate(str, max) { return str?.length > max ? str.substring(0, max) + "..." : str; }
+
 function triggerUnicorn(event) {
-  const u = document.createElement('div');
-  u.className = 'unicorn'; u.textContent = '🦄';
-  u.style.left = (event.clientX - 30) + 'px'; u.style.top = (event.clientY - 30) + 'px';
-  document.body.appendChild(u);
-  setTimeout(() => u.remove(), 2000);
+  const x = event.clientX, y = event.clientY;
+  const unicorn = document.createElement('div');
+  unicorn.className = 'unicorn'; unicorn.textContent = '🦄';
+  unicorn.style.left = x + 'px'; unicorn.style.top = y + 'px';
+  document.body.appendChild(unicorn);
+  ['✨', '⭐', '💫', '🌟', '✨'].forEach((sparkle, i) => {
+    setTimeout(() => {
+      const s = document.createElement('div'); s.className = 'sparkle'; s.textContent = sparkle;
+      s.style.left = (x + Math.random() * 100 - 50) + 'px'; s.style.top = (y + Math.random() * 100 - 50) + 'px';
+      s.style.fontSize = (20 + Math.random() * 20) + 'px'; document.body.appendChild(s);
+      setTimeout(() => s.remove(), 1500);
+    }, i * 100);
+  });
+  setTimeout(() => unicorn.remove(), 2000);
+}
+
+function scrollToPost(rowIndex) {
+  setTimeout(() => {
+    const el = document.getElementById(`post-${rowIndex}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.transition = 'background-color 0.5s'; el.style.backgroundColor = '#e3f2fd';
+      setTimeout(() => el.style.backgroundColor = '#fff', 1500);
+    } else if (postsToShow < allPosts.length) {
+      postsToShow += 10; render(); setTimeout(() => scrollToPost(rowIndex), 300);
+    }
+  }, 100);
+}
+
+function updateSinglePost(rowIndex, p) {
+  const u = document.getElementById('user').value.trim();
+  const el = document.getElementById(`post-${rowIndex}`);
+  if (!el) return;
+  el.innerHTML = `
+    <div class="user">${p.user} <span style="font-size:11px;color:#888;">${timeAgo(p.timestamp)}</span></div>
+    <p>${p.message}</p>
+    ${p.image ? `<img src="${p.image}" class="post-img" loading="lazy" onerror="this.style.display='none'">` : ''}
+    <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} (${p.likes.length})</button>
+    ${p.likes.length > 0 ? `<div style="margin-top:8px; font-size:12px; color:#666;"><span style="cursor:pointer;" onclick="toggleLikes(${p.rowIndex})">👥 Liked by <b>${formatLikes(p.likes)}</b></span><div id="likes-${p.rowIndex}" style="display:none; margin-top:4px; padding:6px; background:#f0f2f5; border-radius:4px;">${p.likes.map(name => `<div style="padding:2px 0;">❤️ ${name}</div>`).join('')}</div></div>` : ''}
+    <div style="margin-top:10px">${p.comments.map(c => `<div class="comment"><b>${c.user}</b>: ${c.text}</div>`).join('')}</div>
+    <div style="display:flex; gap:5px; margin-top:10px"><input id="c-${p.rowIndex}" placeholder="Comment..." style="margin:0; font-size:13px"><button class="btn" onclick="apiCall('comment', ${p.rowIndex})">Post</button></div>`;
+  updateTrending(); localStorage.setItem("gb_cache", JSON.stringify(allPosts));
+}
+
+async function sharePost(rowIndex, event) {
+  const post = allPosts.find(p => p.rowIndex === rowIndex);
+  if (!post) return;
+  
+  const btn = event?.target;
+  if (btn) {
+    const originalText = btn.innerText;
+    btn.innerText = "⌛ Generating..."; 
+    btn.disabled = true;
+  }
+
+  // Generate the image card
+  const card = document.createElement('div');
+  card.style.cssText = `position: fixed; left: -9999px; width: 600px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 20px; font-family: system-ui, -apple-system, sans-serif; display: block;`;
+  
+  const previewMessage = post.message.length > 200 ? post.message.substring(0, 200) + '...' : post.message;
+  
+  card.innerHTML = `
+    <div style="background: white; border-radius: 16px; padding: 25px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
+      <div style="display: flex; align-items: center; margin-bottom: 20px;">
+        <div style="width: 50px; height: 50px; background: #3b5998; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; margin-right: 15px;">🦄</div>
+        <div>
+          <div style="font-size: 20px; font-weight: bold; color: #3b5998;">theGooldbook</div>
+          <div style="font-size: 14px; color: #888;">Shared by ${post.user}</div>
+        </div>
+      </div>
+      <div style="font-size: 18px; color: #333; line-height: 1.6; margin-bottom: 20px;">${previewMessage}</div>
+      ${post.image ? `
+        <div style="margin-bottom: 20px; border-radius: 12px; overflow: hidden; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 350px;">
+          <img src="${post.image}" style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;" crossorigin="anonymous">
+        </div>` : ''}
+      <div style="display: flex; gap: 20px; padding-top: 15px; border-top: 2px solid #f0f2f5; font-size: 14px; color: #666;">
+        <div>❤️ ${post.likes.length} likes</div>
+        <div>💬 ${post.comments.length} comments</div>
+        <div>🕐 ${timeAgo(post.timestamp)}</div>
+      </div>
+    </div>`;
+  
+  document.body.appendChild(card);
+  const images = card.querySelectorAll('img');
+  await Promise.all(Array.from(images).map(img => img.complete ? Promise.resolve() : new Promise(r => { img.onload=r; img.onerror=r; })));
+  
+  try {
+    const canvas = await html2canvas(card, { useCORS: true, scale: 2 });
+    document.body.removeChild(card);
+    
+    // Convert canvas to blob
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    const file = new File([blob], 'gooldbook-post.png', { type: 'image/png' });
+    
+    const shareUrl = `${window.location.origin}${window.location.pathname}?post=${rowIndex}`;
+    const shareText = `Check out this post on theGooldbook 🦄\n\n"${truncate(post.message, 100)}"\n\n- ${post.user}`;
+    
+    if (btn) {
+      btn.innerText = "🔗 Share"; 
+      btn.disabled = false;
+    }
+    
+    // Try native share with the image file
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: `${post.user} on theGooldbook`,
+          text: shareText,
+          url: shareUrl
+        });
+        return; // Success! Exit early
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          return; // User cancelled, that's fine
+        }
+        console.log('Native share with image failed, trying URL only', err);
+      }
+    }
+    
+    // Try native share with just URL (fallback)
+    if (navigator.share) {
+      try {
+        await navigator.share({ 
+          title: `${post.user} on theGooldbook`, 
+          text: shareText, 
+          url: shareUrl 
+        });
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          return; // User cancelled
+        }
+        console.log('Native share failed, showing modal', err);
+      }
+    }
+    
+    // Fallback: show custom share modal
+    const generatedImageData = canvas.toDataURL("image/png");
+    showShareOptions(shareUrl, post, shareText, generatedImageData);
+    
+  } catch (err) {
+    console.error(err); 
+    if (btn) {
+      btn.innerText = "🔗 Share"; 
+      btn.disabled = false;
+    }
+    document.body.removeChild(card);
+    alert("Failed to generate share content.");
+  }
+}
+
+async function shareAsImage(rowIndex, event) {
+  const post = allPosts.find(p => p.rowIndex === rowIndex);
+  if (!post) return;
+  
+  const btn = event.target;
+  const originalText = btn.innerText;
+  btn.innerText = "⌛ Generating..."; btn.disabled = true;
+
+  const card = document.createElement('div');
+  card.style.cssText = `position: fixed; left: -9999px; width: 600px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 20px; font-family: system-ui, -apple-system, sans-serif; display: block;`;
+  
+  const previewMessage = post.message.length > 200 ? post.message.substring(0, 200) + '...' : post.message;
+  
+  card.innerHTML = `
+    <div style="background: white; border-radius: 16px; padding: 25px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
+      <div style="display: flex; align-items: center; margin-bottom: 20px;">
+        <div style="width: 50px; height: 50px; background: #3b5998; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; margin-right: 15px;">🦄</div>
+        <div>
+          <div style="font-size: 20px; font-weight: bold; color: #3b5998;">theGooldbook</div>
+          <div style="font-size: 14px; color: #888;">Shared by ${post.user}</div>
+        </div>
+      </div>
+      <div style="font-size: 18px; color: #333; line-height: 1.6; margin-bottom: 20px;">${previewMessage}</div>
+      ${post.image ? `
+        <div style="margin-bottom: 20px; border-radius: 12px; overflow: hidden; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 350px;">
+          <img src="${post.image}" style="max-width: 100%; max-height: 100%; object-fit: contain; display: block;" crossorigin="anonymous">
+        </div>` : ''}
+      <div style="display: flex; gap: 20px; padding-top: 15px; border-top: 2px solid #f0f2f5; font-size: 14px; color: #666;">
+        <div>❤️ ${post.likes.length} likes</div>
+        <div>💬 ${post.comments.length} comments</div>
+        <div>🕐 ${timeAgo(post.timestamp)}</div>
+      </div>
+    </div>`;
+  
+  document.body.appendChild(card);
+  const images = card.querySelectorAll('img');
+  await Promise.all(Array.from(images).map(img => img.complete ? Promise.resolve() : new Promise(r => { img.onload=r; img.onerror=r; })));
+  
+  try {
+    const canvas = await html2canvas(card, { useCORS: true, scale: 2 });
+    document.body.removeChild(card);
+    
+    // Convert canvas to blob
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    const file = new File([blob], 'gooldbook-post.png', { type: 'image/png' });
+    
+    const shareUrl = `${window.location.origin}${window.location.pathname}?post=${rowIndex}`;
+    const shareText = `Check out this post on theGooldbook 🦄`;
+    
+    btn.innerText = originalText; 
+    btn.disabled = false;
+    
+    // Try native share with the image file
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: `${post.user} on theGooldbook`,
+          text: shareText,
+          url: shareUrl
+        });
+        return; // Success! Exit early
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          return; // User cancelled, that's fine
+        }
+        console.log('Native share failed, falling back to modal', err);
+      }
+    }
+    
+    // Fallback: show custom share modal
+    const generatedImageData = canvas.toDataURL("image/png");
+    showShareOptions(shareUrl, post, shareText, generatedImageData);
+    
+  } catch (err) {
+    console.error(err); 
+    btn.innerText = originalText; 
+    btn.disabled = false; 
+    document.body.removeChild(card);
+    alert("Failed to generate image.");
+  }
+}
+
+function showShareOptions(url, post, shareText, generatedImage = null) {
+  const modal = document.createElement('div');
+  modal.style.cssText = `position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 20px;`;
+  
+  const previewHtml = generatedImage 
+    ? `<div style="text-align:center;"><img src="${generatedImage}" style="max-width:100%; border-radius:8px; border:2px solid #fff; box-shadow: 0 4px 15px rgba(0,0,0,0.3);"><p style="font-size:12px; color:#666; margin-top:5px;">Long-press to save image!</p></div>`
+    : `<div style="border: 1px solid #ddd; border-radius: 8px; padding: 15px; background: #f9f9f9;"><div style="color: #365899; font-weight: bold;">${post.user}</div><div style="font-size: 14px;">${truncate(post.message, 100)}</div></div>`;
+
+  modal.innerHTML = `
+    <div style="background: white; padding: 20px; border-radius: 12px; max-width: 450px; width: 100%; max-height: 90vh; overflow-y: auto;">
+      <h3 style="margin-top: 0;">${generatedImage ? '📸 Image Preview' : '🔗 Share Post'}</h3>
+      ${previewHtml}
+      <div style="margin: 15px 0;">
+        <label style="font-size: 12px; font-weight: bold; color: #666;">Share Link:</label>
+        <textarea id="shareTextArea" readonly style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; height: 60px; margin-top:5px;">${shareText}\n\n${url}</textarea>
+        <button class="btn" onclick="copyShareText()" style="width: 100%; margin-top: 8px;">📋 Copy Link & Message</button>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+        <a href="https://wa.me/?text=${encodeURIComponent(shareText + '\n' + url)}" target="_blank" class="btn" style="text-align: center; text-decoration: none; background: #25D366;">WhatsApp</a>
+        <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}" target="_blank" class="btn" style="text-align: center; text-decoration: none;">Facebook</a>
+      </div>
+      ${generatedImage ? `<button class="btn" style="width:100%; background:#764ba2; margin-bottom:10px;" onclick="downloadFromDataURL('${generatedImage}', 'gooldbook-post.png')">📥 Download Image</button>` : ''}
+      <button class="btn-refresh" onclick="this.parentElement.parentElement.remove()" style="width: 100%;">Close</button>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+}
+
+function downloadFromDataURL(dataUrl, filename) {
+  const a = document.createElement('a'); a.href = dataUrl; a.download = filename; a.click();
+}
+
+function copyShareText() {
+  const textarea = document.getElementById('shareTextArea');
+  textarea.select();
+  navigator.clipboard.writeText(textarea.value).then(() => {
+    const btn = event.target; const old = btn.textContent;
+    btn.textContent = '✅ Copied!'; setTimeout(() => btn.textContent = old, 2000);
+  });
+}
+</script>
+</body>
+</html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>The Gooldbook🦄</title>
+  
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  
+  <style>
+    body { background:#e9ebee; font-family:system-ui, -apple-system, sans-serif; margin:0; padding-bottom:50px; }
+    
+    .nav { 
+      background:#3b5998; color:#fff; padding:15px; 
+      text-align:center; font-weight:bold; position:sticky; top:0; z-index:1000; 
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .container { max-width:900px; margin:auto; display:flex; gap:20px; padding:10px; }
+    .sidebar { width:280px; position:sticky; top:70px; }
+    .main-feed { flex-grow:1; max-width:550px; width:100%; }
+    
+    .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; }
+    .sidebar-card { background:#fff; border:1px solid #ddd; padding:10px; margin-bottom:10px; border-radius:4px; font-size:13px; }
+    
+    .user { color:#365899; font-weight:bold; display: flex; align-items: center; justify-content: space-between; }
+    .time-stamp { font-size:11px; font-weight:normal; color:#888; }
+    
+    .post-img { width:100%; max-height:500px; object-fit: cover; margin-top:10px; border-radius:4px; display:block; background:#f0f2f5; }
+    
+    .btn { background:#4267b2; color:#fff; border:none; padding:8px 12px; cursor:pointer; font-weight:bold; border-radius:4px; margin-top:5px; }
+    .btn:disabled { background:#ccc; }
+
+    input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:4px; box-sizing: border-box; font-family: inherit; }
+    
+    .comment-section { margin-top:10px; border-top: 1px solid #eee; padding-top: 10px; }
+    .comment { background:#f0f2f5; padding:8px; border-radius:8px; margin-top:5px; font-size:13px; }
+    .comment-time { font-size:9px; color:#999; margin-top:2px; }
+
+    /* Unicorn Sparkle Animation */
+    .unicorn { position: fixed; font-size: 50px; pointer-events: none; z-index: 9999; animation: unicornFloat 2s ease-out forwards; }
+    @keyframes unicornFloat { 
+      0% { transform: translateY(0) scale(0); opacity: 0; } 
+      20% { opacity: 1; transform: translateY(-20px) scale(1.2); } 
+      100% { transform: translateY(-300px) scale(0.5); opacity: 0; } 
+    }
+
+    @media(max-width:700px){ 
+      .container { flex-direction:column; } 
+      .sidebar { width:100%; position:static; } 
+    }
+  </style>
+</head>
+<body>
+
+<div class="nav">🦄 theGooldbook</div>
+
+<div class="container">
+  <div class="sidebar">
+    <div class="sidebar-card">
+      <b>🔍 Search Feed</b>
+      <input id="searchBar" placeholder="Filter by name or message..." oninput="render()">
+    </div>
+    <div id="trending"></div>
+  </div>
+
+  <div class="main-feed">
+    <div class="card">
+      <input id="user" placeholder="Your Name" onchange="localStorage.setItem('gb_user', this.value)">
+      <textarea id="msg" rows="2" placeholder="What's on your mind?"></textarea>
+      <input type="file" id="file" accept="image/*">
+      <button id="postBtn" class="btn" onclick="upload()">Post Update</button>
+      <button class="btn" style="background:#f5f6f7; color:#333; width:100%; margin-top:5px; border:1px solid #ddd;" onclick="loadFeed()">Update Feed</button>
+    </div>
+    <div id="feed">Loading latest posts...</div>
+  </div>
+</div>
+
+<script>
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyF9L-xcjvpDp-ch2U26FUfPo9EHo7zBdSLeAbimg1iskiiaiOeU1DQ1JzbZmiwxB1v/exec"; // <--- Update this!
+let allPosts = [];
+
+// OneSignal Init
+window.OneSignalDeferred = window.OneSignalDeferred || [];
+OneSignalDeferred.push(async function(OneSignal) {
+  await OneSignal.init({ appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064" });
+});
+
+window.onload = () => {
+  document.getElementById('user').value = localStorage.getItem("gb_user") || "";
+  loadFeed();
+};
+
+async function loadFeed() {
+  try {
+    const res = await fetch(SCRIPT_URL);
+    allPosts = await res.json();
+    render();
+  } catch(e) { 
+    document.getElementById('feed').innerText = "Connection error. Please refresh.";
+  }
+}
+
+function render() {
+  const u = document.getElementById('user').value.trim();
+  const s = document.getElementById('searchBar').value.toLowerCase();
+  
+  // Filter logic
+  const filtered = allPosts.filter(p => 
+    (p.message || "").toLowerCase().includes(s) || 
+    (p.user || "").toLowerCase().includes(s)
+  );
+  
+  document.getElementById('feed').innerHTML = filtered.map(p => `
+    <div class="card">
+      <div class="user">
+        <span>${p.user}</span>
+        <span class="time-stamp">${timeAgo(p.timestamp)}</span>
+      </div>
+      <p style="margin: 10px 0;">${p.message}</p>
+      ${p.image ? `<img src="${p.image}" class="post-img" loading="lazy">` : ''}
+      
+      <div style="margin-top:12px;">
+        <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">
+          ${(p.likes || []).includes(u) ? '❤️' : '👍'} (${(p.likes || []).length})
+        </button>
+      </div>
+
+      <div class="comment-section">
+        ${(p.comments || []).map(c => `
+          <div class="comment">
+            <b>${c.user}</b>: ${c.text}
+            <div class="comment-time">${timeAgo(c.time)}</div>
+          </div>
+        `).join('')}
+      </div>
+
+      <div style="display:flex; gap:5px; margin-top:10px">
+        <input id="c-${p.rowIndex}" placeholder="Write a comment..." style="margin:0;">
+        <button class="btn" onclick="apiCall('comment', ${p.rowIndex})">Reply</button>
+      </div>
+    </div>`).join('');
+    
+  updateTrending();
+}
+
+function updateTrending() {
+  // Logic: Sort by most likes + comments
+  const top = [...allPosts]
+    .sort((a,b) => ((b.likes?.length || 0) + (b.comments?.length || 0)) - ((a.likes?.length || 0) + (a.comments?.length || 0)))
+    .slice(0,3);
+
+  document.getElementById('trending').innerHTML = `
+    <div class="sidebar-card">
+      <b>🔥 Trending Now</b><br>
+      ${top.map(p => `
+        <div style="font-size:11px; margin-top:8px; border-bottom:1px solid #eee; padding-bottom:4px;">
+          <b>${p.user}</b>: ${(p.message || "").substring(0,25)}...
+        </div>
+      `).join('')}
+    </div>`;
+}
+
+async function upload() {
+  const user = document.getElementById('user').value.trim();
+  const msg = document.getElementById('msg').value.trim();
+  const file = document.getElementById('file').files[0];
+  const btn = document.getElementById('postBtn');
+
+  if (!user || !msg) return alert("Please enter your name and a message.");
+  
+  btn.innerText = "Uploading..."; btn.disabled = true;
+
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      await sendPost(user, msg, e.target.result);
+    };
+    reader.readAsDataURL(file);
+  } else {
+    await sendPost(user, msg, "");
+  }
+}
+
+async function sendPost(user, msg, img) {
+  try {
+    await fetch(SCRIPT_URL, { 
+      method: 'POST', 
+      body: JSON.stringify({ action: 'post', username: user, message: msg, image: img }) 
+    });
+    document.getElementById('msg').value = "";
+    document.getElementById('file').value = "";
+    loadFeed();
+  } catch(e) {
+    alert("Upload failed. Try a smaller photo.");
+  } finally {
+    document.getElementById('postBtn').innerText = "Post Update";
+    document.getElementById('postBtn').disabled = false;
+  }
+}
+
+async function apiCall(action, rowIndex, event) {
+  const user = document.getElementById('user').value.trim();
+  if (!user) return alert("Please enter your name first!");
+  
+  const textInput = document.getElementById(`c-${rowIndex}`);
+  const text = textInput ? textInput.value : "";
+  
+  // Unicorn Animation Trigger
+  if (action === 'like' && event) {
+    const u = document.createElement('div');
+    u.className = 'unicorn';
+    u.textContent = '🦄';
+    u.style.left = (event.clientX - 25) + 'px';
+    u.style.top = (event.clientY - 25) + 'px';
+    document.body.appendChild(u);
+    setTimeout(() => u.remove(), 2000);
+  }
+  
+  await fetch(SCRIPT_URL, { 
+    method: 'POST', 
+    body: JSON.stringify({ action, rowIndex, username: user, text }) 
+  });
+  
+  if (action === 'comment') textInput.value = "";
+  loadFeed();
+}
+
+function timeAgo(date) {
+  if (!date) return "";
+  const s = Math.floor((Date.now() - new Date(date)) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.floor(s/60) + "m ago";
+  if (s < 86400) return Math.floor(s/3600) + "h ago";
+  return Math.floor(s/86400) + "d ago";
 }
 </script>
 </body>
