@@ -15,17 +15,12 @@
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:10px; margin-bottom:10px; border-radius:4px; font-size:13px; }
     .user { color:#365899; font-weight:bold; }
     .post-img { width:100%; max-height:500px; object-fit: cover; margin-top:10px; border-radius:4px; display:block; background:#f0f2f5; }
-    video.post-img { background: #000; object-fit: contain; aspect-ratio: 16 / 9; max-height: 400px; }
     .btn { background:#4267b2; color:#fff; border:none; padding:8px 12px; cursor:pointer; font-weight:bold; border-radius:4px; }
     .btn-refresh { background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; width:100%; padding:8px; margin-top:6px; font-weight:bold; cursor:pointer; border-radius:4px; }
     .progress-container { width: 100%; background: #eee; border-radius: 4px; display: none; margin: 10px 0; height: 10px; overflow: hidden; border:1px solid #ddd; }
     .progress-bar { width: 0%; height: 100%; background: #4267b2; transition: width 0.1s; }
     .comment { background:#f0f2f5; padding:6px; border-radius:6px; margin-top:4px; font-size:13px; }
     input, textarea { width:100%; padding:8px; margin-bottom:8px; border:1px solid #ddd; border-radius:4px; box-sizing: border-box; }
-    .unicorn { position: fixed; font-size: 60px; pointer-events: none; z-index: 9999; animation: unicornFloat 2s ease-out forwards; }
-    @keyframes unicornFloat { 0% { transform: translateY(0) rotate(0deg) scale(0); opacity: 0; } 10% { opacity: 1; transform: translateY(-20px) rotate(10deg) scale(1); } 100% { transform: translateY(-300px) rotate(360deg) scale(0.5); opacity: 0; } }
-    .sparkle { position: fixed; pointer-events: none; z-index: 9998; animation: sparkleFloat 1.5s ease-out forwards; }
-    @keyframes sparkleFloat { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-150px) scale(0); opacity: 0; } }
     @media(max-width:700px){ .container{flex-direction:column;} .sidebar{width:100%; position:static;} }
   </style>
 </head>
@@ -42,7 +37,7 @@
     <div class="card">
       <input id="user" placeholder="Your Name" onchange="saveUser()">
       <textarea id="msg" rows="2" placeholder="What's on your mind?"></textarea>
-      <input type="file" id="file" accept="image/*,video/*">
+      <input type="file" id="file" accept="image/*">
       <div class="progress-container" id="pContainer"><div class="progress-bar" id="pBar"></div></div>
       <button id="postBtn" class="btn" onclick="upload()">Post</button>
       <button class="btn-refresh" onclick="loadFeed()">Update Feed</button>
@@ -52,8 +47,7 @@
 </div>
 
 <script>
-// UPDATE THIS URL WITH YOUR NEW DEPLOYMENT URL
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz0I6l1dt7ohLbwgS5pLw1_u2pI4uuZCik9MSZUd2qZHbH2ucK-fYz1G5dPzHH4kzZD/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw15rYu-wx30xBrbSE8Yt8LVJxPuHdkidk5QBCpXHcKRhyAYRu76bCbgaGuQydFleRi/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 
 window.onload = () => {
@@ -73,10 +67,7 @@ async function loadFeed() {
 
 function renderMedia(url) {
   if (!url) return '';
-  const isVideo = url.includes("export=download") || url.match(/\.(mp4|mov|webm|quicktime)$/i);
-  return isVideo 
-    ? `<video src="${url}" class="post-img" controls playsinline preload="metadata" poster="https://via.placeholder.com/550x300/3b5998/FFFFFF?text=Loading+Video..."></video>` 
-    : `<img src="${url}" class="post-img" loading="lazy" onerror="this.style.display='none'">`;
+  return `<img src="${url}" class="post-img" loading="lazy" onerror="this.style.display='none'">`;
 }
 
 function render() {
@@ -90,8 +81,7 @@ function render() {
       <p>${p.message}</p>
       ${renderMedia(p.image)}
       <div style="margin-top:10px; display:flex; gap:10px;">
-        <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">${(p.likes || []).includes(u)?'❤️':'👍'} (${(p.likes || []).length})</button>
-        <button class="btn" style="background:#27ae60;" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
+        <button class="btn" onclick="apiCall('like', ${p.rowIndex})">${(p.likes || []).includes(u)?'❤️':'👍'} (${(p.likes || []).length})</button>
       </div>
       <div style="margin-top:10px">${(p.comments || []).map(c => `<div class="comment"><b>${c.user}</b>: ${c.text}</div>`).join('')}</div>
       <div style="display:flex; gap:5px; margin-top:10px">
@@ -110,18 +100,17 @@ function updateTrending() {
     <div style="cursor:pointer; padding:6px 0; border-bottom:1px solid #e9ebee;" onclick="document.getElementById('post-${p.rowIndex}').scrollIntoView({behavior:'smooth', block:'center'})">
       <div style="font-weight:bold; color:#365899; font-size:12px;">${p.user}</div>
       <div style="font-size:11px; color:#666;">${p.message.substring(0,40)}...</div>
-      <div style="font-size:10px; color:#888;">❤️ ${p.likes.length} • 💬 ${p.comments.length}</div>
     </div>`).join('');
   document.getElementById('trending').innerHTML = html + `</div>`;
 }
 
-async function apiCall(action, rowIndex, event) {
+async function apiCall(action, rowIndex) {
   const user = document.getElementById('user').value.trim();
   if (!user) return alert("Enter your name!");
   const post = allPosts.find(p => p.rowIndex === rowIndex);
   if (action === 'like') {
     const idx = post.likes.indexOf(user);
-    if (idx === -1) { post.likes.push(user); if (event) triggerUnicorn(event); }
+    if (idx === -1) { post.likes.push(user); }
     else post.likes.splice(idx, 1);
     render(); 
   }
@@ -136,91 +125,43 @@ async function upload() {
   const msg = document.getElementById('msg').value.trim();
   const file = document.getElementById('file').files[0];
   const btn = document.getElementById('postBtn');
-  
   if (!user || (!msg && !file)) return alert("Name and content required");
-  if (file && file.size > 15 * 1024 * 1024) return alert("File too large (>15MB)");
 
   btn.disabled = true;
   document.getElementById('pContainer').style.display = "block";
-  document.getElementById('pBar').style.width = "5%";
+  document.getElementById('pBar').style.width = "10%";
 
   let fileBase64 = "";
-  if (file) {
-    if (file.type.startsWith('image/')) {
-      fileBase64 = await new Promise(resolve => {
-        const img = new Image();
-        img.src = URL.createObjectURL(file);
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX = 1200;
-          let w = img.width, h = img.height;
-          if (w > h) { if (w > MAX) { h *= MAX/w; w = MAX; } }
-          else { if (h > MAX) { w *= MAX/h; h = MAX; } }
-          canvas.width = w; canvas.height = h;
-          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.7)); 
-        };
-      });
-    } else {
-      fileBase64 = await new Promise(r => {
-        const rd = new FileReader();
-        rd.onload = e => r(e.target.result);
-        rd.readAsDataURL(file);
-      });
-    }
+  if (file && file.type.startsWith('image/')) {
+    fileBase64 = await new Promise(resolve => {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX = 1000;
+        let w = img.width, h = img.height;
+        if (w > h) { if (w > MAX) { h *= MAX/w; w = MAX; } }
+        else { if (h > MAX) { w *= MAX/h; h = MAX; } }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.6)); 
+      };
+    });
   }
 
   const xhr = new XMLHttpRequest();
-  // We use the SCRIPT_URL but Google Apps Script requires a specific POST handling
   xhr.open("POST", SCRIPT_URL, true);
-  
-  xhr.upload.onprogress = (e) => { 
-    if (e.lengthComputable) document.getElementById('pBar').style.width = (e.loaded / e.total * 100) + "%"; 
-  };
-
+  xhr.upload.onprogress = (e) => { if (e.lengthComputable) document.getElementById('pBar').style.width = (e.loaded / e.total * 100) + "%"; };
   xhr.onload = () => {
     document.getElementById('pContainer').style.display = "none";
     btn.disabled = false;
-    
-    try {
-      const response = JSON.parse(xhr.responseText);
-      if (response.status === "success") {
-        document.getElementById('msg').value = "";
-        document.getElementById('file').value = "";
-        loadFeed();
-      } else {
-        alert("Server Error: " + response.message);
-      }
-    } catch (e) {
-      // If the response isn't JSON, it's usually a Google permissions error page
-      alert("Post sent! If it doesn't appear, check your Google Sheet for a new row.");
+    if (xhr.status === 200) {
+      document.getElementById('msg').value = "";
+      document.getElementById('file').value = "";
       loadFeed();
-    }
+    } else { alert("Error uploading. Check your Script URL."); }
   };
-
-  xhr.onerror = () => {
-    alert("Network error. Please check your SCRIPT_URL deployment.");
-    btn.disabled = false;
-  };
-
-  // Crucial: We send as plain text to bypass some CORS 'Pre-flight' restrictions in Apps Script
   xhr.send(JSON.stringify({ action: 'post', username: user, message: msg, image: fileBase64 }));
-}
-
-function triggerUnicorn(event) {
-  const x = event.clientX, y = event.clientY;
-  const unicorn = document.createElement('div');
-  unicorn.className = 'unicorn'; unicorn.textContent = '🦄';
-  unicorn.style.left = x + 'px'; unicorn.style.top = y + 'px';
-  document.body.appendChild(unicorn);
-  setTimeout(() => unicorn.remove(), 2000);
-}
-
-async function sharePost(rowIndex) {
-  const post = allPosts.find(p => p.rowIndex === rowIndex);
-  const shareUrl = `${window.location.origin}${window.location.pathname}?post=${rowIndex}`;
-  if (navigator.share) navigator.share({ title: 'theGooldbook', text: post.message, url: shareUrl });
-  else prompt("Copy link:", shareUrl);
 }
 
 function timeAgo(d) {
