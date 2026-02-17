@@ -13,37 +13,7 @@
   <meta name="apple-mobile-web-app-title" content="theGooldbook">
   <link rel="apple-touch-icon" href="/Gooldbook/icon.png">
 
-  <!-- OneSignal -->
-  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-  <script>
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    window.OneSignalDeferred.push(async function(OneSignal) {
-      await OneSignal.init({
-        appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064",
-        serviceWorkerParam: { scope: "/Gooldbook/" },
-        serviceWorkerPath: "/Gooldbook/OneSignalSDKWorker.js",
-        promptOptions: {
-          slidedown: {
-            prompts: [{
-              type: "push",
-              autoPrompt: true,
-              text: {
-                actionMessage: "Get notified when someone posts on theGooldbook! 🦄",
-                acceptButton: "Allow",
-                cancelButton: "No Thanks"
-              },
-              delay: { pageViews: 1, timeDelay: 3 }
-            }]
-          }
-        },
-        welcomeNotification: {
-          title: "theGooldbook 🦄",
-          message: "You're subscribed to Gooldbook notifications!"
-        }
-      });
-    });
-  </script>
-
+ 
   <!-- html2canvas -->
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
