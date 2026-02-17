@@ -17,7 +17,7 @@
   <style>
     :root { --gb-blue: #3b5998; --gb-hover: #4267b2; --gb-bg: #e9ebee; }
     
-    body { background: var(--gb-bg); font-family: system-ui, -apple-system, sans-serif; margin:0; padding-bottom:50px; }
+    body { background: var(--gb-bg); font-family: system-ui, -apple-system, sans-serif; margin:0; padding-bottom:50px; scroll-behavior: smooth; }
     
     .nav { 
       background: var(--gb-blue); color:#fff; padding:15px; 
@@ -30,9 +30,13 @@
     .sidebar { width:280px; position:sticky; top:70px; height: fit-content; }
     .main-feed { flex-grow:1; max-width:550px; width:100%; }
     
-    .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+    /* Post Card Styles */
+    .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: background-color 0.5s ease; }
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:12px; margin-bottom:10px; border-radius:8px; font-size:13px; }
     
+    /* Navigation Highlight Effect */
+    .highlight-post { background-color: #fff9c4 !important; border: 1px solid #fbc02d !important; transform: scale(1.02); transition: all 0.3s ease; }
+
     .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .user-name { color: var(--gb-blue); font-weight:bold; }
     .time-stamp { font-size:11px; color:#888; }
@@ -47,7 +51,11 @@
     .comment-box { background:#f0f2f5; padding:8px; border-radius:8px; margin-top:6px; font-size:13px; }
     input, textarea { width:100%; padding:10px; margin-bottom:8px; border:1px solid #ddd; border-radius:6px; box-sizing: border-box; font-family: inherit; }
 
-    /* Animations */
+    .trend-item { cursor:pointer; padding:10px 0; border-bottom:1px solid #eee; }
+    .trend-item:last-child { border-bottom: none; }
+    .trend-item:hover { background: #f9f9f9; }
+    .trend-stats { font-size: 11px; color: #777; margin-top: 4px; display: flex; gap: 8px; }
+
     .unicorn { position: fixed; font-size: 50px; pointer-events: none; z-index: 9999; animation: unicornFloat 2s ease-out forwards; }
     @keyframes unicornFloat { 0% { transform: translateY(0) scale(0); opacity: 0; } 20% { opacity: 1; transform: translateY(-20px) scale(1.2); } 100% { transform: translateY(-300px) scale(0.5); opacity: 0; } }
     
@@ -83,13 +91,11 @@
 </div>
 
 <script>
-// CONFIGURATION - Replace with your active Apps Script URL
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwN_XgiqcEPQsiTNEBMTIemJA75NIgnLrlt2a9T5wq8h9b7FPM9yFSd72tUUIoeh8xu/exec";
 
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let postsToShow = 5;
 
-// OneSignal Setup
 window.OneSignalDeferred = window.OneSignalDeferred || [];
 OneSignalDeferred.push(async (OneSignal) => {
   await OneSignal.init({ appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064" });
@@ -105,7 +111,6 @@ async function loadFeed() {
   try {
     const res = await fetch(SCRIPT_URL);
     allPosts = await res.json();
-    // Sanitize data
     allPosts.forEach(p => { p.likes = p.likes || []; p.comments = p.comments || []; });
     localStorage.setItem("gb_cache", JSON.stringify(allPosts));
     render();
@@ -148,22 +153,60 @@ function render() {
   updateTrending();
 }
 
-// Logic: Trending based on activity (Likes + Comments)
 function updateTrending() {
+  // Sort by engagement
   const top = [...allPosts]
     .sort((a,b) => ((b.likes?.length || 0) + (b.comments?.length || 0)) - ((a.likes?.length || 0) + (a.comments?.length || 0)))
     .slice(0,5);
 
-  document.getElementById('trending').innerHTML = `
+  const trendingEl = document.getElementById('trending');
+  trendingEl.innerHTML = `
     <div class="sidebar-card">
       <b style="color: #e67e22;">🔥 Trending Activity</b><br>
       ${top.length ? top.map(p => `
-        <div style="cursor:pointer; padding:8px 0; border-bottom:1px solid #eee;" onclick="scrollToPost(${p.rowIndex})">
+        <div class="trend-item" onclick="scrollToPost(${p.rowIndex})">
           <div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div>
-          <div style="font-size:11px; color:#666;">${p.message.substring(0,40)}...</div>
+          <div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div>
+          <div class="trend-stats">
+            <span>❤️ ${p.likes.length}</span>
+            <span>💬 ${p.comments.length}</span>
+          </div>
         </div>
       `).join('') : '<div style="color:#999; margin-top:5px;">No activity yet</div>'}
     </div>`;
+}
+
+// THE FIXED NAVIGATION FUNCTION
+function scrollToPost(id) {
+  // 1. Check if the post is currently rendered
+  let el = document.getElementById(`post-${id}`);
+  
+  if (!el) {
+    // 2. If not found, it might be hidden by "Load More". Show all posts.
+    postsToShow = allPosts.length;
+    render();
+    el = document.getElementById(`post-${id}`);
+  }
+
+  if (el) {
+    // 3. Scroll with an offset to account for the sticky nav
+    const offset = 80; 
+    const bodyRect = document.body.getBoundingClientRect().top;
+    const elementRect = el.getBoundingClientRect().top;
+    const elementPosition = elementRect - bodyRect;
+    const offsetPosition = elementPosition - offset;
+
+    window.scrollTo({
+      top: offsetPosition,
+      behavior: 'smooth'
+    });
+
+    // 4. Visual Flash effect
+    el.classList.add('highlight-post');
+    setTimeout(() => {
+      el.classList.remove('highlight-post');
+    }, 2000);
+  }
 }
 
 async function apiCall(action, rowIndex, event) {
@@ -174,7 +217,6 @@ async function apiCall(action, rowIndex, event) {
   const textInput = document.getElementById(`c-${rowIndex}`);
   const text = textInput ? textInput.value : "";
 
-  // Optimistic Update
   if (action === 'like') {
     const i = p.likes.indexOf(user);
     if (i === -1) { 
@@ -188,9 +230,8 @@ async function apiCall(action, rowIndex, event) {
     textInput.value = "";
   } else if (action === 'comment' && !text) return;
 
-  render(); // Instant visual feedback
+  render();
 
-  // Background Sync
   try {
     fetch(SCRIPT_URL, { 
       method: 'POST', 
@@ -222,7 +263,7 @@ async function upload() {
     document.getElementById('msg').value = "";
     document.getElementById('file').value = "";
     await loadFeed();
-  } catch(e) { alert("Upload failed. Image might be too large."); } 
+  } catch(e) { alert("Upload failed."); } 
   finally { btn.innerText = "Post Update"; btn.disabled = false; }
 }
 
@@ -246,12 +287,6 @@ function timeAgo(date) {
 
 function saveUser() { localStorage.setItem("gb_user", document.getElementById('user').value); }
 
-function scrollToPost(idx) {
-  const el = document.getElementById(`post-${idx}`);
-  if(el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
-// Share Logic from V1
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex);
   if (!post) return;
@@ -278,7 +313,7 @@ async function sharePost(rowIndex, event) {
   if (navigator.share && navigator.canShare({ files: [file] })) {
     await navigator.share({ files: [file], title: 'theGooldbook', text: post.message });
   } else {
-    alert("Sharing not supported on this browser. Long-press the image to save if on mobile.");
+    alert("Sharing fallback: Long-press image to save.");
     window.open(canvas.toDataURL());
   }
   btn.innerText = "🔗 Share"; btn.disabled = false;
