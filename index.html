@@ -22,7 +22,12 @@
     .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:12px; margin-bottom:10px; border-radius:8px; font-size:13px; }
     
-    .filter-badge { background: #fff9c4; border: 1px solid #fbc02d; padding: 10px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+    /* Link Preview Style */
+    .link-preview { border: 1px solid #ddd; border-radius: 8px; margin-top: 10px; overflow: hidden; background: #f9f9f9; text-decoration: none; color: inherit; display: block; transition: background 0.2s; }
+    .link-preview:hover { background: #f0f2f5; }
+    .link-details { padding: 10px; display: flex; align-items: center; gap: 10px; }
+    .link-icon { width: 32px; height: 32px; border-radius: 4px; background: #fff; border: 1px solid #eee; }
+    .link-url { font-size: 13px; color: var(--gb-blue); font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .user-name { color: var(--gb-blue); font-weight:bold; cursor: pointer; }
@@ -44,7 +49,6 @@
     .sidebar-item:hover { background: #f0f2f5; }
     .sidebar-item.active { background: #e7f3ff; font-weight: bold; border-left: 3px solid var(--gb-blue); padding-left: 5px; }
 
-    /* Magic Animations */
     .unicorn-pop { position: fixed; font-size: 40px; pointer-events: none; z-index: 9999; animation: unicornFloat 1.5s ease-out forwards; }
     .sparkle { position: fixed; font-size: 15px; pointer-events: none; z-index: 9998; animation: sparkleBurst 1s ease-out forwards; }
     .global-sparkle { position: fixed; font-size: 30px; pointer-events: none; z-index: 10001; animation: globalFall 3s linear forwards; }
@@ -72,7 +76,7 @@
     <div id="filterStatus"></div>
     <div class="card" id="postComposer">
       <input id="user" placeholder="Your Name" onchange="saveUser()">
-      <textarea id="msg" rows="2" placeholder="What's on your mind? (Use #hashtags!)"></textarea>
+      <textarea id="msg" rows="2" placeholder="What's on your mind?"></textarea>
       <input type="file" id="file" accept="image/*">
       <div style="display: flex; gap: 5px;">
         <button id="postBtn" class="btn" style="flex: 2;" onclick="upload()">Post Update</button>
@@ -127,7 +131,33 @@ function formatLikes(likes) {
 
 function highlightHashtags(text) {
   if (!text) return "";
-  return text.replace(/#(\w+)/g, '<span style="color:var(--gb-hover); font-weight:bold; cursor:pointer;" onclick="setFilter(\'hashtag\', \'#$1\'); event.stopPropagation();">#$1</span>');
+  
+  // 1. Make URLs in the text clickable
+  let formatted = text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:var(--gb-hover); text-decoration:none;">$1</a>');
+  
+  // 2. Make Hashtags clickable
+  formatted = formatted.replace(/#(\w+)/g, '<span style="color:var(--gb-hover); font-weight:bold; cursor:pointer;" onclick="setFilter(\'hashtag\', \'#$1\'); event.stopPropagation();">#$1</span>');
+  
+  return formatted;
+}
+
+function renderLinkPreview(text) {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const match = text.match(urlRegex);
+  if (!match) return "";
+  
+  const url = match[0];
+  try {
+    const domain = new URL(url).hostname;
+    return `
+      <a href="${url}" target="_blank" class="link-preview">
+        <div class="link-details">
+          <img class="link-icon" src="https://www.google.com/s2/favicons?sz=64&domain=${domain}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'%3E%3Cpath fill=\'%23888\' d=\'M3.9,12c0-1.7,1.4-3.1,3.1-3.1h4V7H7c-2.8,0-5,2.2-5,5s2.2,5,5,5h4v-1.9H7C5.3,15.1,3.9,13.7,3.9,12z M8,13h8v-2H8V13z M17,7h-4v1.9h4c1.7,0,3.1,1.4,3.1,3.1s-1.4,3.1-3.1,3.1h-4V17h4c2.8,0,5-2.2,5-5S19.8,7,17,7z\'/%3E%3C/svg%3E'">
+          <div class="link-url">${domain}</div>
+        </div>
+      </a>
+    `;
+  } catch(e) { return ""; }
 }
 
 function render() {
@@ -166,6 +196,7 @@ function render() {
         <span class="time-stamp">${timeAgo(p.timestamp)}</span>
       </div>
       <p>${highlightHashtags(p.message)}</p>
+      ${renderLinkPreview(p.message)}
       ${p.image ? `<img src="${p.image}" class="post-img" crossorigin="anonymous">` : ''}
       <div style="margin-top:12px; display:flex; gap:8px;">
         <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">
@@ -177,7 +208,7 @@ function render() {
       ${p.likes.length > 0 ? `<div class="liked-by">❤️ ${formatLikes(p.likes)}</div>` : ''}
 
       <div class="comment-section">
-        ${p.comments.map(c => `<div class="comment-box"><b style="cursor:pointer" onclick="setFilter('author', '${c.user}')">${c.user}</b>: ${highlightHashtags(c.text)}<span class="comment-time">${timeAgo(c.time || p.timestamp)}</span></div>`).join('')}
+        ${p.comments.map(c => `<div class="comment-box"><b style="cursor:pointer" onclick="setFilter('author', '${c.user}')">${c.user}</b>: ${highlightHashtags(c.text)} ${renderLinkPreview(c.text)}<span class="comment-time">${timeAgo(c.time || p.timestamp)}</span></div>`).join('')}
       </div>
       <div style="display:flex; gap:5px; margin-top:10px">
         <input id="c-${p.rowIndex}" placeholder="Write a comment..." style="margin:0; font-size:13px">
