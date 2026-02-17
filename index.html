@@ -4,41 +4,48 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>The Gooldbook🦄</title>
-  
+
+  <!-- PWA tags -->
+  <link rel="manifest" href="/Gooldbook/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="theGooldbook">
+  <link rel="apple-touch-icon" href="/Gooldbook/icon.png">
+
+  <!-- OneSignal -->
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    window.OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({
+        appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064",
+        serviceWorkerParam: { scope: "/Gooldbook/" },
+        serviceWorkerPath: "/Gooldbook/OneSignalSDKWorker.js",
+        promptOptions: {
+          slidedown: {
+            prompts: [{
+              type: "push",
+              autoPrompt: true,
+              text: {
+                actionMessage: "Get notified when someone posts on theGooldbook! 🦄",
+                acceptButton: "Allow",
+                cancelButton: "No Thanks"
+              },
+              delay: { pageViews: 1, timeDelay: 3 }
+            }]
+          }
+        },
+        welcomeNotification: {
+          title: "theGooldbook 🦄",
+          message: "You're subscribed to Gooldbook notifications!"
+        }
+      });
+    });
+  </script>
+
+  <!-- html2canvas -->
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
-<script>
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  window.OneSignalDeferred.push(async function(OneSignal) {
-    await OneSignal.init({
-      appId: "4577a6bd-cd70-41d2-bf78-aba5f6211064",
-      promptOptions: {
-        slidedown: {
-          prompts: [{
-            type: "push",
-            autoPrompt: true,
-            text: {
-              actionMessage: "Get notified when someone posts or comments on theGooldbook! 🦄",
-              acceptButton: "Allow",
-              cancelButton: "No Thanks"
-            },
-            delay: {
-              pageViews: 1,
-              timeDelay: 3
-            }
-          }]
-        }
-      },
-      welcomeNotification: {
-        title: "theGooldbook 🦄",
-        message: "You're subscribed to Gooldbook notifications!"
-      }
-    });
-  });
-</script>
-
-  
   <style>
     :root { --gb-blue: #3b5998; --gb-hover: #4267b2; --gb-bg: #e9ebee; }
     body { background: var(--gb-bg); font-family: system-ui, -apple-system, sans-serif; margin:0; padding-bottom:50px; scroll-behavior: smooth; overflow-x: hidden; }
@@ -53,7 +60,6 @@
     .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:12px; margin-bottom:10px; border-radius:8px; font-size:13px; }
     
-    /* Link Preview Style */
     .link-preview { border: 1px solid #ddd; border-radius: 8px; margin-top: 10px; overflow: hidden; background: #f9f9f9; text-decoration: none; color: inherit; display: block; transition: background 0.2s; }
     .link-preview:hover { background: #f0f2f5; }
     .link-details { padding: 10px; display: flex; align-items: center; gap: 10px; }
