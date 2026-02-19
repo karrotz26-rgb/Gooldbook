@@ -111,8 +111,7 @@ let newPostCount = 0;
 
 window.onload = () => {
   document.getElementById('user').value = localStorage.getItem("gb_user") || "";
-  if(allPosts.length) render();
-  loadFeed();
+  loadFeed(); // Always fetch fresh data on load
   setInterval(pollForUpdates, 30000);
 };
 
@@ -172,11 +171,12 @@ function getAvatarMarkup(user, sizeClass) {
   if (!ava || ava === "" || ava === "undefined") {
     return `<div class="${sizeClass}">🦄</div>`;
   }
+  // Force browser to ignore cache for profile images to prevent "ghost" disappearing images
   const src = (ava.includes('googleusercontent') || ava.includes('google.com')) 
-              ? ava + "&t=" + Date.now() 
+              ? ava + "&t=" + new Date().getTime() 
               : ava;
 
-  return `<img src="${src}" class="${sizeClass}" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=${sizeClass}>🦄</div>';">`;
+  return `<img src="${src}" class="${sizeClass}" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=🦄';">`;
 }
 
 async function uploadAvatar(user) {
@@ -184,7 +184,7 @@ async function uploadAvatar(user) {
   if(!file) return;
   
   const btn = document.getElementById('editBioBtn');
-  if(btn) btn.innerText = "Uploading...";
+  if(btn) btn.innerText = "Processing...";
   const preview = document.querySelector('.avatar-large');
   if(preview) preview.style.opacity = "0.3";
 
@@ -201,11 +201,12 @@ async function uploadAvatar(user) {
     }) 
   });
   
+  // Longer timeout to allow Google Drive and Sheets to sync
   setTimeout(async () => {
     await loadFeed();
     if(btn) btn.innerText = "Edit Bio";
     render();
-  }, 3500); 
+  }, 4000); 
 }
 
 async function saveBio(user) {
@@ -222,7 +223,7 @@ async function saveBio(user) {
       avatar: allAvatars[user] || "" 
     }) 
   });
-  loadFeed();
+  setTimeout(loadFeed, 2000);
 }
 
 function render() {
@@ -433,7 +434,12 @@ function timeAgo(d) {
   return Math.floor(s/86400) + "d";
 }
 
-function saveUser() { localStorage.setItem("gb_user", document.getElementById('user').value); render(); }
+function saveUser() { 
+  const val = document.getElementById('user').value;
+  localStorage.setItem("gb_user", val); 
+  // Force a data refresh when name changes to ensure profile syncs
+  loadFeed(); 
+}
 </script>
 </body>
 </html>
