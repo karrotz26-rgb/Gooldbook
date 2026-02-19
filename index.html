@@ -280,6 +280,7 @@ function updateSidebar() {
   const myName = document.getElementById('user').value.trim();
   document.getElementById('myProfileLink').innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', '${myName}')">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
   
+  // 1. Trending Activity (Likes + Comments)
   const topPosts = [...allPosts].sort((a,b) => {
     const scoreA = (a.likes?.length || 0) + (a.comments?.length || 0);
     const scoreB = (b.likes?.length || 0) + (b.comments?.length || 0);
@@ -293,16 +294,28 @@ function updateSidebar() {
       <span class="trend-stats">❤️ ${p.likes.length} • 💬 ${p.comments.length}</span>
     </div>`).join('')}</div>`;
 
+  // 2. Leaderboard
   const lCounts = {};
   allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
   const top = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
   document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${top.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
 
+  // 3. UPDATED: Case-Insensitive Hashtag Logic (Posts + Comments)
   const hCounts = {};
   allPosts.forEach(p => { 
-    const tags = p.message.match(/#(\w+)/g) || [];
-    tags.forEach(t => { const lower = t.toLowerCase(); hCounts[lower] = (hCounts[lower] || 0) + 1; });
+    // Get tags from main post
+    const postTags = (p.message || "").match(/#(\w+)/g) || [];
+    
+    // Get tags from all comments on this post
+    const commentTags = p.comments.flatMap(c => (c.text || "").match(/#(\w+)/g) || []);
+    
+    // Combine and count them
+    [...postTags, ...commentTags].forEach(t => {
+      const lower = t.toLowerCase();
+      hCounts[lower] = (hCounts[lower] || 0) + 1;
+    });
   });
+
   const topTags = Object.entries(hCounts).sort((a,b) => b[1] - a[1]).slice(0,5);
   document.getElementById('hashtags').innerHTML = `<div class="sidebar-card"><b>#️⃣ Trending Tags</b><br>${topTags.map(([tag, count]) => `<div class="sidebar-item" onclick="setFilter('hashtag','${tag}')">${tag} <small>(${count})</small></div>`).join('') || 'No tags yet'}</div>`;
 }
