@@ -222,6 +222,7 @@ function render() {
   const statusEl = document.getElementById('filterStatus');
   const composer = document.getElementById('postComposer');
   
+  // Basic search filter
   let filtered = allPosts.filter(p => (p.message||"").toLowerCase().includes(s) || (p.user||"").toLowerCase().includes(s));
   
   if (filterVal) {
@@ -243,8 +244,21 @@ function render() {
     } else {
         let label = filterType === 'likes' ? `Liked by ${filterVal}` : `Tagged ${filterVal}`;
         statusEl.innerHTML = `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>Showing: <b>${label}</b></span><button class="btn-alt" onclick="setFilter(null,null)">Clear</button></div>`;
-        if(filterType === 'likes') filtered = filtered.filter(p => p.likes.includes(filterVal));
-        if(filterType === 'hashtag') filtered = filtered.filter(p => p.message.toLowerCase().includes(filterVal.toLowerCase()));
+        
+        if(filterType === 'likes') {
+          filtered = filtered.filter(p => p.likes.includes(filterVal));
+        }
+        
+        if(filterType === 'hashtag') {
+          const tag = filterVal.toLowerCase();
+          filtered = filtered.filter(p => {
+            // Check the post message
+            const inPost = (p.message || "").toLowerCase().includes(tag);
+            // Check all comments in this post
+            const inComments = p.comments.some(c => (c.text || "").toLowerCase().includes(tag));
+            return inPost || inComments;
+          });
+        }
     }
   } else { composer.style.display = "block"; statusEl.innerHTML = ""; }
   
@@ -264,7 +278,11 @@ function render() {
         <button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
       </div>
       <div class="comment-section" style="margin-top:10px;">
-        ${p.comments.map(c => `<div class="comment-box"><b onclick="setFilter('author', '${c.user}')" style="cursor:pointer">${c.user}</b>: ${highlightHashtags(c.text)}</div>`).join('')}
+        ${p.comments.map(c => `
+          <div class="comment-box">
+            <b onclick="setFilter('author', '${c.user}')" style="cursor:pointer">${c.user}</b>: 
+            ${highlightHashtags(c.text)}
+          </div>`).join('')}
         <div style="margin-top:10px">
           <input id="c-${p.rowIndex}" placeholder="Write a comment..." style="margin-bottom:0; font-size:13px !important;">
           <button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button>
@@ -275,7 +293,6 @@ function render() {
   document.getElementById('loadMore').style.display = filtered.length > postsToShow ? 'block' : 'none';
   updateSidebar();
 }
-
 function updateSidebar() {
   const myName = document.getElementById('user').value.trim();
   document.getElementById('myProfileLink').innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', '${myName}')">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
