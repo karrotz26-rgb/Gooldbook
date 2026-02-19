@@ -169,9 +169,8 @@ function setFilter(type, val) {
 
 function getAvatarMarkup(user, sizeClass) {
   const ava = allAvatars[user];
-  // Check if it's a URL (http) or an old Base64 string
   if (ava && (ava.startsWith('http') || ava.startsWith('data:image'))) {
-    return `<img src="${ava}" class="${sizeClass}" onerror="this.parentElement.innerHTML='<div class=${sizeClass}>🦄</div>'">`;
+    return `<img src="${ava}" class="${sizeClass}" onerror="this.src='https://via.placeholder.com/150?text=🦄'">`;
   }
   return `<div class="${sizeClass}">🦄</div>`;
 }
@@ -180,13 +179,11 @@ async function uploadAvatar(user) {
   const file = document.getElementById('avaPick').files[0];
   if(!file) return;
   
-  // Show temporary UI feedback
   const preview = document.querySelector('.avatar-large');
   if(preview) preview.style.opacity = "0.5";
 
   const base64 = await compressImage(file);
   
-  // Send to backend
   await fetch(SCRIPT_URL, { 
     method: 'POST', 
     mode: 'no-cors', 
@@ -198,8 +195,25 @@ async function uploadAvatar(user) {
     }) 
   });
   
-  // Refresh feed to get the new Drive URL
-  setTimeout(loadFeed, 1500); 
+  // Refresh after 2 seconds to allow Drive permissions to propagate
+  setTimeout(loadFeed, 2000); 
+}
+
+async function saveBio(user) {
+  const bio = document.getElementById('newBio').value;
+  allBios[user] = bio;
+  render();
+  await fetch(SCRIPT_URL, { 
+    method: 'POST', 
+    mode: 'no-cors', 
+    body: JSON.stringify({ 
+      action: 'updateBio', 
+      username: user, 
+      bio: bio, 
+      avatar: allAvatars[user] || "" 
+    }) 
+  });
+  loadFeed();
 }
 
 function render() {
@@ -266,7 +280,6 @@ function updateSidebar() {
   const myName = document.getElementById('user').value.trim();
   document.getElementById('myProfileLink').innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', '${myName}')">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
   
-  // 🔥 Improved Trending Activity Logic
   const topPosts = [...allPosts].sort((a,b) => {
     const scoreA = (a.likes?.length || 0) + (a.comments?.length || 0);
     const scoreB = (b.likes?.length || 0) + (b.comments?.length || 0);
@@ -280,65 +293,34 @@ function updateSidebar() {
       <span class="trend-stats">❤️ ${p.likes.length} • 💬 ${p.comments.length}</span>
     </div>`).join('')}</div>`;
 
-  // 🏆 Leaderboard
   const lCounts = {};
   allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
   const top = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
   document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${top.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
 
-  // #️⃣ Improved Case-Insensitive Hashtag Logic
   const hCounts = {};
   allPosts.forEach(p => { 
     const tags = p.message.match(/#(\w+)/g) || [];
-    tags.forEach(t => {
-      const lower = t.toLowerCase();
-      hCounts[lower] = (hCounts[lower] || 0) + 1;
-    });
+    tags.forEach(t => { const lower = t.toLowerCase(); hCounts[lower] = (hCounts[lower] || 0) + 1; });
   });
   const topTags = Object.entries(hCounts).sort((a,b) => b[1] - a[1]).slice(0,5);
   document.getElementById('hashtags').innerHTML = `<div class="sidebar-card"><b>#️⃣ Trending Tags</b><br>${topTags.map(([tag, count]) => `<div class="sidebar-item" onclick="setFilter('hashtag','${tag}')">${tag} <small>(${count})</small></div>`).join('') || 'No tags yet'}</div>`;
 }
 
-// Fixed Scroll Function
 function scrollToPost(id) {
-  // If we are in a filtered view, clear it first so the post exists on screen
-  if (filterVal) {
-    setFilter(null, null);
-    setTimeout(() => performScroll(id), 300);
-  } else {
-    performScroll(id);
-  }
+  if (filterVal) { setFilter(null, null); setTimeout(() => performScroll(id), 300); } 
+  else { performScroll(id); }
 }
 
 function performScroll(id) {
   const el = document.getElementById(`post-${id}`);
   if (el) {
-    const navHeight = 60;
-    window.scrollTo({ top: el.offsetTop - navHeight - 10, behavior: 'smooth' });
+    window.scrollTo({ top: el.offsetTop - 70, behavior: 'smooth' });
     el.classList.add('highlight-card');
     setTimeout(() => el.classList.remove('highlight-card'), 2000);
   } else {
-    // If not found, it might be further down the list
-    postsToShow += 5;
-    render();
-    setTimeout(() => performScroll(id), 100);
+    postsToShow += 5; render(); setTimeout(() => performScroll(id), 100);
   }
-}
-
-async function uploadAvatar(user) {
-  const file = document.getElementById('avaPick').files[0];
-  if(!file) return;
-  const base64 = await compressImage(file);
-  allAvatars[user] = base64;
-  render();
-  fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action:'updateBio', username:user, bio:allBios[user]||"", avatar:base64 }) });
-}
-
-async function saveBio(user) {
-  const bio = document.getElementById('newBio').value;
-  allBios[user] = bio;
-  render();
-  fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action:'updateBio', username:user, bio:bio, avatar:allAvatars[user]||"" }) });
 }
 
 async function upload() {
@@ -411,9 +393,7 @@ async function sharePost(rowIndex, event) {
   } catch(e) { alert("Share failed."); } finally { btn.innerText = "🔗 Share"; }
 }
 
-function highlightHashtags(t) {
-  return t.replace(/#(\w+)/g, '<span style="color:var(--gb-hover);font-weight:bold;cursor:pointer" onclick="setFilter(\'hashtag\',\'#$1\')">#$1</span>');
-}
+function highlightHashtags(t) { return t.replace(/#(\w+)/g, '<span style="color:var(--gb-hover);font-weight:bold;cursor:pointer" onclick="setFilter(\'hashtag\',\'#$1\')">#$1</span>'); }
 
 function timeAgo(d) {
   if(!d) return "just now";
