@@ -169,14 +169,10 @@ function setFilter(type, val) {
 
 function getAvatarMarkup(user, sizeClass) {
   const ava = allAvatars[user];
-  // If no avatar exists, or it's a known broken/empty string, show unicorn
   if (!ava || ava === "" || ava === "undefined") {
     return `<div class="${sizeClass}">🦄</div>`;
   }
-  
-  // If it's a URL or Base64, try to render it
-  // We add a timestamp to the URL to bypass browser cache: ?t=Date.now()
-  const src = ava.includes('googleusercontent') || ava.includes('google.com') 
+  const src = (ava.includes('googleusercontent') || ava.includes('google.com')) 
               ? ava + "&t=" + Date.now() 
               : ava;
 
@@ -187,7 +183,6 @@ async function uploadAvatar(user) {
   const file = document.getElementById('avaPick').files[0];
   if(!file) return;
   
-  // UI Feedback: Show loading state
   const btn = document.getElementById('editBioBtn');
   if(btn) btn.innerText = "Uploading...";
   const preview = document.querySelector('.avatar-large');
@@ -206,37 +201,11 @@ async function uploadAvatar(user) {
     }) 
   });
   
-  // Wait 3 seconds for Google Drive to index the file and permissions
   setTimeout(async () => {
-    await loadFeed(); // Hard refresh of the data
+    await loadFeed();
     if(btn) btn.innerText = "Edit Bio";
     render();
-    alert("Profile picture updated! If it still looks like a question mark, please refresh once more.");
-  }, 3000); 
-}
-
-async function uploadAvatar(user) {
-  const file = document.getElementById('avaPick').files[0];
-  if(!file) return;
-  
-  const preview = document.querySelector('.avatar-large');
-  if(preview) preview.style.opacity = "0.5";
-
-  const base64 = await compressImage(file);
-  
-  await fetch(SCRIPT_URL, { 
-    method: 'POST', 
-    mode: 'no-cors', 
-    body: JSON.stringify({ 
-      action: 'updateBio', 
-      username: user, 
-      bio: allBios[user] || "", 
-      avatar: base64 
-    }) 
-  });
-  
-  // Refresh after 2 seconds to allow Drive permissions to propagate
-  setTimeout(loadFeed, 2000); 
+  }, 3500); 
 }
 
 async function saveBio(user) {
@@ -262,7 +231,6 @@ function render() {
   const statusEl = document.getElementById('filterStatus');
   const composer = document.getElementById('postComposer');
   
-  // Basic search filter
   let filtered = allPosts.filter(p => (p.message||"").toLowerCase().includes(s) || (p.user||"").toLowerCase().includes(s));
   
   if (filterVal) {
@@ -292,9 +260,7 @@ function render() {
         if(filterType === 'hashtag') {
           const tag = filterVal.toLowerCase();
           filtered = filtered.filter(p => {
-            // Check the post message
             const inPost = (p.message || "").toLowerCase().includes(tag);
-            // Check all comments in this post
             const inComments = p.comments.some(c => (c.text || "").toLowerCase().includes(tag));
             return inPost || inComments;
           });
@@ -333,11 +299,11 @@ function render() {
   document.getElementById('loadMore').style.display = filtered.length > postsToShow ? 'block' : 'none';
   updateSidebar();
 }
+
 function updateSidebar() {
   const myName = document.getElementById('user').value.trim();
   document.getElementById('myProfileLink').innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', '${myName}')">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
   
-  // 1. Trending Activity (Likes + Comments)
   const topPosts = [...allPosts].sort((a,b) => {
     const scoreA = (a.likes?.length || 0) + (a.comments?.length || 0);
     const scoreB = (b.likes?.length || 0) + (b.comments?.length || 0);
@@ -351,22 +317,15 @@ function updateSidebar() {
       <span class="trend-stats">❤️ ${p.likes.length} • 💬 ${p.comments.length}</span>
     </div>`).join('')}</div>`;
 
-  // 2. Leaderboard
   const lCounts = {};
   allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
   const top = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
   document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${top.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
 
-  // 3. UPDATED: Case-Insensitive Hashtag Logic (Posts + Comments)
   const hCounts = {};
   allPosts.forEach(p => { 
-    // Get tags from main post
     const postTags = (p.message || "").match(/#(\w+)/g) || [];
-    
-    // Get tags from all comments on this post
     const commentTags = p.comments.flatMap(c => (c.text || "").match(/#(\w+)/g) || []);
-    
-    // Combine and count them
     [...postTags, ...commentTags].forEach(t => {
       const lower = t.toLowerCase();
       hCounts[lower] = (hCounts[lower] || 0) + 1;
