@@ -3,20 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-
   <title>The Gooldbook🦄</title>
 
-  <!-- PWA tags -->
   <link rel="manifest" href="/Gooldbook/Manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="theGooldbook">
-  <!-- Force iOS PWA icon -->
-<link rel="apple-touch-icon" href="https://karrotz26-rgb.github.io/Gooldbook/icon.png">
-<link rel="apple-touch-icon-precomposed" href="https://karrotz26-rgb.github.io/Gooldbook/icon.png">
+  <link rel="apple-touch-icon" href="https://karrotz26-rgb.github.io/Gooldbook/icon.png">
 
-
-  <!-- html2canvas -->
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
   <style>
@@ -27,7 +21,6 @@
     .nav-icon { background: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
     .nav-badge { background: #e74c3c; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 11px; display: none; align-items: center; justify-content: center; font-weight: bold; margin-left: -8px; margin-top: -16px; }
 
-    /* In-app notification banner */
     .notif-banner { position: fixed; top: calc(60px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); background: #1c1e21; color: white; padding: 12px 20px; border-radius: 12px; font-size: 14px; z-index: 9000; display: none; align-items: center; gap: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); max-width: 90vw; cursor: pointer; animation: slideDown 0.3s ease; }
     .notif-banner.show { display: flex; }
     @keyframes slideDown { from { transform: translateX(-50%) translateY(-20px); opacity: 0; } to { transform: translateX(-50%) translateY(0); opacity: 1; } }
@@ -39,60 +32,37 @@
     .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:12px; margin-bottom:10px; border-radius:8px; font-size:13px; }
     
-    .link-preview { border: 1px solid #ddd; border-radius: 8px; margin-top: 10px; overflow: hidden; background: #f9f9f9; text-decoration: none; color: inherit; display: block; transition: background 0.2s; }
-    .link-preview:hover { background: #f0f2f5; }
-    .link-details { padding: 10px; display: flex; align-items: center; gap: 10px; }
-    .link-icon { width: 32px; height: 32px; border-radius: 4px; background: #fff; border: 1px solid #eee; }
-    .link-url { font-size: 13px; color: var(--gb-blue); font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* Avatar Styles */
+    .avatar-small { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #eee; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .avatar-large { width: 90px; height: 90px; border-radius: 50%; object-fit: cover; background: #eee; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.15); margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 45px; }
 
-    .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .user-name { color: var(--gb-blue); font-weight:bold; cursor: pointer; }
+    .user-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .user-info { flex-grow: 1; }
+    .user-name { color: var(--gb-blue); font-weight:bold; cursor: pointer; display: block; }
     .user-name:hover { text-decoration: underline; }
     .time-stamp { font-size:11px; color:#888; }
+    
     .post-img { width:100%; max-height:500px; object-fit: cover; margin-top:10px; border-radius:4px; display:block; background:#f0f2f5; }
     
-    .btn { background: var(--gb-hover); color:#fff; border:none; padding:8px 14px; cursor:pointer; font-weight:bold; border-radius:4px; transition: transform 0.1s; }
-    .btn:active { transform: scale(0.96); }
-    .btn-alt { background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; }
-    
-    .liked-by { font-size: 12px; color: #65676b; margin: 10px 0; display: flex; align-items: center; gap: 5px; }
-    .comment-box { background:#f0f2f5; padding:8px; border-radius:8px; margin-top:6px; font-size:13px; }
-    .comment-time { font-size: 10px; color: #999; margin-top: 2px; display: block; }
-    
-    input, textarea { width:100%; padding:10px; margin-bottom:8px; border:1px solid #ddd; border-radius:6px; box-sizing: border-box; font-family: inherit; }
-    
-    .sidebar-item { cursor:pointer; padding:8px 0; border-bottom:1px solid #eee; transition: background 0.2s; }
+    input, textarea { width:100%; padding:10px; margin-bottom:8px; border:1px solid #ddd; border-radius:6px; box-sizing: border-box; font-family: inherit; font-size: 16px !important; }
+    button { touch-action: manipulation; cursor: pointer; }
+
+    .btn { background: var(--gb-hover); color:#fff; border:none; padding:8px 14px; cursor:pointer; font-weight:bold; border-radius:4px; }
+    .btn-alt { background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; padding: 6px 12px; font-size: 13px; font-weight: bold; border-radius: 4px; }
+
+    .sidebar-item { cursor:pointer; padding:8px 0; border-bottom:1px solid #eee; }
     .sidebar-item:hover { background: #f0f2f5; }
-    .sidebar-item.active { background: #e7f3ff; font-weight: bold; border-left: 3px solid var(--gb-blue); padding-left: 5px; }
 
     .unicorn-pop { position: fixed; font-size: 40px; pointer-events: none; z-index: 9999; animation: unicornFloat 1.5s ease-out forwards; }
-    .sparkle { position: fixed; font-size: 15px; pointer-events: none; z-index: 9998; animation: sparkleBurst 1s ease-out forwards; }
-    .global-sparkle { position: fixed; font-size: 30px; pointer-events: none; z-index: 10001; animation: globalFall 3s linear forwards; }
-
     @keyframes unicornFloat { 0% { transform: translateY(0) scale(0); opacity: 0; } 30% { opacity: 1; transform: translateY(-40px) scale(1.2); } 100% { transform: translateY(-120px) scale(0); opacity: 0; } }
-    @keyframes sparkleBurst { 0% { transform: translate(0,0) scale(1); opacity: 1; } 100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; } }
-    @keyframes globalFall { 0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(360deg); opacity: 0; } }
 
     @media(max-width:700px){ .container { flex-direction:column; } .sidebar { width:100%; position:static; } }
-  /* Prevents iOS from zooming in on focus */
-input, textarea {
-  font-size: 16px !important;
-}
-
-/* Optional: Prevent double-tap zoom on buttons */
-button {
-  touch-action: manipulation;
-}
-
   </style>
 </head>
 <body>
 
-<!-- In-app notification banner -->
 <div class="notif-banner" id="notifBanner" onclick="dismissNotif()">
-  <span style="font-size:20px;">🦄</span>
   <span id="notifText"></span>
-  <span style="margin-left:auto; font-size:18px; opacity:0.6;">✕</span>
 </div>
 
 <div class="nav">
@@ -103,10 +73,10 @@ button {
 
 <div class="container">
   <div class="sidebar">
-    <div class="sidebar-card"><b>🔍 Search Feed</b><input id="searchBar" placeholder="Filter posts..." oninput="render()"></div>
+    <div id="myProfileLink"></div>
+    <div class="sidebar-card"><b>🔍 Search</b><input id="searchBar" placeholder="Search Gooldbook..." oninput="render()"></div>
     <div id="leaderboard"></div>
     <div id="hashtags"></div>
-    <div id="trending"></div>
   </div>
 
   <div class="main-feed">
@@ -117,181 +87,87 @@ button {
       <input type="file" id="file" accept="image/*">
       <div style="display: flex; gap: 5px;">
         <button id="postBtn" class="btn" style="flex: 2;" onclick="upload()">Post Update</button>
-        <button class="btn btn-alt" style="flex: 1;" onclick="loadFeed()">🔄 Refresh</button>
+        <button class="btn btn-alt" style="flex: 1;" onclick="loadFeed()">🔄</button>
       </div>
     </div>
-    <div id="feed">Loading your world...</div>
+    <div id="feed">Loading feed...</div>
     <button id="loadMore" class="btn btn-alt" style="width:100%; display:none; margin-bottom:20px;" onclick="postsToShow+=5; render()">Load More</button>
   </div>
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwwdb3tSlUV2aZBb9f9NqbznLoccCGQVPCMa4_8lMwxgImx0hSW8xkdS_x_X31psva/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzTHdTO0VwW1FRZITxCXCN4dXBarW4jRrYafvni_Qf16Gi_V4HLpzBZBtrebvQlSP7q/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
+let allBios = {}, allAvatars = {};
 let postsToShow = 5;
-let filterType = null; 
-let filterVal = null;
+let filterType = null, filterVal = null;
 let lastPostCount = 0;
-let lastCommentSnapshot = {};
-let notifTimeout = null;
 let newPostCount = 0;
 
 window.onload = () => {
   document.getElementById('user').value = localStorage.getItem("gb_user") || "";
-  if(allPosts.length) {
-    render();
-    lastPostCount = allPosts.length;
-    allPosts.forEach(p => { lastCommentSnapshot[p.rowIndex] = p.comments.length; });
-  }
+  if(allPosts.length) render();
   loadFeed();
   setInterval(pollForUpdates, 30000);
 };
-
-async function pollForUpdates() {
-  try {
-    const res = await fetch(SCRIPT_URL);
-    const data = await res.json();
-    const newPosts = data.map(p => ({ ...p, likes: p.likes || [], comments: p.comments || [] }));
-
-    if (lastPostCount === 0) {
-      lastPostCount = newPosts.length;
-      newPosts.forEach(p => { lastCommentSnapshot[p.rowIndex] = p.comments.length; });
-      allPosts = newPosts;
-      localStorage.setItem("gb_cache", JSON.stringify(allPosts));
-      render();
-      return;
-    }
-
-    const myName = document.getElementById('user').value.trim();
-    let notifMessage = "";
-
-    if (newPosts.length > lastPostCount) {
-      const diff = newPosts.length - lastPostCount;
-      const newestPost = newPosts[0];
-      if (newestPost.user !== myName) {
-        notifMessage = diff === 1
-          ? `${newestPost.user} just posted! 📝`
-          : `${diff} new posts appeared! 📝`;
-        newPostCount += diff;
-      }
-    }
-
-    if (!notifMessage) {
-      for (const post of newPosts) {
-        const prevCount = lastCommentSnapshot[post.rowIndex] || 0;
-        if (post.comments.length > prevCount) {
-          const newComment = post.comments[post.comments.length - 1];
-          if (newComment.user !== myName) {
-            notifMessage = `${newComment.user} commented on ${post.user}'s post 💬`;
-            newPostCount++;
-            break;
-          }
-        }
-      }
-    }
-
-    lastPostCount = newPosts.length;
-    newPosts.forEach(p => { lastCommentSnapshot[p.rowIndex] = p.comments.length; });
-    allPosts = newPosts;
-    localStorage.setItem("gb_cache", JSON.stringify(allPosts));
-    render();
-
-    if (notifMessage) showNotif(notifMessage);
-
-  } catch(e) { console.error("Poll failed", e); }
-}
-
-function showNotif(message) {
-  const banner = document.getElementById('notifBanner');
-  const text = document.getElementById('notifText');
-  const badge = document.getElementById('navBadge');
-
-  text.textContent = message;
-  banner.classList.add('show');
-
-  badge.textContent = newPostCount;
-  badge.style.display = 'flex';
-
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.connect(g);
-    g.connect(ctx.destination);
-    o.frequency.setValueAtTime(520, ctx.currentTime);
-    o.frequency.setValueAtTime(660, ctx.currentTime + 0.1);
-    g.gain.setValueAtTime(0.1, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-    o.start(ctx.currentTime);
-    o.stop(ctx.currentTime + 0.4);
-  } catch(e) {}
-
-  clearTimeout(notifTimeout);
-  notifTimeout = setTimeout(dismissNotif, 5000);
-}
-
-function dismissNotif() {
-  const banner = document.getElementById('notifBanner');
-  const badge = document.getElementById('navBadge');
-  banner.classList.remove('show');
-  badge.style.display = 'none';
-  newPostCount = 0;
-  clearTimeout(notifTimeout);
-}
 
 async function loadFeed() {
   try {
     const res = await fetch(SCRIPT_URL);
     const data = await res.json();
-    allPosts = data.map(p => ({ ...p, likes: p.likes || [], comments: p.comments || [] }));
+    allPosts = data.posts || [];
+    allBios = data.bios || {};
+    allAvatars = data.avatars || {}; // Ensure backend returns this
     localStorage.setItem("gb_cache", JSON.stringify(allPosts));
     lastPostCount = allPosts.length;
-    allPosts.forEach(p => { lastCommentSnapshot[p.rowIndex] = p.comments.length; });
     render();
   } catch(e) { console.error("Load failed", e); }
 }
 
+async function pollForUpdates() {
+  try {
+    const res = await fetch(SCRIPT_URL);
+    const data = await res.json();
+    const newPosts = data.posts || [];
+    if (newPosts.length > lastPostCount && newPosts[0].user !== document.getElementById('user').value.trim()) {
+      newPostCount += (newPosts.length - lastPostCount);
+      showNotif(`${newPosts[0].user} posted something new!`);
+    }
+    allPosts = newPosts;
+    allBios = data.bios;
+    allAvatars = data.avatars || {};
+    lastPostCount = newPosts.length;
+    render();
+  } catch(e) {}
+}
+
+function showNotif(msg) {
+  const b = document.getElementById('notifBanner');
+  document.getElementById('notifText').textContent = "🦄 " + msg;
+  b.classList.add('show');
+  document.getElementById('navBadge').textContent = newPostCount;
+  document.getElementById('navBadge').style.display = 'flex';
+  setTimeout(dismissNotif, 5000);
+}
+
+function dismissNotif() {
+  document.getElementById('notifBanner').classList.remove('show');
+  document.getElementById('navBadge').style.display = 'none';
+  newPostCount = 0;
+}
+
 function setFilter(type, val) {
-  if (filterVal === val && filterType === type) {
-    filterVal = null; filterType = null;
-  } else {
-    filterVal = val; filterType = type;
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
+  if (filterVal === val && filterType === type) { filterVal = null; filterType = null; } 
+  else { filterVal = val; filterType = type; window.scrollTo({ top: 0, behavior: 'smooth' }); }
   render();
 }
 
-function formatLikes(likes) {
-  if (!likes || likes.length === 0) return "";
-  const count = likes.length;
-  if (count === 1) return `Liked by <b>${likes[0]}</b>`;
-  if (count === 2) return `Liked by <b>${likes[0]}</b> and <b>${likes[1]}</b>`;
-  return `Liked by <b>${likes[0]}</b>, <b>${likes[1]}</b> and ${count - 2} others`;
-}
-
-function highlightHashtags(text) {
-  if (!text) return "";
-  let formatted = text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:var(--gb-hover); text-decoration:none;">$1</a>');
-  formatted = formatted.replace(/#(\w+)/g, '<span style="color:var(--gb-hover); font-weight:bold; cursor:pointer;" onclick="setFilter(\'hashtag\', \'#$1\'); event.stopPropagation();">#$1</span>');
-  return formatted;
-}
-
-function renderLinkPreview(text) {
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  const match = text.match(urlRegex);
-  if (!match) return "";
-  const url = match[0];
-  try {
-    const domain = new URL(url).hostname;
-    return `
-      <a href="${url}" target="_blank" class="link-preview">
-        <div class="link-details">
-          <img class="link-icon" src="https://www.google.com/s2/favicons?sz=64&domain=${domain}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'%3E%3Cpath fill=\'%23888\' d=\'M3.9,12c0-1.7,1.4-3.1,3.1-3.1h4V7H7c-2.8,0-5,2.2-5,5s2.2,5,5,5h4v-1.9H7C5.3,15.1,3.9,13.7,3.9,12z M8,13h8v-2H8V13z M17,7h-4v1.9h4c1.7,0,3.1,1.4,3.1,3.1s-1.4,3.1-3.1,3.1h-4V17h4c2.8,0,5-2.2,5-5S19.8,7,17,7z\'/%3E%3C/svg%3E'">
-          <div class="link-url">${domain}</div>
-        </div>
-      </a>
-    `;
-  } catch(e) { return ""; }
+function getAvatarMarkup(user, sizeClass) {
+  const ava = allAvatars[user];
+  if (ava && ava.startsWith('data:image')) {
+    return `<img src="${ava}" class="${sizeClass}">`;
+  }
+  return `<div class="${sizeClass}">🦄</div>`;
 }
 
 function render() {
@@ -304,196 +180,137 @@ function render() {
   
   if (filterVal) {
     composer.style.display = "none";
-    let label = "";
-    if (filterType === 'likes') {
-        filtered = filtered.filter(p => p.likes.includes(filterVal));
-        label = `✨ Everything <b>${filterVal}</b> liked`;
-    } else if (filterType === 'author') {
+    if (filterType === 'author') {
+        const bio = allBios[filterVal] || "A mysterious Gooldbooker.";
+        const isMe = filterVal === u;
+        statusEl.innerHTML = `
+          <div class="card" style="text-align:center;">
+            ${getAvatarMarkup(filterVal, 'avatar-large')}
+            ${isMe ? `<input type="file" id="avaPick" style="display:none" onchange="uploadAvatar('${u}')"><button class="btn-alt" style="margin-bottom:10px" onclick="document.getElementById('avaPick').click()">Change Photo</button>` : ''}
+            <h2 style="margin:0">${filterVal}</h2>
+            <p id="pBio" style="font-style:italic; color:#555">"${bio}"</p>
+            ${isMe ? `<div id="bioEdit" style="display:none"><textarea id="newBio">${bio}</textarea><button class="btn" onclick="saveBio('${u}')">Save</button></div><button class="btn-alt" id="editBioBtn" onclick="document.getElementById('bioEdit').style.display='block'; this.style.display='none'">Edit Bio</button>` : ''}
+            <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
+            <button class="btn-alt" onclick="setFilter(null,null)">← Back to Feed</button>
+          </div>`;
         filtered = filtered.filter(p => p.user === filterVal);
-        label = `📝 Posts by <b>${filterVal}</b>`;
-    } else if (filterType === 'hashtag') {
-        const tag = filterVal.toLowerCase();
-        filtered = filtered.filter(p => p.message.toLowerCase().includes(tag) || p.comments.some(c => c.text.toLowerCase().includes(tag)));
-        label = `#️⃣ Posts tagged with <b>${filterVal}</b>`;
+    } else {
+        statusEl.innerHTML = `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>Showing: <b>${filterVal}</b></span><button class="btn-alt" onclick="setFilter(null,null)">Clear</button></div>`;
+        if(filterType === 'likes') filtered = filtered.filter(p => p.likes.includes(filterVal));
+        if(filterType === 'hashtag') filtered = filtered.filter(p => p.message.toLowerCase().includes(filterVal.toLowerCase()));
     }
-    statusEl.innerHTML = `<div class="filter-badge"><span>${label}</span><button class="btn" style="padding:4px 8px; font-size:12px;" onclick="setFilter(null, null)">Clear</button></div>`;
-  } else {
-    composer.style.display = "block";
-    statusEl.innerHTML = "";
-  }
+  } else { composer.style.display = "block"; statusEl.innerHTML = ""; }
   
-  const feedEl = document.getElementById('feed');
-  feedEl.innerHTML = filtered.slice(0, postsToShow).map(p => `
-    <div class="card" id="post-${p.rowIndex}">
+  document.getElementById('feed').innerHTML = filtered.slice(0, postsToShow).map(p => `
+    <div class="card">
       <div class="user-header">
-        <span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span>
-        <span class="time-stamp">${timeAgo(p.timestamp)}</span>
+        ${getAvatarMarkup(p.user, 'avatar-small')}
+        <div class="user-info">
+          <span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span>
+          <span class="time-stamp">${timeAgo(p.timestamp)}</span>
+        </div>
       </div>
-      <p>${highlightHashtags(p.message)}</p>
-      ${renderLinkPreview(p.message)}
+      <p style="margin:10px 0;">${highlightHashtags(p.message)}</p>
       ${p.image ? `<img src="${p.image}" class="post-img" crossorigin="anonymous">` : ''}
-      <div style="margin-top:12px; display:flex; gap:8px;">
-        <button class="btn" onclick="apiCall('like', ${p.rowIndex}, event)">
-          ${p.likes.includes(u)?'❤️':'👍'} (${p.likes.length})
-        </button>
-        <button class="btn" style="background:#27ae60;" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
+      <div style="margin-top:12px; display:flex; gap:10px;">
+        <button class="btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} ${p.likes.length}</button>
+        <button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
       </div>
-      ${p.likes.length > 0 ? `<div class="liked-by">❤️ ${formatLikes(p.likes)}</div>` : ''}
-      <div class="comment-section">
-        ${p.comments.map(c => `<div class="comment-box"><b style="cursor:pointer" onclick="setFilter('author', '${c.user}')">${c.user}</b>: ${highlightHashtags(c.text)} ${renderLinkPreview(c.text)}<span class="comment-time">${timeAgo(c.time || p.timestamp)}</span></div>`).join('')}
-      </div>
-      <div style="display:flex; gap:5px; margin-top:10px">
-        <input id="c-${p.rowIndex}" placeholder="Write a comment..." style="margin:0; font-size:13px">
-        <button class="btn" onclick="apiCall('comment', ${p.rowIndex})">Reply</button>
+      <div class="comment-section" style="margin-top:10px;">
+        ${p.comments.map(c => `<div class="comment-box"><b>${c.user}</b>: ${c.text}</div>`).join('')}
+        <input id="c-${p.rowIndex}" placeholder="Write a comment..." style="margin-top:8px; font-size:13px !important;">
       </div>
     </div>`).join('');
-  document.getElementById('loadMore').style.display = (filtered.length > postsToShow) ? 'block' : 'none';
+  
+  document.getElementById('loadMore').style.display = filtered.length > postsToShow ? 'block' : 'none';
   updateSidebar();
 }
 
-function updateSidebar() {
-  const topPosts = [...allPosts].sort((a,b) => ((b.likes?.length||0)+(b.comments?.length||0)) - ((a.likes?.length||0)+(a.comments?.length||0))).slice(0,3);
-  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b><br>${topPosts.map(p => `<div class="sidebar-item" onclick="scrollToPost(${p.rowIndex})"><div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div><div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div><div style="font-size:11px; color:#999;">❤️ ${p.likes.length}  💬 ${p.comments.length}</div></div>`).join('')}</div>`;
-
-  const lCounts = {};
-  allPosts.forEach(p => p.likes.forEach(name => lCounts[name] = (lCounts[name] || 0) + 1));
-  const topLikers = Object.entries(lCounts).sort((a,b) => b[1] - a[1]).slice(0,3);
-  document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b style="color: #9b59b6;">🏆 Top Likers</b><br>${topLikers.map(([name, count], i) => `<div class="sidebar-item ${ (filterVal === name && filterType === 'likes') ? 'active' : ''}" onclick="setFilter('likes', '${name}')"><span>${i===0?'🥇':i===1?'🥈':'🥉'} ${name}</span><b>${count} ❤️</b></div>`).join('')}</div>`;
-
-  const hCounts = {};
-  allPosts.forEach(p => {
-    const fromPost = p.message.match(/#(\w+)/g) || [];
-    const fromComments = p.comments.flatMap(c => c.text.match(/#(\w+)/g) || []);
-    [...fromPost, ...fromComments].forEach(t => {
-        const tag = t.toLowerCase();
-        hCounts[tag] = (hCounts[tag] || 0) + 1;
-    });
-  });
-  const topTags = Object.entries(hCounts).sort((a,b) => b[1] - a[1]).slice(0,5);
-  document.getElementById('hashtags').innerHTML = `<div class="sidebar-card"><b style="color: #27ae60;">#️⃣ Trending Tags</b><br>${topTags.map(([tag, count]) => `<div class="sidebar-item ${ (filterVal === tag && filterType === 'hashtag') ? 'active' : ''}" onclick="setFilter('hashtag', '${tag}')"><span>${tag}</span><b style="color:#999; float:right;">${count}</b></div>`).join('') || '<div style="color:#999; margin-top:5px;">No tags yet</div>'}</div>`;
-}
-
-async function apiCall(action, rowIndex, event) {
-  const user = document.getElementById('user').value.trim();
-  if (!user) return alert("Enter your name first!");
-  const p = allPosts.find(x => x.rowIndex === rowIndex);
-  if (action === 'like') {
-    const i = p.likes.indexOf(user);
-    if (i === -1) { 
-      p.likes.push(user); 
-      if(event) triggerMagic(event); 
-      if (p.likes.length === 3) triggerGlobalCelebration();
-    } else { p.likes.splice(i, 1); }
-  } else if (action === 'comment') {
-    const input = document.getElementById(`c-${rowIndex}`);
-    if(!input.value) return;
-    p.comments.push({ user, text: input.value, time: new Date().toISOString() });
-    input.value = "";
-  }
+async function uploadAvatar(user) {
+  const file = document.getElementById('avaPick').files[0];
+  if(!file) return;
+  const base64 = await compressImage(file);
+  allAvatars[user] = base64;
   render();
-  fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, rowIndex, username: user, text: action==='comment'?p.comments[p.comments.length-1].text:"" }) });
+  fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action:'updateBio', username:user, bio:allBios[user]||"", avatar:base64 }) });
 }
 
-function triggerMagic(event) {
-  const x = event.clientX, y = event.clientY;
-  const u = document.createElement('div'); u.className = 'unicorn-pop'; u.textContent = '🦄';
-  u.style.left = (x - 20) + 'px'; u.style.top = (y - 20) + 'px';
-  document.body.appendChild(u); setTimeout(() => u.remove(), 1500);
-  const particles = ['✨', '⭐', '💫', '🌟'];
-  for (let i = 0; i < 8; i++) {
-    const s = document.createElement('div'); s.className = 'sparkle'; s.textContent = particles[Math.floor(Math.random()*4)];
-    s.style.left = x + 'px'; s.style.top = y + 'px';
-    const tx = (Math.random()-0.5)*200, ty = (Math.random()-0.5)*200;
-    s.style.setProperty('--tx', `${tx}px`); s.style.setProperty('--ty', `${ty}px`);
-    document.body.appendChild(s); setTimeout(() => s.remove(), 1000);
-  }
+async function saveBio(user) {
+  const bio = document.getElementById('newBio').value;
+  allBios[user] = bio;
+  render();
+  fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action:'updateBio', username:user, bio:bio, avatar:allAvatars[user]||"" }) });
 }
 
-function triggerGlobalCelebration() {
-  const items = ['✨', '⭐', '🦄', '🌈', '💫', '🌟'];
-  for (let i = 0; i < 40; i++) {
-    setTimeout(() => {
-      const s = document.createElement('div'); s.className = 'global-sparkle';
-      s.textContent = items[Math.floor(Math.random()*6)];
-      s.style.left = Math.random()*100+'vw'; s.style.fontSize = (Math.random()*20+20)+'px';
-      document.body.appendChild(s); setTimeout(() => s.remove(), 3000);
-    }, i * 80);
-  }
+function updateSidebar() {
+  const myName = document.getElementById('user').value.trim();
+  document.getElementById('myProfileLink').innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', '${myName}')">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
+  
+  const lCounts = {};
+  allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
+  const top = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${top.map(([n,c]) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
 }
 
 async function upload() {
-  const user = document.getElementById('user').value.trim();
-  const msg = document.getElementById('msg').value.trim();
-  const file = document.getElementById('file').files[0];
-  if (!user || !msg) return alert("Fill in name and message!");
-  document.getElementById('postBtn').innerText = "Processing...";
-  let imgBase64 = file ? await compressImage(file) : "";
-  const tempPost = { user, message: msg, image: imgBase64, timestamp: new Date().toISOString(), likes: [], comments: [], rowIndex: -1 };
-  allPosts.unshift(tempPost);
-  render();
-  try {
-    await fetch(SCRIPT_URL, { 
-      method: 'POST', 
-      mode: 'no-cors',
-      body: JSON.stringify({ action:'post', username:user, message:msg, image:imgBase64 })
-    });
-    document.getElementById('msg').value = ""; 
-    document.getElementById('file').value = "";
-    loadFeed();
-  } catch(e) { alert("Upload failed."); } 
-  finally { document.getElementById('postBtn').innerText = "Post Update"; }
+  const user = document.getElementById('user').value.trim(), msg = document.getElementById('msg').value.trim(), file = document.getElementById('file').files[0];
+  if(!user || !msg) return alert("Fill in name and message!");
+  document.getElementById('postBtn').innerText = "Posting...";
+  const img = file ? await compressImage(file) : "";
+  await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action:'post', username:user, message:msg, image:img }) });
+  document.getElementById('msg').value = ""; document.getElementById('file').value = "";
+  loadFeed();
+  document.getElementById('postBtn').innerText = "Post Update";
 }
 
 async function compressImage(file) {
-  return new Promise((resolve) => {
-    const reader = new FileReader(); reader.readAsDataURL(file);
-    reader.onload = (e) => {
-      const img = new Image(); img.src = e.target.result;
-      img.onload = () => {
-        const canvas = document.createElement('canvas'); const MAX = 800;
-        let w = img.width, h = img.height;
-        if (w > MAX) { h *= MAX/w; w = MAX; }
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', 0.7));
+  return new Promise(res => {
+    const r = new FileReader(); r.readAsDataURL(file);
+    r.onload = (e) => {
+      const i = new Image(); i.src = e.target.result;
+      i.onload = () => {
+        const c = document.createElement('canvas'); const m = 800;
+        let w = i.width, h = i.height;
+        if(w > m){ h *= m/w; w = m; }
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(i,0,0,w,h);
+        res(c.toDataURL('image/jpeg', 0.7));
       };
     };
   });
 }
 
-async function sharePost(rowIndex, event) {
-  const post = allPosts.find(p => p.rowIndex === rowIndex); if (!post) return;
-  const btn = event.target; const old = btn.innerText; btn.innerText = "⏳ Wait...";
-  const card = document.createElement('div'); card.style.cssText = `position: fixed; left: -9999px; width: 400px; background: white; padding: 25px; border-radius: 12px; border: 1px solid #ddd; font-family: system-ui, sans-serif;`;
-  card.innerHTML = `<div style="display:flex; align-items:center; gap:8px; color:#3b5998; font-weight:bold; margin-bottom:12px;"><div style="background:#3b5998; color:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-size:16px;">🦄</div>theGooldbook</div><div style="font-size:16px; margin-bottom:10px; color:#1c1e21; line-height:1.4;">${post.message}</div>${post.image ? `<img src="${post.image}" style="width:100%; border-radius:8px; margin-bottom:10px;">` : ''}<div style="display:flex; justify-content:space-between; align-items:center; padding-top:10px; border-top:1px solid #eee;"><div style="font-size:13px; color:#65676b;">❤️ ${post.likes.length} &nbsp; 💬 ${post.comments.length}</div><div style="font-size:11px; color:#888;">Post by ${post.user}</div></div>`;
-  document.body.appendChild(card);
-  try {
-    const canvas = await html2canvas(card, { useCORS: true, allowTaint: true });
-    document.body.removeChild(card);
-    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-    const file = new File([blob], 'gooldbook-post.png', { type: 'image/png' });
-    const postUrl = `${window.location.origin}${window.location.pathname}?post=${rowIndex}`;
-    if (navigator.share) await navigator.share({ files: [file], title: 'theGooldbook', text: `View post: ${postUrl}` });
-    else window.open(canvas.toDataURL());
-  } catch(e) { alert("Share failed."); } finally { btn.innerText = old; }
+async function apiCall(action, rowIndex, event) {
+  const user = document.getElementById('user').value.trim();
+  if(!user) return alert("Name required!");
+  const p = allPosts.find(x => x.rowIndex === rowIndex);
+  if(action==='like') {
+    const i = p.likes.indexOf(user);
+    i === -1 ? p.likes.push(user) : p.likes.splice(i,1);
+    if(i === -1 && event) {
+       const u = document.createElement('div'); u.className='unicorn-pop'; u.textContent='🦄';
+       u.style.left=event.clientX+'px'; u.style.top=event.clientY+'px';
+       document.body.appendChild(u); setTimeout(()=>u.remove(), 1500);
+    }
+  }
+  render();
+  fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, rowIndex, username:user }) });
 }
 
-function timeAgo(date) {
-  if (!date) return "Just now";
-  const s = Math.floor((Date.now() - new Date(date)) / 1000);
-  if (s < 60) return "just now";
-  if (s < 3600) return Math.floor(s/60) + "m ago";
-  if (s < 86400) return Math.floor(s/3600) + "h ago";
-  return Math.floor(s/86400) + "d ago";
+function highlightHashtags(t) {
+  return t.replace(/#(\w+)/g, '<span style="color:var(--gb-hover);font-weight:bold;cursor:pointer" onclick="setFilter(\'hashtag\',\'#$1\')">#$1</span>');
 }
 
-function scrollToPost(id) {
-  let el = document.getElementById(`post-${id}`);
-  if (!el) { postsToShow = allPosts.length; render(); el = document.getElementById(`post-${id}`); }
-  if (el) { window.scrollTo({ top: el.offsetTop - 80, behavior: 'smooth' }); el.classList.add('highlight-post'); setTimeout(() => el.classList.remove('highlight-post'), 2000); }
+function timeAgo(d) {
+  if(!d) return "just now";
+  const s = Math.floor((Date.now() - new Date(d)) / 1000);
+  if(s < 60) return "just now";
+  if(s < 3600) return Math.floor(s/60) + "m";
+  if(s < 86400) return Math.floor(s/3600) + "h";
+  return Math.floor(s/86400) + "d";
 }
 
-function saveUser() { localStorage.setItem("gb_user", document.getElementById('user').value); }
+function saveUser() { localStorage.setItem("gb_user", document.getElementById('user').value); render(); }
 </script>
 </body>
 </html>
