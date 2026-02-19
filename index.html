@@ -101,7 +101,7 @@
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxl2c6GnEsbXzlZbxPkgdJzzE_mHth-MX2-AYCaau9tuHbrsXzOVXbk1RnlaHY58ljn/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby84oCnQV-uzSHF2LraOUqIUUy7RgEX6ik9B4zrrhd3d-UwXr7epVVgygyLEtKRl1lC/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let allBios = {}, allAvatars = {};
 let postsToShow = 5;
@@ -169,10 +169,37 @@ function setFilter(type, val) {
 
 function getAvatarMarkup(user, sizeClass) {
   const ava = allAvatars[user];
-  if (ava && ava.startsWith('data:image')) {
-    return `<img src="${ava}" class="${sizeClass}">`;
+  // Check if it's a URL (http) or an old Base64 string
+  if (ava && (ava.startsWith('http') || ava.startsWith('data:image'))) {
+    return `<img src="${ava}" class="${sizeClass}" onerror="this.parentElement.innerHTML='<div class=${sizeClass}>🦄</div>'">`;
   }
   return `<div class="${sizeClass}">🦄</div>`;
+}
+
+async function uploadAvatar(user) {
+  const file = document.getElementById('avaPick').files[0];
+  if(!file) return;
+  
+  // Show temporary UI feedback
+  const preview = document.querySelector('.avatar-large');
+  if(preview) preview.style.opacity = "0.5";
+
+  const base64 = await compressImage(file);
+  
+  // Send to backend
+  await fetch(SCRIPT_URL, { 
+    method: 'POST', 
+    mode: 'no-cors', 
+    body: JSON.stringify({ 
+      action: 'updateBio', 
+      username: user, 
+      bio: allBios[user] || "", 
+      avatar: base64 
+    }) 
+  });
+  
+  // Refresh feed to get the new Drive URL
+  setTimeout(loadFeed, 1500); 
 }
 
 function render() {
