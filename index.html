@@ -32,8 +32,7 @@
     .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:12px; margin-bottom:10px; border-radius:8px; font-size:13px; }
     
-    /* Avatar Styles */
-    .avatar-small { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #eee; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .avatar-small { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #eee; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
     .avatar-large { width: 90px; height: 90px; border-radius: 50%; object-fit: cover; background: #eee; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.15); margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 45px; }
 
     .user-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
@@ -49,8 +48,11 @@
 
     .btn { background: var(--gb-hover); color:#fff; border:none; padding:8px 14px; cursor:pointer; font-weight:bold; border-radius:4px; }
     .btn-alt { background:#f5f6f7; color:#4b4f56; border:1px solid #ddd; padding: 6px 12px; font-size: 13px; font-weight: bold; border-radius: 4px; }
+    .btn-comment { background: var(--gb-blue); color: white; border: none; padding: 8px; border-radius: 4px; width: 100%; font-weight: bold; margin-top: 5px; font-size: 12px; }
 
-    .sidebar-item { cursor:pointer; padding:8px 0; border-bottom:1px solid #eee; }
+    .comment-box { background: #f0f2f5; padding: 8px; border-radius: 8px; margin-top: 5px; font-size: 13px; }
+
+    .sidebar-item { cursor:pointer; padding:8px 0; border-bottom:1px solid #eee; transition: background 0.2s; }
     .sidebar-item:hover { background: #f0f2f5; }
 
     .unicorn-pop { position: fixed; font-size: 40px; pointer-events: none; z-index: 9999; animation: unicornFloat 1.5s ease-out forwards; }
@@ -74,9 +76,10 @@
 <div class="container">
   <div class="sidebar">
     <div id="myProfileLink"></div>
-    <div class="sidebar-card"><b>🔍 Search</b><input id="searchBar" placeholder="Search Gooldbook..." oninput="render()"></div>
+    <div class="sidebar-card"><b>🔍 Search Feed</b><input id="searchBar" placeholder="Filter posts..." oninput="render()"></div>
     <div id="leaderboard"></div>
     <div id="hashtags"></div>
+    <div id="trending"></div>
   </div>
 
   <div class="main-feed">
@@ -96,7 +99,7 @@
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzTHdTO0VwW1FRZITxCXCN4dXBarW4jRrYafvni_Qf16Gi_V4HLpzBZBtrebvQlSP7q/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxl2c6GnEsbXzlZbxPkgdJzzE_mHth-MX2-AYCaau9tuHbrsXzOVXbk1RnlaHY58ljn/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let allBios = {}, allAvatars = {};
 let postsToShow = 5;
@@ -117,7 +120,7 @@ async function loadFeed() {
     const data = await res.json();
     allPosts = data.posts || [];
     allBios = data.bios || {};
-    allAvatars = data.avatars || {}; // Ensure backend returns this
+    allAvatars = data.avatars || {};
     localStorage.setItem("gb_cache", JSON.stringify(allPosts));
     lastPostCount = allPosts.length;
     render();
@@ -202,7 +205,7 @@ function render() {
   } else { composer.style.display = "block"; statusEl.innerHTML = ""; }
   
   document.getElementById('feed').innerHTML = filtered.slice(0, postsToShow).map(p => `
-    <div class="card">
+    <div class="card" id="post-${p.rowIndex}">
       <div class="user-header">
         ${getAvatarMarkup(p.user, 'avatar-small')}
         <div class="user-info">
@@ -217,13 +220,34 @@ function render() {
         <button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
       </div>
       <div class="comment-section" style="margin-top:10px;">
-        ${p.comments.map(c => `<div class="comment-box"><b>${c.user}</b>: ${c.text}</div>`).join('')}
-        <input id="c-${p.rowIndex}" placeholder="Write a comment..." style="margin-top:8px; font-size:13px !important;">
+        ${p.comments.map(c => `<div class="comment-box"><b onclick="setFilter('author', '${c.user}')" style="cursor:pointer">${c.user}</b>: ${highlightHashtags(c.text)}</div>`).join('')}
+        <div style="margin-top:10px">
+          <input id="c-${p.rowIndex}" placeholder="Write a comment..." style="margin-bottom:0; font-size:13px !important;">
+          <button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button>
+        </div>
       </div>
     </div>`).join('');
   
   document.getElementById('loadMore').style.display = filtered.length > postsToShow ? 'block' : 'none';
   updateSidebar();
+}
+
+function updateSidebar() {
+  const myName = document.getElementById('user').value.trim();
+  document.getElementById('myProfileLink').innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', '${myName}')">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
+  
+  const topPosts = [...allPosts].sort((a,b) => ((b.likes?.length||0)+(b.comments?.length||0)) - ((a.likes?.length||0)+(a.comments?.length||0))).slice(0,3);
+  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b><br>${topPosts.map(p => `<div class="sidebar-item" onclick="scrollToPost(${p.rowIndex})"><div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div><div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div></div>`).join('')}</div>`;
+
+  const lCounts = {};
+  allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
+  const top = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${top.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
+
+  const hCounts = {};
+  allPosts.forEach(p => { (p.message.match(/#(\w+)/g) || []).forEach(t => hCounts[t.toLowerCase()] = (hCounts[t.toLowerCase()]||0)+1); });
+  const topTags = Object.entries(hCounts).sort((a,b) => b[1] - a[1]).slice(0,5);
+  document.getElementById('hashtags').innerHTML = `<div class="sidebar-card"><b>#️⃣ Trending Tags</b><br>${topTags.map(([tag, count]) => `<div class="sidebar-item" onclick="setFilter('hashtag','${tag}')">${tag} <small>(${count})</small></div>`).join('') || 'No tags yet'}</div>`;
 }
 
 async function uploadAvatar(user) {
@@ -240,16 +264,6 @@ async function saveBio(user) {
   allBios[user] = bio;
   render();
   fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action:'updateBio', username:user, bio:bio, avatar:allAvatars[user]||"" }) });
-}
-
-function updateSidebar() {
-  const myName = document.getElementById('user').value.trim();
-  document.getElementById('myProfileLink').innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', '${myName}')">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
-  
-  const lCounts = {};
-  allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
-  const top = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
-  document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${top.map(([n,c]) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
 }
 
 async function upload() {
@@ -292,9 +306,39 @@ async function apiCall(action, rowIndex, event) {
        u.style.left=event.clientX+'px'; u.style.top=event.clientY+'px';
        document.body.appendChild(u); setTimeout(()=>u.remove(), 1500);
     }
+  } else if (action === 'comment') {
+    const input = document.getElementById(`c-${rowIndex}`);
+    if(!input.value) return;
+    const txt = input.value;
+    p.comments.push({ user, text: txt, time: new Date().toISOString() });
+    input.value = "";
+    render();
+    fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, rowIndex, username:user, text: txt }) });
+    return;
   }
   render();
   fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, rowIndex, username:user }) });
+}
+
+async function sharePost(rowIndex, event) {
+  const post = allPosts.find(p => p.rowIndex === rowIndex); if (!post) return;
+  const btn = event.target; btn.innerText = "⏳ Wait...";
+  const card = document.createElement('div'); card.style.cssText = `position: fixed; left: -9999px; width: 400px; background: white; padding: 25px; border-radius: 12px; font-family: sans-serif;`;
+  card.innerHTML = `<h3>🦄 theGooldbook</h3><p>${post.message}</p>${post.image ? `<img src="${post.image}" style="width:100%;">` : ''}<p><small>Post by ${post.user}</small></p>`;
+  document.body.appendChild(card);
+  try {
+    const canvas = await html2canvas(card, { useCORS: true });
+    document.body.removeChild(card);
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    const file = new File([blob], 'post.png', { type: 'image/png' });
+    if (navigator.share) await navigator.share({ files: [file], title: 'theGooldbook' });
+    else window.open(canvas.toDataURL());
+  } catch(e) { alert("Share failed."); } finally { btn.innerText = "🔗 Share"; }
+}
+
+function scrollToPost(id) {
+  const el = document.getElementById(`post-${id}`);
+  if (el) window.scrollTo({ top: el.offsetTop - 80, behavior: 'smooth' });
 }
 
 function highlightHashtags(t) {
