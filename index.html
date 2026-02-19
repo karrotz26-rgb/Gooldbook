@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
   <title>The Gooldbook🦄</title>
 
   <!-- PWA tags -->
@@ -73,6 +74,16 @@
     @keyframes globalFall { 0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(360deg); opacity: 0; } }
 
     @media(max-width:700px){ .container { flex-direction:column; } .sidebar { width:100%; position:static; } }
+  /* Prevents iOS from zooming in on focus */
+input, textarea {
+  font-size: 16px !important;
+}
+
+/* Optional: Prevent double-tap zoom on buttons */
+button {
+  touch-action: manipulation;
+}
+
   </style>
 </head>
 <body>
@@ -115,7 +126,7 @@
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyYDtSwtRBNfIE_KvBj2CqTsrRluOBhH6_AnT-emvjNTepQjZjfl8K7V5Dl4xE0r_qB/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwwdb3tSlUV2aZBb9f9NqbznLoccCGQVPCMa4_8lMwxgImx0hSW8xkdS_x_X31psva/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let postsToShow = 5;
 let filterType = null; 
