@@ -29,7 +29,8 @@
     .sidebar { width:280px; position:sticky; top:70px; height: fit-content; }
     .main-feed { flex-grow:1; max-width:550px; width:100%; }
     
-    .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+    .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: background 0.5s; }
+    .highlight-card { background: #fffbe6 !important; border-color: #ffe58f !important; }
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:12px; margin-bottom:10px; border-radius:8px; font-size:13px; }
     
     .avatar-small { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #eee; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
@@ -52,8 +53,9 @@
 
     .comment-box { background: #f0f2f5; padding: 8px; border-radius: 8px; margin-top: 5px; font-size: 13px; }
 
-    .sidebar-item { cursor:pointer; padding:8px 0; border-bottom:1px solid #eee; transition: background 0.2s; }
+    .sidebar-item { cursor:pointer; padding:8px 6px; border-bottom:1px solid #eee; transition: background 0.2s; border-radius: 4px; }
     .sidebar-item:hover { background: #f0f2f5; }
+    .trend-stats { font-size: 10px; color: #888; display: block; margin-top: 2px; }
 
     .unicorn-pop { position: fixed; font-size: 40px; pointer-events: none; z-index: 9999; animation: unicornFloat 1.5s ease-out forwards; }
     @keyframes unicornFloat { 0% { transform: translateY(0) scale(0); opacity: 0; } 30% { opacity: 1; transform: translateY(-40px) scale(1.2); } 100% { transform: translateY(-120px) scale(0); opacity: 0; } }
@@ -198,7 +200,8 @@ function render() {
           </div>`;
         filtered = filtered.filter(p => p.user === filterVal);
     } else {
-        statusEl.innerHTML = `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>Showing: <b>${filterVal}</b></span><button class="btn-alt" onclick="setFilter(null,null)">Clear</button></div>`;
+        let label = filterType === 'likes' ? `Liked by ${filterVal}` : `Tagged ${filterVal}`;
+        statusEl.innerHTML = `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>Showing: <b>${label}</b></span><button class="btn-alt" onclick="setFilter(null,null)">Clear</button></div>`;
         if(filterType === 'likes') filtered = filtered.filter(p => p.likes.includes(filterVal));
         if(filterType === 'hashtag') filtered = filtered.filter(p => p.message.toLowerCase().includes(filterVal.toLowerCase()));
     }
@@ -236,18 +239,63 @@ function updateSidebar() {
   const myName = document.getElementById('user').value.trim();
   document.getElementById('myProfileLink').innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', '${myName}')">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
   
-  const topPosts = [...allPosts].sort((a,b) => ((b.likes?.length||0)+(b.comments?.length||0)) - ((a.likes?.length||0)+(a.comments?.length||0))).slice(0,3);
-  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b><br>${topPosts.map(p => `<div class="sidebar-item" onclick="scrollToPost(${p.rowIndex})"><div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div><div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div></div>`).join('')}</div>`;
+  // 🔥 Improved Trending Activity Logic
+  const topPosts = [...allPosts].sort((a,b) => {
+    const scoreA = (a.likes?.length || 0) + (a.comments?.length || 0);
+    const scoreB = (b.likes?.length || 0) + (b.comments?.length || 0);
+    return scoreB - scoreA;
+  }).slice(0,3);
 
+  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b><br>${topPosts.map(p => `
+    <div class="sidebar-item" onclick="scrollToPost(${p.rowIndex})">
+      <div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div>
+      <div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div>
+      <span class="trend-stats">❤️ ${p.likes.length} • 💬 ${p.comments.length}</span>
+    </div>`).join('')}</div>`;
+
+  // 🏆 Leaderboard
   const lCounts = {};
   allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
   const top = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
   document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${top.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
 
+  // #️⃣ Improved Case-Insensitive Hashtag Logic
   const hCounts = {};
-  allPosts.forEach(p => { (p.message.match(/#(\w+)/g) || []).forEach(t => hCounts[t.toLowerCase()] = (hCounts[t.toLowerCase()]||0)+1); });
+  allPosts.forEach(p => { 
+    const tags = p.message.match(/#(\w+)/g) || [];
+    tags.forEach(t => {
+      const lower = t.toLowerCase();
+      hCounts[lower] = (hCounts[lower] || 0) + 1;
+    });
+  });
   const topTags = Object.entries(hCounts).sort((a,b) => b[1] - a[1]).slice(0,5);
   document.getElementById('hashtags').innerHTML = `<div class="sidebar-card"><b>#️⃣ Trending Tags</b><br>${topTags.map(([tag, count]) => `<div class="sidebar-item" onclick="setFilter('hashtag','${tag}')">${tag} <small>(${count})</small></div>`).join('') || 'No tags yet'}</div>`;
+}
+
+// Fixed Scroll Function
+function scrollToPost(id) {
+  // If we are in a filtered view, clear it first so the post exists on screen
+  if (filterVal) {
+    setFilter(null, null);
+    setTimeout(() => performScroll(id), 300);
+  } else {
+    performScroll(id);
+  }
+}
+
+function performScroll(id) {
+  const el = document.getElementById(`post-${id}`);
+  if (el) {
+    const navHeight = 60;
+    window.scrollTo({ top: el.offsetTop - navHeight - 10, behavior: 'smooth' });
+    el.classList.add('highlight-card');
+    setTimeout(() => el.classList.remove('highlight-card'), 2000);
+  } else {
+    // If not found, it might be further down the list
+    postsToShow += 5;
+    render();
+    setTimeout(() => performScroll(id), 100);
+  }
 }
 
 async function uploadAvatar(user) {
@@ -334,11 +382,6 @@ async function sharePost(rowIndex, event) {
     if (navigator.share) await navigator.share({ files: [file], title: 'theGooldbook' });
     else window.open(canvas.toDataURL());
   } catch(e) { alert("Share failed."); } finally { btn.innerText = "🔗 Share"; }
-}
-
-function scrollToPost(id) {
-  const el = document.getElementById(`post-${id}`);
-  if (el) window.scrollTo({ top: el.offsetTop - 80, behavior: 'smooth' });
 }
 
 function highlightHashtags(t) {
