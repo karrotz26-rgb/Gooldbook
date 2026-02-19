@@ -101,7 +101,7 @@
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby84oCnQV-uzSHF2LraOUqIUUy7RgEX6ik9B4zrrhd3d-UwXr7epVVgygyLEtKRl1lC/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw0PTyme5bPK6OcVjArlREYHIPeOiwyqxOwKShC5CXW094PjGWAVf998bdZZMoPJF_7/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let allBios = {}, allAvatars = {};
 let postsToShow = 5;
@@ -169,10 +169,50 @@ function setFilter(type, val) {
 
 function getAvatarMarkup(user, sizeClass) {
   const ava = allAvatars[user];
-  if (ava && (ava.startsWith('http') || ava.startsWith('data:image'))) {
-    return `<img src="${ava}" class="${sizeClass}" onerror="this.src='https://via.placeholder.com/150?text=🦄'">`;
+  // If no avatar exists, or it's a known broken/empty string, show unicorn
+  if (!ava || ava === "" || ava === "undefined") {
+    return `<div class="${sizeClass}">🦄</div>`;
   }
-  return `<div class="${sizeClass}">🦄</div>`;
+  
+  // If it's a URL or Base64, try to render it
+  // We add a timestamp to the URL to bypass browser cache: ?t=Date.now()
+  const src = ava.includes('googleusercontent') || ava.includes('google.com') 
+              ? ava + "&t=" + Date.now() 
+              : ava;
+
+  return `<img src="${src}" class="${sizeClass}" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=${sizeClass}>🦄</div>';">`;
+}
+
+async function uploadAvatar(user) {
+  const file = document.getElementById('avaPick').files[0];
+  if(!file) return;
+  
+  // UI Feedback: Show loading state
+  const btn = document.getElementById('editBioBtn');
+  if(btn) btn.innerText = "Uploading...";
+  const preview = document.querySelector('.avatar-large');
+  if(preview) preview.style.opacity = "0.3";
+
+  const base64 = await compressImage(file);
+  
+  await fetch(SCRIPT_URL, { 
+    method: 'POST', 
+    mode: 'no-cors', 
+    body: JSON.stringify({ 
+      action: 'updateBio', 
+      username: user, 
+      bio: allBios[user] || "", 
+      avatar: base64 
+    }) 
+  });
+  
+  // Wait 3 seconds for Google Drive to index the file and permissions
+  setTimeout(async () => {
+    await loadFeed(); // Hard refresh of the data
+    if(btn) btn.innerText = "Edit Bio";
+    render();
+    alert("Profile picture updated! If it still looks like a question mark, please refresh once more.");
+  }, 3000); 
 }
 
 async function uploadAvatar(user) {
