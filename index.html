@@ -168,15 +168,25 @@ function setFilter(type, val) {
 
 function getAvatarMarkup(user, sizeClass) {
   const ava = allAvatars[user];
+  
   if (!ava || ava === "" || ava === "undefined") {
     return `<div class="${sizeClass}">🦄</div>`;
   }
-  // Force browser to ignore cache for profile images to prevent "ghost" disappearing images
-  const src = (ava.includes('googleusercontent') || ava.includes('google.com')) 
-              ? ava + "&t=" + new Date().getTime() 
-              : ava;
 
-  return `<img src="${src}" class="${sizeClass}" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=🦄';">`;
+  // Use the 'lh3' subdomain which is faster and more CORS-friendly for Google Drive
+  let finalSrc = ava;
+  if (ava.includes("googleusercontent.com/profile/picture/0")) {
+     const id = ava.split("picture/0")[1];
+     finalSrc = `https://lh3.googleusercontent.com/d/${id}`;
+  }
+
+  // Add a timestamp to bypass the browser's "Broken Image Memory"
+  const cacheBuster = finalSrc.includes('?') ? `&t=${Date.now()}` : `?t=${Date.now()}`;
+
+  return `<img src="${finalSrc}${cacheBuster}" 
+               class="${sizeClass}" 
+               style="display:block;"
+               onerror="this.onerror=null; this.parentElement.innerHTML='<div class=${sizeClass}>🦄</div>';">`;
 }
 
 async function uploadAvatar(user) {
