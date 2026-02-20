@@ -427,11 +427,93 @@ async function sharePost(rowIndex, event) {
 
 function highlightHashtags(t) { 
   if(!t) return "";
-  let linkedText = t.replace(/(https?:\/\/[^\s]+)/g, (url) => {
-    const shortName = url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
-    return `<a href="${url}" target="_blank" style="color:#3b5998; text-decoration:none; font-weight:600; background:#f0f2f5; padding:2px 6px; border-radius:4px;">${shortName}</a>`;
-  });
-  return linkedText.replace(/#(\w+)/g, '<span style="color:var(--gb-hover);font-weight:bold;cursor:pointer" onclick="setFilter(\'hashtag\',\'#$1\')">#$1</span>'); 
+  try {
+    // Improved link detection that handles special characters better
+    let linkedText = t.replace(/(https?:\/\/[^\s]+)/g, (url) => {
+      try {
+        const urlObj = new URL(url);
+        const shortName = urlObj.hostname.replace('www.', '');
+        return `<a href="${url}" target="_blank" style="color:#3b5998; text-decoration:none; font-weight:600; background:#f0f2f5; padding:2px 6px; border-radius:4px;">🔗 ${shortName}</a>`;
+      } catch(e) {
+        // If the URL is slightly malformed, just return it as a plain link
+        return `<a href="${url}" target="_blank" style="color:#3b5998;">${url}</a>`;
+      }
+    });
+    return linkedText.replace(/#(\w+)/g, '<span style="color:var(--gb-hover);font-weight:bold;cursor:pointer" onclick="setFilter(\'hashtag\',\'#$1\')">#$1</span>'); 
+  } catch(e) {
+    return t; // If all else fails, return plain text so the app doesn't crash
+  }
+}
+
+function render() {
+  const u = document.getElementById('user').value.trim();
+  const s = document.getElementById('searchBar').value.toLowerCase();
+  const statusEl = document.getElementById('filterStatus');
+  const composer = document.getElementById('postComposer');
+  const feedEl = document.getElementById('feed');
+  
+  feedEl.innerHTML = ""; 
+
+  let filtered = allPosts.filter(p => 
+    (p.message || "").toLowerCase().includes(s) || 
+    (p.user || "").toLowerCase().includes(s)
+  );
+  
+  if (filterVal) {
+    composer.style.display = "none";
+    if (filterType === 'author') {
+        const bio = allBios[filterVal] || "A mysterious Gooldbooker.";
+        const isMe = filterVal === u;
+        statusEl.innerHTML = `<div class="card" style="text-align:center;">${getAvatarMarkup(filterVal, 'avatar-large')}${isMe ? `<input type="file" id="avaPick" style="display:none" onchange="uploadAvatar('${u}')"><button class="btn-alt" style="margin-bottom:10px" onclick="document.getElementById('avaPick').click()">Change Photo</button>` : ''}<h2 style="margin:0">${filterVal}</h2><p style="font-style:italic; color:#555">"${bio}"</p>${isMe ? `<div id="bioEdit" style="display:none"><textarea id="newBio">${bio}</textarea><button class="btn" onclick="saveBio('${u}')">Save</button></div><button class="btn-alt" id="editBioBtn" onclick="document.getElementById('bioEdit').style.display='block'; this.style.display='none'">Edit Bio</button>` : ''}<hr style="border:0; border-top:1px solid #eee; margin:15px 0;"><button class="btn-alt" onclick="setFilter(null,null)">← Back to Feed</button></div>`;
+        filtered = filtered.filter(p => p.user === filterVal);
+    } else {
+        let label = filterType === 'likes' ? `Liked by ${filterVal}` : `Tagged ${filterVal}`;
+        statusEl.innerHTML = `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>Showing: <b>${label}</b></span><button class="btn-alt" onclick="setFilter(null,null)">Clear</button></div>`;
+        if(filterType === 'likes') filtered = filtered.filter(p => p.likes.includes(filterVal));
+        if(filterType === 'hashtag') {
+          const tag = filterVal.toLowerCase();
+          filtered = filtered.filter(p => (p.message || "").toLowerCase().includes(tag));
+        }
+    }
+  } else { composer.style.display = "block"; statusEl.innerHTML = ""; }
+  
+  const feedHTML = filtered.slice(0, postsToShow).map(p => {
+    try {
+      const postImg = (p.image && p.image.length > 10) ? 
+        `<div class="img-container" style="margin-top:10px; background:#f0f2f5; border-radius:4px; overflow:hidden; min-height:100px;">
+          <img src="${p.image}" id="img-${p.rowIndex}-${Date.now()}" class="post-img" crossorigin="anonymous">
+        </div>` : '';
+
+      return `
+        <div class="card" id="post-${p.rowIndex}">
+          <div class="user-header">${getAvatarMarkup(p.user, 'avatar-small')}<div class="user-info"><span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span><span class="time-stamp">${timeAgo(p.timestamp)}</span></div></div>
+          <p style="margin:10px 0;">${highlightHashtags(p.message)}</p>
+          ${postImg}
+          <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; gap:10px; align-items:center;">
+              <button class="btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} ${p.likes.length}</button>
+              <button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
+            </div>
+            ${p.likes.length > 0 ? `
+              <div style="font-size:11px; color:#65676b; margin-left:5px; line-height:1.4;">
+                Liked by: ${p.likes.map(name => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()}</b>`).join(', ')}
+              </div>
+            ` : ''}
+          </div>
+          <div class="comment-section" style="margin-top:10px;">
+            ${p.comments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">${timeAgo(c.time)}</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}
+            <div style="margin-top:10px"><input id="c-${p.rowIndex}" placeholder="Reply..." style="margin-bottom:0; font-size:13px!important;"><button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button></div>
+          </div>
+        </div>`;
+    } catch (err) {
+      console.error("Error rendering post:", err);
+      return `<div class="card">Error loading this post.</div>`;
+    }
+  }).join('');
+
+  feedEl.innerHTML = feedHTML || '<div class="card">No posts found.</div>';
+  document.getElementById('loadMore').style.display = filtered.length > postsToShow ? 'block' : 'none';
+  if (!filterVal && !s) updateSidebar();
 }
 
 function timeAgo(d) {
