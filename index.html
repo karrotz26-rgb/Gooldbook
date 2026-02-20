@@ -359,6 +359,7 @@ async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
   const btn = event.target; 
+  const originalText = btn.innerText;
   btn.innerText = "⏳ Wait...";
 
   const card = document.createElement('div');
@@ -375,7 +376,8 @@ async function sharePost(rowIndex, event) {
     </div>
     <div style="font-size: 16px; margin-bottom: 15px; line-height: 1.4;">${post.message}</div>
     ${post.image ? `<img src="${post.image}" style="width:100%; border-radius: 8px; margin-bottom: 10px;">` : ''}
-    <div style="display: flex; gap: 15px; border-top: 1px solid #eee; padding-top: 10px; font-size: 13px; font-weight: bold; color: #65676b;">
+    
+    <div style="display: flex; gap: 15px; border-top: 2px solid #f0f2f5; padding-top: 12px; margin-top: 5px; font-size: 14px; font-weight: bold; color: #65676b;">
       <span>❤️ ${post.likes.length} Likes</span>
       <span>💬 ${post.comments.length} Comments</span>
     </div>`;
@@ -383,7 +385,12 @@ async function sharePost(rowIndex, event) {
   document.body.appendChild(card);
 
   try {
-    const canvas = await html2canvas(card, { useCORS: true, scale: 2, backgroundColor: "#ffffff" });
+    const canvas = await html2canvas(card, { 
+      useCORS: true, 
+      scale: 2, 
+      backgroundColor: "#ffffff",
+      logging: false 
+    });
     document.body.removeChild(card);
     const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
     const file = new File([blob], `Gooldbook_${rowIndex}.png`, { type: 'image/png' });
@@ -400,7 +407,7 @@ async function sharePost(rowIndex, event) {
     console.error(e);
     alert("Share failed."); 
   } finally { 
-    btn.innerText = "🔗 Share"; 
+    btn.innerText = originalText; 
   }
 }
 
