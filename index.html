@@ -436,19 +436,85 @@ async function apiCall(action, rowIndex, event) {
 }
 
 async function sharePost(rowIndex, event) {
-  const post = allPosts.find(p => p.rowIndex === rowIndex); if (!post) return;
-  const btn = event.target; btn.innerText = "⏳ Wait...";
-  const card = document.createElement('div'); card.style.cssText = `position: fixed; left: -9999px; width: 400px; background: white; padding: 25px; border-radius: 12px; font-family: sans-serif;`;
-  card.innerHTML = `<h3>🦄 theGooldbook</h3><p>${post.message}</p>${post.image ? `<img src="${post.image}" style="width:100%;">` : ''}<p><small>Post by ${post.user}</small></p>`;
+  const post = allPosts.find(p => p.rowIndex === rowIndex); 
+  if (!post) return;
+  
+  const btn = event.target; 
+  const originalText = btn.innerText;
+  btn.innerText = "⏳ Wait...";
+
+  // 1. Prepare the Avatar for the shared image
+  const ava = allAvatars[post.user];
+  let avatarHtml = `<div style="width:50px; height:50px; border-radius:50%; background:#eee; display:flex; align-items:center; justify-content:center; font-size:25px;">🦄</div>`;
+  
+  if (ava && ava !== "" && ava !== "undefined") {
+    // We use a clean version of the image for the canvas
+    avatarHtml = `<img src="${ava}" style="width:50px; height:50px; border-radius:50%; object-fit:cover;">`;
+  }
+
+  // 2. Create the "Hidden" card for the screenshot
+  const card = document.createElement('div'); 
+  card.style.cssText = `
+    position: fixed; 
+    left: -9999px; 
+    width: 450px; 
+    background: white; 
+    padding: 30px; 
+    border-radius: 15px; 
+    font-family: system-ui, -apple-system, sans-serif;
+    color: #1c1e21;
+  `;
+
+  card.innerHTML = `
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+      ${avatarHtml}
+      <div>
+        <b style="font-size:20px; color:#1c1e21;">${post.user}</b><br>
+        <span style="color:#65676b; font-size:14px;">via theGooldbook 🦄</span>
+      </div>
+    </div>
+    <p style="font-size:18px; line-height:1.4; margin-bottom:20px; color:#050505;">${post.message}</p>
+    ${post.image ? `<img src="${post.image}" style="width:100%; border-radius:12px; margin-bottom:20px; display:block;" crossorigin="anonymous">` : ''}
+    <div style="display:flex; gap:25px; border-top:1px solid #ebedf0; padding-top:20px; color:#65676b; font-weight:600; font-size:15px;">
+      <span>❤️ ${post.likes.length} Likes</span>
+      <span>💬 ${post.comments.length} Comments</span>
+    </div>
+  `;
+
   document.body.appendChild(card);
+
   try {
-    const canvas = await html2canvas(card, { useCORS: true });
+    // Note: useCORS: true is vital so the canvas can "see" images from other domains
+    const canvas = await html2canvas(card, { 
+      useCORS: true, 
+      allowTaint: false,
+      backgroundColor: "#ffffff",
+      scale: 2 
+    });
+    
     document.body.removeChild(card);
+    
     const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-    const file = new File([blob], 'post.png', { type: 'image/png' });
-    if (navigator.share) await navigator.share({ files: [file], title: 'theGooldbook' });
-    else window.open(canvas.toDataURL());
-  } catch(e) { alert("Share failed."); } finally { btn.innerText = "🔗 Share"; }
+    const file = new File([blob], 'Gooldbook-Post.png', { type: 'image/png' });
+
+    if (navigator.share) {
+      await navigator.share({ 
+        files: [file], 
+        title: 'theGooldbook',
+        text: `Shared from theGooldbook` 
+      });
+    } else {
+      const link = document.createElement('a');
+      link.download = `${post.user}-post.png`;
+      link.href = canvas.toDataURL();
+      link.click();
+    }
+  } catch(e) { 
+    console.error("Snapshot error:", e);
+    alert("Snapshot failed. This usually happens if an image is protected by privacy settings."); 
+  } finally { 
+    btn.innerText = originalText; 
+  }
 }
 
 function highlightHashtags(t) { return t.replace(/#(\w+)/g, '<span style="color:var(--gb-hover);font-weight:bold;cursor:pointer" onclick="setFilter(\'hashtag\',\'#$1\')">#$1</span>'); }
