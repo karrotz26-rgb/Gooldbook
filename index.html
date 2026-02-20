@@ -220,7 +220,7 @@ function render() {
   const composer = document.getElementById('postComposer');
   const feedEl = document.getElementById('feed');
   
-  // CRITICAL: We clear the feed entirely to prevent image "ghosting"
+  // Fully clear feed to reset image memory
   feedEl.innerHTML = ""; 
 
   let filtered = allPosts.filter(p => 
@@ -247,10 +247,9 @@ function render() {
   } else { composer.style.display = "block"; statusEl.innerHTML = ""; }
   
   const feedHTML = filtered.slice(0, postsToShow).map(p => {
-    // FIX: We add a unique ID to the image and a "key" attribute to the container
-    // This forces the browser to treat this as a brand new element every time
+    // Unique ID per render to force browser to re-fetch/re-draw the specific image
     const postImg = (p.image && p.image.length > 10) ? 
-      `<div class="img-container" data-key="${p.rowIndex}" style="margin-top:10px; background:#f0f2f5; border-radius:4px; overflow:hidden; min-height:150px;">
+      `<div class="img-container" style="margin-top:10px; background:#f0f2f5; border-radius:4px; overflow:hidden; min-height:100px;">
         <img src="${p.image}" id="img-${p.rowIndex}-${Date.now()}" class="post-img" crossorigin="anonymous">
       </div>` : '';
 
@@ -259,10 +258,20 @@ function render() {
         <div class="user-header">${getAvatarMarkup(p.user, 'avatar-small')}<div class="user-info"><span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span><span class="time-stamp">${timeAgo(p.timestamp)}</span></div></div>
         <p style="margin:10px 0;">${highlightHashtags(p.message)}</p>
         ${postImg}
-        <div style="margin-top:12px; display:flex; gap:10px;">
-          <button class="btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} ${p.likes.length}</button>
-          <button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
+        
+        <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; gap:10px; align-items:center;">
+            <button class="btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} ${p.likes.length}</button>
+            <button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
+          </div>
+          
+          ${p.likes.length > 0 ? `
+            <div style="font-size:11px; color:#65676b; margin-left:5px; line-height:1.4;">
+              Liked by: ${p.likes.map(name => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()}</b>`).join(', ')}
+            </div>
+          ` : ''}
         </div>
+
         <div class="comment-section" style="margin-top:10px;">
           ${p.comments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">${timeAgo(c.time)}</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}
           <div style="margin-top:10px"><input id="c-${p.rowIndex}" placeholder="Reply..." style="margin-bottom:0; font-size:13px!important;"><button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button></div>
