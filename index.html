@@ -215,6 +215,7 @@ function render() {
   
   feedEl.innerHTML = ""; 
 
+  // 1. Filter the posts
   let filtered = allPosts.filter(p => 
     (p.message || "").toLowerCase().includes(s) || 
     (p.user || "").toLowerCase().includes(s)
@@ -250,50 +251,62 @@ function render() {
     statusEl.innerHTML = ""; 
   }
   
-  const feedHTML = filtered.slice(0, postsToShow).map(p => `
-    <div class="card" id="post-${p.rowIndex}" data-id="${p.rowIndex}">
-      <div class="user-header">
-        ${getAvatarMarkup(p.user, 'avatar-small')}
-        <div class="user-info">
-          <span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span>
-          <span class="time-stamp">${timeAgo(p.timestamp)}</span>
-        </div>
-      </div>
-      <p style="margin:10px 0;">${highlightHashtags(p.message)}</p>
-      ${p.image ? `<div style="min-height:200px; background:#f0f2f5; border-radius:4px; overflow:hidden;">
-                     <img src="${p.image}" class="post-img" crossorigin="anonymous" loading="lazy">
-                   </div>` : ''}
-      <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
-        <div style="display:flex; gap:10px; align-items:center;">
-          <button class="btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} ${p.likes.length}</button>
-          <button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
-        </div>
-        ${p.likes.length > 0 ? `
-          <div style="font-size:11px; color:#65676b; margin-left:5px;">
-            Liked by: ${p.likes.map(name => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()}</b>`).join(', ')}
+  // 2. Generate the HTML using the specific post object (p)
+  const feedHTML = filtered.slice(0, postsToShow).map(p => {
+    // We lock the image to the specific post's data
+    const postImageHTML = (p.image && p.image !== "") ? `
+      <div style="margin-top:10px; background:#f0f2f5; border-radius:4px; overflow:hidden; min-height:100px;">
+        <img src="${p.image}" class="post-img" crossorigin="anonymous" loading="lazy">
+      </div>` : '';
+
+    return `
+      <div class="card" id="post-${p.rowIndex}" data-id="${p.rowIndex}">
+        <div class="user-header">
+          ${getAvatarMarkup(p.user, 'avatar-small')}
+          <div class="user-info">
+            <span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span>
+            <span class="time-stamp">${timeAgo(p.timestamp)}</span>
           </div>
-        ` : ''}
-      </div>
-      <div class="comment-section" style="margin-top:10px;">
-        ${p.comments.map(c => `
-          <div class="comment-box">
-            <div style="display:flex; justify-content:space-between; align-items:start;">
-              <b onclick="setFilter('author', '${c.user}')" style="cursor:pointer">${c.user}</b>
-              <span style="font-size:10px; color:#888;">${timeAgo(c.time)}</span>
-            </div>
-            <div style="margin-top:2px;">${highlightHashtags(c.text)}</div>
-          </div>`).join('')}
-        <div style="margin-top:10px">
-          <input id="c-${p.rowIndex}" placeholder="Write a comment..." style="margin-bottom:0; font-size:13px !important;">
-          <button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button>
         </div>
-      </div>
-    </div>`).join('');
+        <p style="margin:10px 0;">${highlightHashtags(p.message)}</p>
+        
+        ${postImageHTML}
+
+        <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; gap:10px; align-items:center;">
+            <button class="btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} ${p.likes.length}</button>
+            <button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
+          </div>
+          ${p.likes.length > 0 ? `
+            <div style="font-size:11px; color:#65676b; margin-left:5px;">
+              Liked by: ${p.likes.map(name => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()}</b>`).join(', ')}
+            </div>
+          ` : ''}
+        </div>
+        <div class="comment-section" style="margin-top:10px;">
+          ${p.comments.map(c => `
+            <div class="comment-box">
+              <div style="display:flex; justify-content:space-between; align-items:start;">
+                <b onclick="setFilter('author', '${c.user}')" style="cursor:pointer">${c.user}</b>
+                <span style="font-size:10px; color:#888;">${timeAgo(c.time)}</span>
+              </div>
+              <div style="margin-top:2px;">${highlightHashtags(c.text)}</div>
+            </div>`).join('')}
+          <div style="margin-top:10px">
+            <input id="c-${p.rowIndex}" placeholder="Write a comment..." style="margin-bottom:0; font-size:13px !important;">
+            <button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
 
   feedEl.innerHTML = feedHTML || '<div class="card">No posts found.</div>';
   
   document.getElementById('loadMore').style.display = filtered.length > postsToShow ? 'block' : 'none';
-  updateSidebar();
+  
+  // Only update the sidebar if we aren't currently viewing a specific filtered view
+  // this prevents the sidebar from "fighting" with the images while you browse hashtags
+  if (!filterVal && !s) updateSidebar();
 }
 
 function updateSidebar() {
