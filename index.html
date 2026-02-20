@@ -212,8 +212,15 @@ function render() {
   const s = document.getElementById('searchBar').value.toLowerCase();
   const statusEl = document.getElementById('filterStatus');
   const composer = document.getElementById('postComposer');
+  const feedEl = document.getElementById('feed');
   
-  let filtered = allPosts.filter(p => (p.message||"").toLowerCase().includes(s) || (p.user||"").toLowerCase().includes(s));
+  // 1. Clear the feed entirely before re-rendering to prevent "ghost" posts
+  feedEl.innerHTML = ""; 
+
+  let filtered = allPosts.filter(p => 
+    (p.message || "").toLowerCase().includes(s) || 
+    (p.user || "").toLowerCase().includes(s)
+  );
   
   if (filterVal) {
     composer.style.display = "none";
@@ -240,10 +247,14 @@ function render() {
           filtered = filtered.filter(p => (p.message || "").toLowerCase().includes(tag) || p.comments.some(c => (c.text || "").toLowerCase().includes(tag)));
         }
     }
-  } else { composer.style.display = "block"; statusEl.innerHTML = ""; }
+  } else { 
+    composer.style.display = "block"; 
+    statusEl.innerHTML = ""; 
+  }
   
-  document.getElementById('feed').innerHTML = filtered.slice(0, postsToShow).map(p => `
-    <div class="card" id="post-${p.rowIndex}">
+  // 2. Map the filtered posts and join them into one clean string
+  const feedHTML = filtered.slice(0, postsToShow).map(p => `
+    <div class="card" id="post-${p.rowIndex}" data-id="${p.rowIndex}">
       <div class="user-header">
         ${getAvatarMarkup(p.user, 'avatar-small')}
         <div class="user-info">
@@ -252,7 +263,9 @@ function render() {
         </div>
       </div>
       <p style="margin:10px 0;">${highlightHashtags(p.message)}</p>
-      ${p.image ? `<img src="${p.image}" class="post-img" crossorigin="anonymous">` : ''}
+      ${p.image ? `<div style="min-height:200px; background:#f0f2f5; border-radius:4px; overflow:hidden;">
+                     <img src="${p.image}" class="post-img" crossorigin="anonymous" loading="lazy">
+                   </div>` : ''}
       <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
         <div style="display:flex; gap:10px; align-items:center;">
           <button class="btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} ${p.likes.length}</button>
@@ -276,6 +289,8 @@ function render() {
         </div>
       </div>
     </div>`).join('');
+
+  feedEl.innerHTML = feedHTML || '<div class="card">No posts found.</div>';
   
   document.getElementById('loadMore').style.display = filtered.length > postsToShow ? 'block' : 'none';
   updateSidebar();
