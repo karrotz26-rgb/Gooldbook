@@ -299,43 +299,76 @@ function render() {
 function updateSidebar() {
   const myName = document.getElementById('user').value.trim();
   
-  // Update My Profile Link
-  document.getElementById('myProfileLink').innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', '${myName}')">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
+  // 1. My Profile Link Section
+  document.getElementById('myProfileLink').innerHTML = myName ? 
+    `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', '${myName}')">
+      ${getAvatarMarkup(myName, 'avatar-small')} My Profile
+    </div>` : "";
   
-  // Update Trending Activity
-  const topPosts = [...allPosts].sort((a,b) => ((b.likes?.length || 0) + (b.comments?.length || 0)) - ((a.likes?.length || 0) + (a.comments?.length || 0))).slice(0,3);
-  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b><br>${topPosts.map(p => `<div class="sidebar-item" onclick="scrollToPost(${p.rowIndex})"><div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div><div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div><span class="trend-stats">❤️ ${p.likes.length} • 💬 ${p.comments.length}</span></div>`).join('')}</div>`;
+  // 2. Trending Activity (Top 3 most liked/commented)
+  const topPosts = [...allPosts].sort((a,b) => {
+    const scoreA = (a.likes?.length || 0) + (a.comments?.length || 0);
+    const scoreB = (b.likes?.length || 0) + (b.comments?.length || 0);
+    return scoreB - scoreA;
+  }).slice(0,3);
+
+  document.getElementById('trending').innerHTML = `
+    <div class="sidebar-card">
+      <b style="color: #e67e22;">🔥 Trending Activity</b><br>
+      ${topPosts.map(p => `
+        <div class="sidebar-item" onclick="scrollToPost(${p.rowIndex})">
+          <div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div>
+          <div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div>
+          <span class="trend-stats">❤️ ${p.likes.length} • 💬 ${p.comments.length}</span>
+        </div>`).join('')}
+    </div>`;
+
+  // 3. Top Likers Leaderboard
+  const lCounts = {}; 
+  allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
+  const topLikers = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
   
-  // Update Leaderboard
-  const lCounts = {}; allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
-  const top = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
-  document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${top.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
-  
-  // --- FIXED TAG LOGIC START ---
+  document.getElementById('leaderboard').innerHTML = `
+    <div class="sidebar-card">
+      <b>🏆 Top Likers</b><br>
+      ${topLikers.map(([n,c], i) => `
+        <div class="sidebar-item" onclick="setFilter('likes','${n}')">
+          ${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b>
+        </div>`).join('')}
+    </div>`;
+
+  // 4. #️⃣ Trending Tags (The Spaced-Out Pill Layout)
   const hCounts = {}; 
   allPosts.forEach(p => { 
-    // Combine post message and all comments into one string to scan for tags
     const fullText = (p.message || "") + " " + p.comments.map(c => c.text).join(" ");
-    
-    // This Regex finds # followed by letters/numbers but stops at spaces or punctuation
     const tags = fullText.match(/#(\w+)/g) || []; 
-    
     tags.forEach(t => {
-      const cleanTag = t.toLowerCase().trim(); // Ensure #unicorn and #Unicorn match
+      const cleanTag = t.toLowerCase().trim();
       hCounts[cleanTag] = (hCounts[cleanTag] || 0) + 1;
     });
   });
 
-  const topTags = Object.entries(hCounts)
-    .sort((a,b) => b[1] - a[1]) // Sort by most used
-    .slice(0, 5); // Take top 5
+  const topTags = Object.entries(hCounts).sort((a,b) => b[1] - a[1]).slice(0, 8);
 
-  document.getElementById('hashtags').innerHTML = `<div class="sidebar-card"><b>#️⃣ Trending Tags</b><br>${topTags.map(([tag, count]) => `
-    <div class="sidebar-item" onclick="setFilter('hashtag','${tag}')">
-      <span style="color:var(--gb-hover); font-weight:bold;">${tag}</span> 
-      <small style="color:#888;">(${count})</small>
-    </div>`).join('') || '<div style="color:#888; padding:5px;">No tags yet</div>'}</div>`;
-  // --- FIXED TAG LOGIC END ---
+  document.getElementById('hashtags').innerHTML = `
+    <div class="sidebar-card">
+      <b>#️⃣ Trending Tags</b>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
+        ${topTags.map(([tag, count]) => `
+          <div class="sidebar-item" 
+               style="background: #f0f2f5; padding: 5px 10px; border-radius: 15px; border: none; font-size: 12px; margin: 0; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;" 
+               onclick="setFilter('hashtag','${tag}')">
+            <span style="color:var(--gb-hover); font-weight:bold;">${tag}</span> 
+            <span style="color:#888; font-size: 10px;">${count}</span>
+          </div>`).join('') || '<div style="color:#888; font-size:12px;">No tags yet</div>'}
+      </div>
+    </div>`;
+}
+
+// Ensure this function is also updated to prevent "eating" spaces in your posts
+function highlightHashtags(t) { 
+  if(!t) return "";
+  return t.replace(/#(\w+)/g, '<span style="color:var(--gb-hover);font-weight:bold;cursor:pointer" onclick="setFilter(\'hashtag\',\'#$1\')">#$1</span>'); 
 }
 
 function scrollToPost(id) {
