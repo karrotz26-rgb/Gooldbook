@@ -220,6 +220,7 @@ function render() {
   const composer = document.getElementById('postComposer');
   const feedEl = document.getElementById('feed');
   
+  // CRITICAL: We clear the feed entirely to prevent image "ghosting"
   feedEl.innerHTML = ""; 
 
   let filtered = allPosts.filter(p => 
@@ -246,7 +247,13 @@ function render() {
   } else { composer.style.display = "block"; statusEl.innerHTML = ""; }
   
   const feedHTML = filtered.slice(0, postsToShow).map(p => {
-    const postImg = (p.image && p.image.length > 10) ? `<div style="margin-top:10px; background:#f0f2f5; border-radius:4px; overflow:hidden;"><img src="${p.image}" class="post-img" crossorigin="anonymous"></div>` : '';
+    // FIX: We add a unique ID to the image and a "key" attribute to the container
+    // This forces the browser to treat this as a brand new element every time
+    const postImg = (p.image && p.image.length > 10) ? 
+      `<div class="img-container" data-key="${p.rowIndex}" style="margin-top:10px; background:#f0f2f5; border-radius:4px; overflow:hidden; min-height:150px;">
+        <img src="${p.image}" id="img-${p.rowIndex}-${Date.now()}" class="post-img" crossorigin="anonymous">
+      </div>` : '';
+
     return `
       <div class="card" id="post-${p.rowIndex}">
         <div class="user-header">${getAvatarMarkup(p.user, 'avatar-small')}<div class="user-info"><span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span><span class="time-stamp">${timeAgo(p.timestamp)}</span></div></div>
