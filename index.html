@@ -173,20 +173,25 @@ function getAvatarMarkup(user, sizeClass) {
     return `<div class="${sizeClass}">🦄</div>`;
   }
 
-  // Use the 'lh3' subdomain which is faster and more CORS-friendly for Google Drive
   let finalSrc = ava;
+
+  // FIX: If it's a Drive link, convert it to the high-compatibility format
   if (ava.includes("googleusercontent.com/profile/picture/0")) {
-     const id = ava.split("picture/0")[1];
-     finalSrc = `https://lh3.googleusercontent.com/d/${id}`;
+     const parts = ava.split("picture/0");
+     if (parts.length > 1) {
+       const id = parts[1];
+       // We use lh3.googleusercontent.com which is the most reliable for <img> tags
+       finalSrc = `https://lh3.googleusercontent.com/d/${id}`;
+     }
   }
 
-  // Add a timestamp to bypass the browser's "Broken Image Memory"
+  // Add a cache buster so that if you change your photo, it updates immediately
   const cacheBuster = finalSrc.includes('?') ? `&t=${Date.now()}` : `?t=${Date.now()}`;
 
   return `<img src="${finalSrc}${cacheBuster}" 
                class="${sizeClass}" 
-               style="display:block;"
-               onerror="this.onerror=null; this.parentElement.innerHTML='<div class=${sizeClass}>🦄</div>';">`;
+               loading="lazy"
+               onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=🦄';">`;
 }
 
 async function uploadAvatar(user) {
