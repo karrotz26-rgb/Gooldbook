@@ -460,7 +460,7 @@ async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
   
-  const btn = event.target; 
+  const btn = event.currentTarget || event.target; 
   const originalText = btn.innerText;
   btn.innerText = "⏳ Wait...";
 
@@ -468,35 +468,35 @@ async function sharePost(rowIndex, event) {
   const ava = allAvatars[post.user];
   let avatarHtml = `<div style="width:50px; height:50px; border-radius:50%; background:#eee; display:flex; align-items:center; justify-content:center; font-size:25px;">🦄</div>`;
   
+  // Use a reliable avatar source if available
   if (ava && ava !== "" && ava !== "undefined") {
-    // We use a clean version of the image for the canvas
-    avatarHtml = `<img src="${ava}" style="width:50px; height:50px; border-radius:50%; object-fit:cover;">`;
+    avatarHtml = `<img src="${ava}" style="width:50px; height:50px; border-radius:50%; object-fit:cover;" crossorigin="anonymous">`;
   }
 
-  // 2. Create the "Hidden" card for the screenshot
+  // 2. Create the snapshot container
   const card = document.createElement('div'); 
   card.style.cssText = `
-    position: fixed; 
+    position: absolute; 
+    top: -9999px; 
     left: -9999px; 
-    width: 450px; 
+    width: 400px; 
     background: white; 
-    padding: 30px; 
-    border-radius: 15px; 
-    font-family: system-ui, -apple-system, sans-serif;
-    color: #1c1e21;
+    padding: 25px; 
+    border-radius: 0; 
+    font-family: sans-serif;
   `;
 
   card.innerHTML = `
-    <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:15px;">
       ${avatarHtml}
       <div>
-        <b style="font-size:20px; color:#1c1e21;">${post.user}</b><br>
-        <span style="color:#65676b; font-size:14px;">via theGooldbook 🦄</span>
+        <b style="font-size:18px; color:#1c1e21; display:block;">${post.user}</b>
+        <span style="color:#65676b; font-size:12px;">theGooldbook 🦄</span>
       </div>
     </div>
-    <p style="font-size:18px; line-height:1.4; margin-bottom:20px; color:#050505;">${post.message}</p>
-    ${post.image ? `<img src="${post.image}" style="width:100%; border-radius:12px; margin-bottom:20px; display:block;" crossorigin="anonymous">` : ''}
-    <div style="display:flex; gap:25px; border-top:1px solid #ebedf0; padding-top:20px; color:#65676b; font-weight:600; font-size:15px;">
+    <div style="font-size:16px; line-height:1.4; margin-bottom:15px; color:#050505; word-wrap: break-word;">${post.message}</div>
+    ${post.image ? `<img src="${post.image}" style="width:100%; border-radius:8px; margin-bottom:15px; display:block;" crossorigin="anonymous">` : ''}
+    <div style="display:flex; gap:20px; border-top:1px solid #ebedf0; padding-top:15px; color:#65676b; font-weight:bold; font-size:13px;">
       <span>❤️ ${post.likes.length} Likes</span>
       <span>💬 ${post.comments.length} Comments</span>
     </div>
@@ -505,36 +505,46 @@ async function sharePost(rowIndex, event) {
   document.body.appendChild(card);
 
   try {
-    // Note: useCORS: true is vital so the canvas can "see" images from other domains
+    // We wait briefly for images to trigger their CORS handshake
+    await new Promise(r => setTimeout(r, 500));
+
     const canvas = await html2canvas(card, { 
       useCORS: true, 
       allowTaint: false,
+      logging: false, // Set to true if it keeps failing to see why
       backgroundColor: "#ffffff",
       scale: 2 
     });
     
     document.body.removeChild(card);
     
-    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-    const file = new File([blob], 'Gooldbook-Post.png', { type: 'image/png' });
+    // Convert to blob for navigator.share
+    canvas.toBlob(async (blob) => {
+      if (!blob) throw new Error("Canvas is empty");
+      
+      const file = new File([blob], `Gooldbook-${post.user}.png`, { type: 'image/png' });
 
-    if (navigator.share) {
-      await navigator.share({ 
-        files: [file], 
-        title: 'theGooldbook',
-        text: `Shared from theGooldbook` 
-      });
-    } else {
-      const link = document.createElement('a');
-      link.download = `${post.user}-post.png`;
-      link.href = canvas.toDataURL();
-      link.click();
-    }
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ 
+          files: [file], 
+          title: 'theGooldbook',
+          text: `Check out this post from ${post.user}!` 
+        });
+      } else {
+        // Desktop Fallback: Simple Download
+        const link = document.createElement('a');
+        link.download = `Gooldbook-${post.user}.png`;
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+      }
+      btn.innerText = originalText;
+    }, 'image/png');
+
   } catch(e) { 
     console.error("Snapshot error:", e);
-    alert("Snapshot failed. This usually happens if an image is protected by privacy settings."); 
-  } finally { 
-    btn.innerText = originalText; 
+    btn.innerText = "❌ Failed";
+    setTimeout(() => btn.innerText = originalText, 2000);
+    document.body.removeChild(card);
   }
 }
 
