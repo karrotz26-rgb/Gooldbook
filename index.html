@@ -214,7 +214,7 @@ function render() {
   const composer = document.getElementById('postComposer');
   const feedEl = document.getElementById('feed');
   
-  // 1. CLEAR: Wipe the feed completely to prevent DOM recycling "ghosts"
+  // 1. Clear the feed entirely before re-rendering to prevent "ghost" posts
   feedEl.innerHTML = ""; 
 
   let filtered = allPosts.filter(p => 
@@ -252,13 +252,9 @@ function render() {
     statusEl.innerHTML = ""; 
   }
   
-  // 2. BUILD: Construct the HTML as a clean string
-  const feedHTML = filtered.slice(0, postsToShow).map(p => {
-    // Generate a unique ID for this specific render instance
-    const uniqueKey = `${p.rowIndex}-${new Date(p.timestamp).getTime()}`;
-    
-    return `
-    <div class="card" id="post-${p.rowIndex}" data-render-id="${uniqueKey}">
+  // 2. Map the filtered posts and join them into one clean string
+  const feedHTML = filtered.slice(0, postsToShow).map(p => `
+    <div class="card" id="post-${p.rowIndex}" data-id="${p.rowIndex}">
       <div class="user-header">
         ${getAvatarMarkup(p.user, 'avatar-small')}
         <div class="user-info">
@@ -266,36 +262,21 @@ function render() {
           <span class="time-stamp">${timeAgo(p.timestamp)}</span>
         </div>
       </div>
-      
-      <p style="margin:10px 0; white-space: pre-wrap;">${highlightHashtags(p.message)}</p>
-      
-      ${p.image ? `
-        <div style="min-height:200px; background:#f0f2f5; border-radius:8px; margin-top:10px; overflow:hidden;">
-          <img src="${p.image}" 
-               key="img-${uniqueKey}" 
-               class="post-img" 
-               crossorigin="anonymous" 
-               loading="lazy"
-               style="display: block; width: 100%; height: auto;"
-               onerror="this.style.display='none'">
-        </div>
-      ` : ''}
-
+      <p style="margin:10px 0;">${highlightHashtags(p.message)}</p>
+      ${p.image ? `<div style="min-height:200px; background:#f0f2f5; border-radius:4px; overflow:hidden;">
+                     <img src="${p.image}" class="post-img" crossorigin="anonymous" loading="lazy">
+                   </div>` : ''}
       <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
         <div style="display:flex; gap:10px; align-items:center;">
-          <button class="btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">
-            ${p.likes.includes(u) ? '❤️' : '👍'} ${p.likes.length}
-          </button>
+          <button class="btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} ${p.likes.length}</button>
           <button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
         </div>
-        
         ${p.likes.length > 0 ? `
           <div style="font-size:11px; color:#65676b; margin-left:5px;">
             Liked by: ${p.likes.map(name => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()}</b>`).join(', ')}
           </div>
         ` : ''}
       </div>
-
       <div class="comment-section" style="margin-top:10px;">
         ${p.comments.map(c => `
           <div class="comment-box">
@@ -307,11 +288,9 @@ function render() {
           <button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button>
         </div>
       </div>
-    </div>`;
-  }).join('');
+    </div>`).join('');
 
-  // 3. INJECT: Add all posts at once
-  feedEl.innerHTML = feedHTML || '<div class="card" style="text-align:center; color:#888;">No posts found.</div>';
+  feedEl.innerHTML = feedHTML || '<div class="card">No posts found.</div>';
   
   document.getElementById('loadMore').style.display = filtered.length > postsToShow ? 'block' : 'none';
   updateSidebar();
@@ -457,80 +436,19 @@ async function apiCall(action, rowIndex, event) {
 }
 
 async function sharePost(rowIndex, event) {
-  const post = allPosts.find(p => p.rowIndex === rowIndex); 
-  if (!post) return;
-  
-  const btn = event.currentTarget || event.target; 
-  const originalText = btn.innerText;
-  btn.innerText = "⏳...";
-
-  // 1. Create the container
-  const card = document.createElement('div'); 
-  card.style.cssText = `
-    position: absolute; top: -9999px; left: -9999px; 
-    width: 350px; background: white; padding: 20px; 
-    border-radius: 12px; font-family: sans-serif; color: #1c1e21;
-  `;
-
-  // 2. Build the Content (Restoring Likes/Comments)
-  card.innerHTML = `
-    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
-      <div style="width:40px; height:40px; border-radius:50%; background:#eee; display:flex; align-items:center; justify-content:center; font-size:20px;">🦄</div>
-      <b style="font-size:16px;">${post.user}</b>
-    </div>
-    <div style="font-size:15px; line-height:1.4; margin-bottom:12px;">${post.message}</div>
-    ${post.image ? `<img src="${post.image}" style="width:100%; border-radius:8px; margin-bottom:12px;" crossorigin="anonymous">` : ''}
-    <div style="display:flex; gap:15px; border-top:1px solid #eee; padding-top:10px; color:#65676b; font-weight:bold; font-size:12px;">
-      <span>❤️ ${post.likes.length} Likes</span>
-      <span>💬 ${post.comments.length} Comments</span>
-    </div>
-  `;
-
+  const post = allPosts.find(p => p.rowIndex === rowIndex); if (!post) return;
+  const btn = event.target; btn.innerText = "⏳ Wait...";
+  const card = document.createElement('div'); card.style.cssText = `position: fixed; left: -9999px; width: 400px; background: white; padding: 25px; border-radius: 12px; font-family: sans-serif;`;
+  card.innerHTML = `<h3>🦄 theGooldbook</h3><p>${post.message}</p>${post.image ? `<img src="${post.image}" style="width:100%;">` : ''}<p><small>Post by ${post.user}</small></p>`;
   document.body.appendChild(card);
-
   try {
-    // 3. The "Force Resolve" Logic
-    // We tell html2canvas to ignore images that are taking too long to load
-    const canvas = await html2canvas(card, { 
-      useCORS: true, 
-      allowTaint: false,
-      scale: 1.5,
-      backgroundColor: "#ffffff",
-      imageTimeout: 3000 // If images take > 3s, just render the text
-    });
-    
+    const canvas = await html2canvas(card, { useCORS: true });
     document.body.removeChild(card);
-    
-    canvas.toBlob(async (blob) => {
-      if (!blob) {
-         btn.innerText = originalText;
-         return;
-      }
-      const file = new File([blob], `Post.png`, { type: 'image/png' });
-
-      if (navigator.share) {
-        // If file sharing fails (Safari timeout), it will catch below
-        await navigator.share({ 
-          files: [file],
-          title: 'theGooldbook',
-          text: post.message 
-        });
-      }
-      btn.innerText = originalText;
-    }, 'image/png');
-
-  } catch(e) { 
-    console.error("Share error:", e);
-    // If the image fails, Safari will still share the text instantly
-    if (navigator.share) {
-      await navigator.share({
-        title: 'theGooldbook',
-        text: `${post.user}: ${post.message}\n\n❤️ ${post.likes.length} Likes`
-      });
-    }
-    btn.innerText = originalText;
-    if (card.parentNode) document.body.removeChild(card);
-  }
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    const file = new File([blob], 'post.png', { type: 'image/png' });
+    if (navigator.share) await navigator.share({ files: [file], title: 'theGooldbook' });
+    else window.open(canvas.toDataURL());
+  } catch(e) { alert("Share failed."); } finally { btn.innerText = "🔗 Share"; }
 }
 
 function highlightHashtags(t) { return t.replace(/#(\w+)/g, '<span style="color:var(--gb-hover);font-weight:bold;cursor:pointer" onclick="setFilter(\'hashtag\',\'#$1\')">#$1</span>'); }
