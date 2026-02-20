@@ -507,6 +507,15 @@ async function sharePost(rowIndex, event) {
   }
 }
 
+function highlightHashtags(t) { return t.replace(/#(\w+)/g, '<span style="color:var(--gb-hover);font-weight:bold;cursor:pointer" onclick="setFilter(\'hashtag\',\'#$1\')">#$1</span>'); }
+function timeAgo(d) {
+  if(!d) return "just now";
+  const s = Math.floor((Date.now() - new Date(d)) / 1000);
+  if(s < 60) return "just now";
+  if(s < 3600) return Math.floor(s/60) + "m";
+  if(s < 86400) return Math.floor(s/3600) + "h";
+  return Math.floor(s/86400) + "d";
+}
 function saveUser() { localStorage.setItem("gb_user", document.getElementById('user').value); loadFeed(); }
 </script>
 </body>
