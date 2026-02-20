@@ -464,38 +464,32 @@ async function sharePost(rowIndex, event) {
   const originalText = btn.innerText;
   btn.innerText = "⏳ Wait...";
 
-  // 1. Prepare the Avatar for the shared image
-  const ava = allAvatars[post.user];
-  let avatarHtml = `<div style="width:50px; height:50px; border-radius:50%; background:#eee; display:flex; align-items:center; justify-content:center; font-size:25px;">🦄</div>`;
-  
-  // Use a reliable avatar source if available
-  if (ava && ava !== "" && ava !== "undefined") {
-    avatarHtml = `<img src="${ava}" style="width:50px; height:50px; border-radius:50%; object-fit:cover;" crossorigin="anonymous">`;
-  }
-
-  // 2. Create the snapshot container
+  // 1. Setup the snapshot container
   const card = document.createElement('div'); 
   card.style.cssText = `
-    position: absolute; 
-    top: -9999px; 
-    left: -9999px; 
-    width: 400px; 
-    background: white; 
-    padding: 25px; 
-    border-radius: 0; 
-    font-family: sans-serif;
+    position: absolute; top: -9999px; left: -9999px; 
+    width: 400px; background: white; padding: 25px; 
+    border-radius: 12px; font-family: sans-serif; color: #1c1e21;
   `;
+
+  // 2. Prepare Avatar with CORS safety
+  const ava = allAvatars[post.user];
+  let avatarHtml = `<div style="width:50px; height:50px; border-radius:50%; background:#eee; display:flex; align-items:center; justify-content:center; font-size:25px;">🦄</div>`;
+  if (ava && ava !== "" && ava !== "undefined") {
+    // Adding crossorigin="anonymous" is the "Magic Fix" for html2canvas
+    avatarHtml = `<img src="${ava}" style="width:50px; height:50px; border-radius:50%; object-fit:cover;" crossorigin="anonymous">`;
+  }
 
   card.innerHTML = `
     <div style="display:flex; align-items:center; gap:12px; margin-bottom:15px;">
       ${avatarHtml}
       <div>
-        <b style="font-size:18px; color:#1c1e21; display:block;">${post.user}</b>
+        <b style="font-size:18px; display:block;">${post.user}</b>
         <span style="color:#65676b; font-size:12px;">theGooldbook 🦄</span>
       </div>
     </div>
-    <div style="font-size:16px; line-height:1.4; margin-bottom:15px; color:#050505; word-wrap: break-word;">${post.message}</div>
-    ${post.image ? `<img src="${post.image}" style="width:100%; border-radius:8px; margin-bottom:15px; display:block;" crossorigin="anonymous">` : ''}
+    <div style="font-size:16px; line-height:1.4; margin-bottom:15px; word-wrap: break-word;">${post.message}</div>
+    ${post.image ? `<img src="${post.image}" style="width:100%; border-radius:8px; margin-bottom:15px;" crossorigin="anonymous">` : ''}
     <div style="display:flex; gap:20px; border-top:1px solid #ebedf0; padding-top:15px; color:#65676b; font-weight:bold; font-size:13px;">
       <span>❤️ ${post.likes.length} Likes</span>
       <span>💬 ${post.comments.length} Comments</span>
@@ -505,33 +499,31 @@ async function sharePost(rowIndex, event) {
   document.body.appendChild(card);
 
   try {
-    // We wait briefly for images to trigger their CORS handshake
-    await new Promise(r => setTimeout(r, 500));
+    // Give images a split second to start the CORS handshake
+    await new Promise(r => setTimeout(r, 600));
 
     const canvas = await html2canvas(card, { 
       useCORS: true, 
-      allowTaint: false,
-      logging: false, // Set to true if it keeps failing to see why
-      backgroundColor: "#ffffff",
-      scale: 2 
+      allowTaint: false, // Must be false for navigator.share to work
+      scale: 2,
+      backgroundColor: "#ffffff"
     });
     
     document.body.removeChild(card);
     
-    // Convert to blob for navigator.share
     canvas.toBlob(async (blob) => {
-      if (!blob) throw new Error("Canvas is empty");
-      
+      if (!blob) throw new Error("Canvas generation failed");
       const file = new File([blob], `Gooldbook-${post.user}.png`, { type: 'image/png' });
 
+      // Check if the browser actually supports file sharing
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({ 
           files: [file], 
           title: 'theGooldbook',
-          text: `Check out this post from ${post.user}!` 
+          text: `Check out ${post.user}'s post!` 
         });
       } else {
-        // Desktop Fallback: Simple Download
+        // Fallback for desktop: Direct Download
         const link = document.createElement('a');
         link.download = `Gooldbook-${post.user}.png`;
         link.href = canvas.toDataURL("image/png");
@@ -541,10 +533,10 @@ async function sharePost(rowIndex, event) {
     }, 'image/png');
 
   } catch(e) { 
-    console.error("Snapshot error:", e);
-    btn.innerText = "❌ Failed";
+    console.error("Share error:", e);
+    btn.innerText = "❌ Error";
     setTimeout(() => btn.innerText = originalText, 2000);
-    document.body.removeChild(card);
+    if (card.parentNode) document.body.removeChild(card);
   }
 }
 
