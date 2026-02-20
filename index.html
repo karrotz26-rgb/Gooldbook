@@ -167,7 +167,6 @@ function setFilter(type, val) {
   } else { 
     filterVal = val; 
     filterType = type; 
-    // Automatically go to the top when navigating to a profile
     window.scrollTo({ top: 0, behavior: 'smooth' });
     document.body.scrollTop = 0;
     document.documentElement.scrollTop = 0;
@@ -214,7 +213,6 @@ function render() {
   const composer = document.getElementById('postComposer');
   const feedEl = document.getElementById('feed');
   
-  // 1. Clear the feed entirely before re-rendering to prevent "ghost" posts
   feedEl.innerHTML = ""; 
 
   let filtered = allPosts.filter(p => 
@@ -252,7 +250,6 @@ function render() {
     statusEl.innerHTML = ""; 
   }
   
-  // 2. Map the filtered posts and join them into one clean string
   const feedHTML = filtered.slice(0, postsToShow).map(p => `
     <div class="card" id="post-${p.rowIndex}" data-id="${p.rowIndex}">
       <div class="user-header">
@@ -299,13 +296,11 @@ function render() {
 function updateSidebar() {
   const myName = document.getElementById('user').value.trim();
   
-  // 1. My Profile Link Section
   document.getElementById('myProfileLink').innerHTML = myName ? 
     `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', '${myName}')">
       ${getAvatarMarkup(myName, 'avatar-small')} My Profile
     </div>` : "";
   
-  // 2. Trending Activity (Top 3 most liked/commented)
   const topPosts = [...allPosts].sort((a,b) => {
     const scoreA = (a.likes?.length || 0) + (a.comments?.length || 0);
     const scoreB = (b.likes?.length || 0) + (b.comments?.length || 0);
@@ -323,7 +318,6 @@ function updateSidebar() {
         </div>`).join('')}
     </div>`;
 
-  // 3. Top Likers Leaderboard
   const lCounts = {}; 
   allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
   const topLikers = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
@@ -337,7 +331,6 @@ function updateSidebar() {
         </div>`).join('')}
     </div>`;
 
-  // 4. #️⃣ Trending Tags (The Spaced-Out Pill Layout)
   const hCounts = {}; 
   allPosts.forEach(p => { 
     const fullText = (p.message || "") + " " + p.comments.map(c => c.text).join(" ");
@@ -363,12 +356,6 @@ function updateSidebar() {
           </div>`).join('') || '<div style="color:#888; font-size:12px;">No tags yet</div>'}
       </div>
     </div>`;
-}
-
-// Ensure this function is also updated to prevent "eating" spaces in your posts
-function highlightHashtags(t) { 
-  if(!t) return "";
-  return t.replace(/#(\w+)/g, '<span style="color:var(--gb-hover);font-weight:bold;cursor:pointer" onclick="setFilter(\'hashtag\',\'#$1\')">#$1</span>'); 
 }
 
 function scrollToPost(id) {
@@ -438,25 +425,13 @@ async function apiCall(action, rowIndex, event) {
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
-  
   const btn = event.target; 
   const originalText = btn.innerText;
   btn.innerText = "⏳ Wait...";
 
-  // Create temporary container for the share image
   const card = document.createElement('div');
-  card.style.cssText = `
-    position: fixed; 
-    left: -9999px; 
-    width: 400px; 
-    background: white; 
-    padding: 20px; 
-    border-radius: 12px; 
-    font-family: system-ui, -apple-system, sans-serif;
-    color: #1c1e21;
-  `;
+  card.style.cssText = `position: fixed; left: -9999px; width: 400px; background: white; padding: 20px; border-radius: 12px; font-family: system-ui, sans-serif; color: #1c1e21;`;
 
-  // Construct the HTML for the share card
   card.innerHTML = `
     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
       ${getAvatarMarkup(post.user, 'avatar-small')}
@@ -465,77 +440,32 @@ async function sharePost(rowIndex, event) {
         <div style="font-size: 11px; color: #888;">theGooldbook 🦄</div>
       </div>
     </div>
-    <div style="font-size: 16px; margin-bottom: 15px; line-height: 1.4;">${post.message}</div>
+    <div style="font-size: 16px; margin-bottom: 15px; line-height: 1.4;">${highlightHashtags(post.message)}</div>
     ${post.image ? `<img src="${post.image}" style="width:100%; border-radius: 8px; margin-bottom: 10px;">` : ''}
-    <div style="display: flex; gap: 15px; border-top: 1px solid #eee; pt: 10px; padding-top: 10px; font-size: 13px; font-weight: bold; color: #65676b;">
+    <div style="display: flex; gap: 15px; border-top: 1px solid #eee; padding-top: 10px; font-size: 13px; font-weight: bold; color: #65676b;">
       <span>❤️ ${post.likes.length} Likes</span>
       <span>💬 ${post.comments.length} Comments</span>
-    </div>
-  `;
+    </div>`;
 
   document.body.appendChild(card);
 
   try {
-    // capturing the card with useCORS enabled for images
-    const canvas = await html2canvas(card, { 
-      useCORS: true,
-      scale: 2, // higher quality
-      backgroundColor: "#ffffff"
-    });
-    
+    const canvas = await html2canvas(card, { useCORS: true, scale: 2, backgroundColor: "#ffffff" });
     document.body.removeChild(card);
     const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
     const file = new File([blob], `Gooldbook_Post_${rowIndex}.png`, { type: 'image/png' });
-
-    if (navigator.share) {
-      await navigator.share({ 
-        files: [file], 
-        title: `Post by ${post.user} on Gooldbook` 
-      });
-    } else {
-      // Fallback for browsers that don't support Web Share API
-      const link = document.createElement('a');
-      link.download = `Gooldbook_Post_${rowIndex}.png`;
-      link.href = canvas.toDataURL();
-      link.click();
-    }
-  } catch(e) { 
-    console.error(e);
-    alert("Share failed. Please try again."); 
-  } finally { 
-    btn.innerText = originalText; 
-  }
+    if (navigator.share) await navigator.share({ files: [file], title: `Post by ${post.user}` });
+    else { const link = document.createElement('a'); link.download = `Gooldbook_Post_${rowIndex}.png`; link.href = canvas.toDataURL(); link.click(); }
+  } catch(e) { console.error(e); alert("Share failed."); } finally { btn.innerText = originalText; }
 }
 
 function highlightHashtags(t) { 
   if(!t) return "";
-  
-  // 1. Convert URLs to clean "Link Pills" with Favicons and Short Names
   let linkedText = t.replace(/(https?:\/\/[^\s]+)/g, (url) => {
     const iconUrl = `https://www.google.com/s2/favicons?sz=32&domain=${url}`;
     const shortName = url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
-
-    return `
-      <a href="${url}" target="_blank" style="
-        display: inline-flex; 
-        align-items: center; 
-        gap: 5px; 
-        color: #3b5998; 
-        text-decoration: none; 
-        font-weight: 600;
-        background: #f0f2f5;
-        padding: 2px 8px;
-        border-radius: 6px;
-        border: 1px solid #ddd;
-        vertical-align: middle;
-        font-size: 0.9em;
-      ">
-        <img src="${iconUrl}" style="width:14px; height:14px; border-radius:2px;" crossorigin="anonymous">
-        ${shortName}
-      </a>`;
+    return `<a href="${url}" target="_blank" style="display: inline-flex; align-items: center; gap: 5px; color: #3b5998; text-decoration: none; font-weight: 600; background: #f0f2f5; padding: 2px 8px; border-radius: 6px; border: 1px solid #ddd; vertical-align: middle; font-size: 0.9em;"><img src="${iconUrl}" style="width:14px; height:14px; border-radius:2px;" crossorigin="anonymous">${shortName}</a>`;
   });
-  
-  // 2. Convert Hashtags
   return linkedText.replace(/#(\w+)/g, '<span style="color:var(--gb-hover);font-weight:bold;cursor:pointer" onclick="setFilter(\'hashtag\',\'#$1\')">#$1</span>'); 
 }
 
@@ -544,14 +474,11 @@ function timeAgo(d) {
   const s = Math.floor((Date.now() - new Date(d)) / 1000);
   if(s < 60) return "just now";
   if(s < 3600) return Math.floor(s/60) + "m";
-  if(s < 86400) return Math.floor(s/3600) + "h";
+  if(s < 8400) return Math.floor(s/3600) + "h";
   return Math.floor(s/86400) + "d";
 }
 
-function saveUser() { 
-  localStorage.setItem("gb_user", document.getElementById('user').value); 
-  loadFeed(); 
-}
+function saveUser() { localStorage.setItem("gb_user", document.getElementById('user').value); loadFeed(); }
 </script>
 </body>
 </html>
