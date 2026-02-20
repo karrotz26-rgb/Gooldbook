@@ -464,32 +464,38 @@ async function sharePost(rowIndex, event) {
   const originalText = btn.innerText;
   btn.innerText = "⏳ Wait...";
 
-  // 1. Setup the snapshot container
+  // 1. Create the snapshot container
   const card = document.createElement('div'); 
-  card.style.cssText = `
-    position: absolute; top: -9999px; left: -9999px; 
-    width: 400px; background: white; padding: 25px; 
-    border-radius: 12px; font-family: sans-serif; color: #1c1e21;
-  `;
+  card.style.cssText = `position: absolute; top: -9999px; left: -9999px; width: 400px; background: white; padding: 25px; border-radius: 12px; font-family: sans-serif; color: #1c1e21;`;
 
-  // 2. Prepare Avatar with CORS safety
-  const ava = allAvatars[post.user];
-  let avatarHtml = `<div style="width:50px; height:50px; border-radius:50%; background:#eee; display:flex; align-items:center; justify-content:center; font-size:25px;">🦄</div>`;
-  if (ava && ava !== "" && ava !== "undefined") {
-    // Adding crossorigin="anonymous" is the "Magic Fix" for html2canvas
-    avatarHtml = `<img src="${ava}" style="width:50px; height:50px; border-radius:50%; object-fit:cover;" crossorigin="anonymous">`;
-  }
+  // 2. Helper to ensure images don't break the canvas
+  const validateImg = (src) => {
+    return new Promise((resolve) => {
+      if (!src || src === "undefined") resolve(null);
+      const img = new Image();
+      img.crossOrigin = "Anonymous";
+      img.onload = () => resolve(src);
+      img.onerror = () => resolve(null); // If image is blocked, return null
+      img.src = src;
+    });
+  };
+
+  // Pre-validate images before building the card
+  const [safeAva, safePostImg] = await Promise.all([
+    validateImg(allAvatars[post.user]),
+    validateImg(post.image)
+  ]);
 
   card.innerHTML = `
     <div style="display:flex; align-items:center; gap:12px; margin-bottom:15px;">
-      ${avatarHtml}
+      ${safeAva ? `<img src="${safeAva}" style="width:50px; height:50px; border-radius:50%; object-fit:cover;" crossorigin="anonymous">` : `<div style="width:50px; height:50px; border-radius:50%; background:#eee; display:flex; align-items:center; justify-content:center; font-size:25px;">🦄</div>`}
       <div>
         <b style="font-size:18px; display:block;">${post.user}</b>
         <span style="color:#65676b; font-size:12px;">theGooldbook 🦄</span>
       </div>
     </div>
     <div style="font-size:16px; line-height:1.4; margin-bottom:15px; word-wrap: break-word;">${post.message}</div>
-    ${post.image ? `<img src="${post.image}" style="width:100%; border-radius:8px; margin-bottom:15px;" crossorigin="anonymous">` : ''}
+    ${safePostImg ? `<img src="${safePostImg}" style="width:100%; border-radius:8px; margin-bottom:15px;" crossorigin="anonymous">` : ''}
     <div style="display:flex; gap:20px; border-top:1px solid #ebedf0; padding-top:15px; color:#65676b; font-weight:bold; font-size:13px;">
       <span>❤️ ${post.likes.length} Likes</span>
       <span>💬 ${post.comments.length} Comments</span>
@@ -499,12 +505,9 @@ async function sharePost(rowIndex, event) {
   document.body.appendChild(card);
 
   try {
-    // Give images a split second to start the CORS handshake
-    await new Promise(r => setTimeout(r, 600));
-
     const canvas = await html2canvas(card, { 
       useCORS: true, 
-      allowTaint: false, // Must be false for navigator.share to work
+      allowTaint: false,
       scale: 2,
       backgroundColor: "#ffffff"
     });
@@ -513,19 +516,13 @@ async function sharePost(rowIndex, event) {
     
     canvas.toBlob(async (blob) => {
       if (!blob) throw new Error("Canvas generation failed");
-      const file = new File([blob], `Gooldbook-${post.user}.png`, { type: 'image/png' });
+      const file = new File([blob], `Gooldbook-Post.png`, { type: 'image/png' });
 
-      // Check if the browser actually supports file sharing
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ 
-          files: [file], 
-          title: 'theGooldbook',
-          text: `Check out ${post.user}'s post!` 
-        });
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'theGooldbook', text: `Check out ${post.user}'s post!` });
       } else {
-        // Fallback for desktop: Direct Download
         const link = document.createElement('a');
-        link.download = `Gooldbook-${post.user}.png`;
+        link.download = `Gooldbook-Post.png`;
         link.href = canvas.toDataURL("image/png");
         link.click();
       }
