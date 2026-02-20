@@ -427,22 +427,30 @@ async function sharePost(rowIndex, event) {
 
 function highlightHashtags(t) { 
   if(!t) return "";
-  try {
-    // Improved link detection that handles special characters better
-    let linkedText = t.replace(/(https?:\/\/[^\s]+)/g, (url) => {
+  // Single pass regex for links and hashtags
+  const regex = /(https?:\/\/[^\s]+)|#(\w+)/g;
+  
+  return t.replace(regex, (match, url, tag) => {
+    if (url) {
       try {
         const urlObj = new URL(url);
-        const shortName = urlObj.hostname.replace('www.', '');
-        return `<a href="${url}" target="_blank" style="color:#3b5998; text-decoration:none; font-weight:600; background:#f0f2f5; padding:2px 6px; border-radius:4px;">🔗 ${shortName}</a>`;
+        let shortName = urlObj.hostname.replace('www.', '');
+        // Truncate if the domain is too long (e.g., verylongsubdomain.website.com)
+        if (shortName.length > 20) shortName = shortName.substring(0, 18) + '...';
+        
+        return `<a href="${url}" target="_blank" style="color:#3b5998; text-decoration:none; font-weight:600; background:#f0f2f5; padding:2px 8px; border-radius:4px; white-space:nowrap; display:inline-block; margin:2px 0;">🔗 ${shortName}</a>`;
       } catch(e) {
-        // If the URL is slightly malformed, just return it as a plain link
-        return `<a href="${url}" target="_blank" style="color:#3b5998;">${url}</a>`;
+        // Fallback for weirdly formatted links
+        let fallback = url.length > 25 ? url.substring(0, 22) + '...' : url;
+        return `<a href="${url}" target="_blank" style="color:#3b5998;">${fallback}</a>`;
       }
-    });
-    return linkedText.replace(/#(\w+)/g, '<span style="color:var(--gb-hover);font-weight:bold;cursor:pointer" onclick="setFilter(\'hashtag\',\'#$1\')">#$1</span>'); 
-  } catch(e) {
-    return t; // If all else fails, return plain text so the app doesn't crash
-  }
+    }
+    if (tag) {
+      // Ensuring the hashtag search is case-insensitive and clean
+      return `<span style="color:var(--gb-hover);font-weight:bold;cursor:pointer" onclick="setFilter('hashtag','${match.toLowerCase()}')">${match}</span>`;
+    }
+    return match;
+  });
 }
 
 function render() {
