@@ -214,7 +214,7 @@ function render() {
   const composer = document.getElementById('postComposer');
   const feedEl = document.getElementById('feed');
   
-  // 1. Clear the feed entirely before re-rendering to prevent "ghost" posts
+  // 1. CLEAR: Wipe the feed completely to prevent DOM recycling "ghosts"
   feedEl.innerHTML = ""; 
 
   let filtered = allPosts.filter(p => 
@@ -252,9 +252,13 @@ function render() {
     statusEl.innerHTML = ""; 
   }
   
-  // 2. Map the filtered posts and join them into one clean string
-  const feedHTML = filtered.slice(0, postsToShow).map(p => `
-    <div class="card" id="post-${p.rowIndex}" data-id="${p.rowIndex}">
+  // 2. BUILD: Construct the HTML as a clean string
+  const feedHTML = filtered.slice(0, postsToShow).map(p => {
+    // Generate a unique ID for this specific render instance
+    const uniqueKey = `${p.rowIndex}-${new Date(p.timestamp).getTime()}`;
+    
+    return `
+    <div class="card" id="post-${p.rowIndex}" data-render-id="${uniqueKey}">
       <div class="user-header">
         ${getAvatarMarkup(p.user, 'avatar-small')}
         <div class="user-info">
@@ -262,21 +266,36 @@ function render() {
           <span class="time-stamp">${timeAgo(p.timestamp)}</span>
         </div>
       </div>
-      <p style="margin:10px 0;">${highlightHashtags(p.message)}</p>
-      ${p.image ? `<div style="min-height:200px; background:#f0f2f5; border-radius:4px; overflow:hidden;">
-                     <img src="${p.image}" class="post-img" crossorigin="anonymous" loading="lazy">
-                   </div>` : ''}
+      
+      <p style="margin:10px 0; white-space: pre-wrap;">${highlightHashtags(p.message)}</p>
+      
+      ${p.image ? `
+        <div style="min-height:200px; background:#f0f2f5; border-radius:8px; margin-top:10px; overflow:hidden;">
+          <img src="${p.image}" 
+               key="img-${uniqueKey}" 
+               class="post-img" 
+               crossorigin="anonymous" 
+               loading="lazy"
+               style="display: block; width: 100%; height: auto;"
+               onerror="this.style.display='none'">
+        </div>
+      ` : ''}
+
       <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
         <div style="display:flex; gap:10px; align-items:center;">
-          <button class="btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} ${p.likes.length}</button>
+          <button class="btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">
+            ${p.likes.includes(u) ? '❤️' : '👍'} ${p.likes.length}
+          </button>
           <button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
         </div>
+        
         ${p.likes.length > 0 ? `
           <div style="font-size:11px; color:#65676b; margin-left:5px;">
             Liked by: ${p.likes.map(name => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()}</b>`).join(', ')}
           </div>
         ` : ''}
       </div>
+
       <div class="comment-section" style="margin-top:10px;">
         ${p.comments.map(c => `
           <div class="comment-box">
@@ -288,9 +307,11 @@ function render() {
           <button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button>
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
-  feedEl.innerHTML = feedHTML || '<div class="card">No posts found.</div>';
+  // 3. INJECT: Add all posts at once
+  feedEl.innerHTML = feedHTML || '<div class="card" style="text-align:center; color:#888;">No posts found.</div>';
   
   document.getElementById('loadMore').style.display = filtered.length > postsToShow ? 'block' : 'none';
   updateSidebar();
