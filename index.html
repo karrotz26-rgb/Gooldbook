@@ -477,10 +477,16 @@ function render() {
     } else {
         let label = filterType === 'likes' ? `Liked by ${filterVal}` : `Tagged ${filterVal}`;
         statusEl.innerHTML = `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>Showing: <b>${label}</b></span><button class="btn-alt" onclick="setFilter(null,null)">Clear</button></div>`;
+        
         if(filterType === 'likes') filtered = filtered.filter(p => p.likes.includes(filterVal));
+        
         if(filterType === 'hashtag') {
           const tag = filterVal.toLowerCase();
-          filtered = filtered.filter(p => (p.message || "").toLowerCase().includes(tag));
+          // UPDATED: Now looks in both message AND comments
+          filtered = filtered.filter(p => 
+            (p.message || "").toLowerCase().includes(tag) || 
+            p.comments.some(c => (c.text || "").toLowerCase().includes(tag))
+          );
         }
     }
   } else { composer.style.display = "block"; statusEl.innerHTML = ""; }
