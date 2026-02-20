@@ -507,14 +507,39 @@ async function sharePost(rowIndex, event) {
   }
 }
 
-function highlightHashtags(t) { return t.replace(/#(\w+)/g, '<span style="color:var(--gb-hover);font-weight:bold;cursor:pointer" onclick="setFilter(\'hashtag\',\'#$1\')">#$1</span>'); }
-function timeAgo(d) {
-  if(!d) return "just now";
-  const s = Math.floor((Date.now() - new Date(d)) / 1000);
-  if(s < 60) return "just now";
-  if(s < 3600) return Math.floor(s/60) + "m";
-  if(s < 86400) return Math.floor(s/3600) + "h";
-  return Math.floor(s/86400) + "d";
+function highlightHashtags(t) { 
+  if(!t) return "";
+  
+  // 1. Convert URLs to clean "Link Pills" with Favicons and Short Names
+  let linkedText = t.replace(/(https?:\/\/[^\s]+)/g, (url) => {
+    // Fetch favicon using Google's service
+    const iconUrl = `https://www.google.com/s2/favicons?sz=32&domain=${url}`;
+    
+    // Clean the URL to show only the domain (e.g., 'google.com')
+    const shortName = url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+
+    return `
+      <a href="${url}" target="_blank" style="
+        display: inline-flex; 
+        align-items: center; 
+        gap: 5px; 
+        color: #3b5998; 
+        text-decoration: none; 
+        font-weight: 600;
+        background: #f0f2f5;
+        padding: 2px 8px;
+        border-radius: 6px;
+        border: 1px solid #ddd;
+        vertical-align: middle;
+        font-size: 0.9em;
+      ">
+        <img src="${iconUrl}" style="width:14px; height:14px; border-radius:2px;" crossorigin="anonymous">
+        ${shortName}
+      </a>`;
+  });
+  
+  // 2. Convert Hashtags
+  return linkedText.replace(/#(\w+)/g, '<span style="color:var(--gb-hover);font-weight:bold;cursor:pointer" onclick="setFilter(\'hashtag\',\'#$1\')">#$1</span>'); 
 }
 function saveUser() { localStorage.setItem("gb_user", document.getElementById('user').value); loadFeed(); }
 </script>
