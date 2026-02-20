@@ -111,7 +111,7 @@ let newPostCount = 0;
 
 window.onload = () => {
   document.getElementById('user').value = localStorage.getItem("gb_user") || "";
-  loadFeed(); // Always fetch fresh data on load
+  loadFeed(); 
   setInterval(pollForUpdates, 30000);
 };
 
@@ -161,83 +161,49 @@ function dismissNotif() {
 }
 
 function setFilter(type, val) {
-  if (filterVal === val && filterType === type) { filterVal = null; filterType = null; } 
-  else { filterVal = val; filterType = type; window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  if (filterVal === val && filterType === type) { 
+    filterVal = null; 
+    filterType = null; 
+  } else { 
+    filterVal = val; 
+    filterType = type; 
+    // Automatically go to the top when navigating to a profile
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    document.body.scrollTop = 0;
+    document.documentElement.scrollTop = 0;
+  }
   render();
 }
 
 function getAvatarMarkup(user, sizeClass) {
   const ava = allAvatars[user];
-  
-  if (!ava || ava === "" || ava === "undefined") {
-    return `<div class="${sizeClass}">🦄</div>`;
-  }
-
+  if (!ava || ava === "" || ava === "undefined") return `<div class="${sizeClass}">🦄</div>`;
   let finalSrc = ava;
-
-  // FIX: If it's a Drive link, convert it to the high-compatibility format
   if (ava.includes("googleusercontent.com/profile/picture/0")) {
-     const parts = ava.split("picture/0");
-     if (parts.length > 1) {
-       const id = parts[1];
-       // We use lh3.googleusercontent.com which is the most reliable for <img> tags
-       finalSrc = `https://lh3.googleusercontent.com/d/${id}`;
-     }
+     const id = ava.split("picture/0")[1];
+     finalSrc = `https://lh3.googleusercontent.com/d/${id}`;
   }
-
-  // Add a cache buster so that if you change your photo, it updates immediately
   const cacheBuster = finalSrc.includes('?') ? `&t=${Date.now()}` : `?t=${Date.now()}`;
-
-  return `<img src="${finalSrc}${cacheBuster}" 
-               class="${sizeClass}" 
-               loading="lazy"
-               onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=🦄';">`;
+  return `<img src="${finalSrc}${cacheBuster}" class="${sizeClass}" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=🦄';">`;
 }
 
 async function uploadAvatar(user) {
   const file = document.getElementById('avaPick').files[0];
   if(!file) return;
-  
   const btn = document.getElementById('editBioBtn');
   if(btn) btn.innerText = "Processing...";
   const preview = document.querySelector('.avatar-large');
   if(preview) preview.style.opacity = "0.3";
-
   const base64 = await compressImage(file);
-  
-  await fetch(SCRIPT_URL, { 
-    method: 'POST', 
-    mode: 'no-cors', 
-    body: JSON.stringify({ 
-      action: 'updateBio', 
-      username: user, 
-      bio: allBios[user] || "", 
-      avatar: base64 
-    }) 
-  });
-  
-  // Longer timeout to allow Google Drive and Sheets to sync
-  setTimeout(async () => {
-    await loadFeed();
-    if(btn) btn.innerText = "Edit Bio";
-    render();
-  }, 4000); 
+  await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'updateBio', username: user, bio: allBios[user] || "", avatar: base64 }) });
+  setTimeout(async () => { await loadFeed(); if(btn) btn.innerText = "Edit Bio"; render(); }, 4000); 
 }
 
 async function saveBio(user) {
   const bio = document.getElementById('newBio').value;
   allBios[user] = bio;
   render();
-  await fetch(SCRIPT_URL, { 
-    method: 'POST', 
-    mode: 'no-cors', 
-    body: JSON.stringify({ 
-      action: 'updateBio', 
-      username: user, 
-      bio: bio, 
-      avatar: allAvatars[user] || "" 
-    }) 
-  });
+  await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'updateBio', username: user, bio: bio, avatar: allAvatars[user] || "" }) });
   setTimeout(loadFeed, 2000);
 }
 
@@ -268,18 +234,10 @@ function render() {
     } else {
         let label = filterType === 'likes' ? `Liked by ${filterVal}` : `Tagged ${filterVal}`;
         statusEl.innerHTML = `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>Showing: <b>${label}</b></span><button class="btn-alt" onclick="setFilter(null,null)">Clear</button></div>`;
-        
-        if(filterType === 'likes') {
-          filtered = filtered.filter(p => p.likes.includes(filterVal));
-        }
-        
+        if(filterType === 'likes') filtered = filtered.filter(p => p.likes.includes(filterVal));
         if(filterType === 'hashtag') {
           const tag = filterVal.toLowerCase();
-          filtered = filtered.filter(p => {
-            const inPost = (p.message || "").toLowerCase().includes(tag);
-            const inComments = p.comments.some(c => (c.text || "").toLowerCase().includes(tag));
-            return inPost || inComments;
-          });
+          filtered = filtered.filter(p => (p.message || "").toLowerCase().includes(tag) || p.comments.some(c => (c.text || "").toLowerCase().includes(tag)));
         }
     }
   } else { composer.style.display = "block"; statusEl.innerHTML = ""; }
@@ -295,9 +253,16 @@ function render() {
       </div>
       <p style="margin:10px 0;">${highlightHashtags(p.message)}</p>
       ${p.image ? `<img src="${p.image}" class="post-img" crossorigin="anonymous">` : ''}
-      <div style="margin-top:12px; display:flex; gap:10px;">
-        <button class="btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} ${p.likes.length}</button>
-        <button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
+      <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button class="btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} ${p.likes.length}</button>
+          <button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
+        </div>
+        ${p.likes.length > 0 ? `
+          <div style="font-size:11px; color:#65676b; margin-left:5px;">
+            Liked by: ${p.likes.map(name => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()}</b>`).join(', ')}
+          </div>
+        ` : ''}
       </div>
       <div class="comment-section" style="margin-top:10px;">
         ${p.comments.map(c => `
@@ -319,35 +284,12 @@ function render() {
 function updateSidebar() {
   const myName = document.getElementById('user').value.trim();
   document.getElementById('myProfileLink').innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', '${myName}')">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
-  
-  const topPosts = [...allPosts].sort((a,b) => {
-    const scoreA = (a.likes?.length || 0) + (a.comments?.length || 0);
-    const scoreB = (b.likes?.length || 0) + (b.comments?.length || 0);
-    return scoreB - scoreA;
-  }).slice(0,3);
-
-  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b><br>${topPosts.map(p => `
-    <div class="sidebar-item" onclick="scrollToPost(${p.rowIndex})">
-      <div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div>
-      <div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div>
-      <span class="trend-stats">❤️ ${p.likes.length} • 💬 ${p.comments.length}</span>
-    </div>`).join('')}</div>`;
-
-  const lCounts = {};
-  allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
+  const topPosts = [...allPosts].sort((a,b) => ((b.likes?.length || 0) + (b.comments?.length || 0)) - ((a.likes?.length || 0) + (a.comments?.length || 0))).slice(0,3);
+  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b><br>${topPosts.map(p => `<div class="sidebar-item" onclick="scrollToPost(${p.rowIndex})"><div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div><div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div><span class="trend-stats">❤️ ${p.likes.length} • 💬 ${p.comments.length}</span></div>`).join('')}</div>`;
+  const lCounts = {}; allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
   const top = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
   document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${top.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
-
-  const hCounts = {};
-  allPosts.forEach(p => { 
-    const postTags = (p.message || "").match(/#(\w+)/g) || [];
-    const commentTags = p.comments.flatMap(c => (c.text || "").match(/#(\w+)/g) || []);
-    [...postTags, ...commentTags].forEach(t => {
-      const lower = t.toLowerCase();
-      hCounts[lower] = (hCounts[lower] || 0) + 1;
-    });
-  });
-
+  const hCounts = {}; allPosts.forEach(p => { const tags = ((p.message || "") + p.comments.map(c=>c.text).join(" ")).match(/#(\w+)/g) || []; tags.forEach(t => hCounts[t.toLowerCase()] = (hCounts[t.toLowerCase()] || 0) + 1); });
   const topTags = Object.entries(hCounts).sort((a,b) => b[1] - a[1]).slice(0,5);
   document.getElementById('hashtags').innerHTML = `<div class="sidebar-card"><b>#️⃣ Trending Tags</b><br>${topTags.map(([tag, count]) => `<div class="sidebar-item" onclick="setFilter('hashtag','${tag}')">${tag} <small>(${count})</small></div>`).join('') || 'No tags yet'}</div>`;
 }
@@ -363,9 +305,7 @@ function performScroll(id) {
     window.scrollTo({ top: el.offsetTop - 70, behavior: 'smooth' });
     el.classList.add('highlight-card');
     setTimeout(() => el.classList.remove('highlight-card'), 2000);
-  } else {
-    postsToShow += 5; render(); setTimeout(() => performScroll(id), 100);
-  }
+  } else { postsToShow += 5; render(); setTimeout(() => performScroll(id), 100); }
 }
 
 async function upload() {
@@ -375,8 +315,7 @@ async function upload() {
   const img = file ? await compressImage(file) : "";
   await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action:'post', username:user, message:msg, image:img }) });
   document.getElementById('msg').value = ""; document.getElementById('file').value = "";
-  loadFeed();
-  document.getElementById('postBtn').innerText = "Post Update";
+  loadFeed(); document.getElementById('postBtn').innerText = "Post Update";
 }
 
 async function compressImage(file) {
@@ -386,10 +325,8 @@ async function compressImage(file) {
       const i = new Image(); i.src = e.target.result;
       i.onload = () => {
         const c = document.createElement('canvas'); const m = 800;
-        let w = i.width, h = i.height;
-        if(w > m){ h *= m/w; w = m; }
-        c.width = w; c.height = h;
-        c.getContext('2d').drawImage(i,0,0,w,h);
+        let w = i.width, h = i.height; if(w > m){ h *= m/w; w = m; }
+        c.width = w; c.height = h; c.getContext('2d').drawImage(i,0,0,w,h);
         res(c.toDataURL('image/jpeg', 0.7));
       };
     };
@@ -413,8 +350,7 @@ async function apiCall(action, rowIndex, event) {
     if(!input.value) return;
     const txt = input.value;
     p.comments.push({ user, text: txt, time: new Date().toISOString() });
-    input.value = "";
-    render();
+    input.value = ""; render();
     fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, rowIndex, username:user, text: txt }) });
     return;
   }
@@ -439,7 +375,6 @@ async function sharePost(rowIndex, event) {
 }
 
 function highlightHashtags(t) { return t.replace(/#(\w+)/g, '<span style="color:var(--gb-hover);font-weight:bold;cursor:pointer" onclick="setFilter(\'hashtag\',\'#$1\')">#$1</span>'); }
-
 function timeAgo(d) {
   if(!d) return "just now";
   const s = Math.floor((Date.now() - new Date(d)) / 1000);
@@ -448,13 +383,7 @@ function timeAgo(d) {
   if(s < 86400) return Math.floor(s/3600) + "h";
   return Math.floor(s/86400) + "d";
 }
-
-function saveUser() { 
-  const val = document.getElementById('user').value;
-  localStorage.setItem("gb_user", val); 
-  // Force a data refresh when name changes to ensure profile syncs
-  loadFeed(); 
-}
+function saveUser() { localStorage.setItem("gb_user", document.getElementById('user').value); loadFeed(); }
 </script>
 </body>
 </html>
