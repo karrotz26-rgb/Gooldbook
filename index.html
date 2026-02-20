@@ -277,8 +277,11 @@ function render() {
       <div class="comment-section" style="margin-top:10px;">
         ${p.comments.map(c => `
           <div class="comment-box">
-            <b onclick="setFilter('author', '${c.user}')" style="cursor:pointer">${c.user}</b>: 
-            ${highlightHashtags(c.text)}
+            <div style="display:flex; justify-content:space-between; align-items:start;">
+              <b onclick="setFilter('author', '${c.user}')" style="cursor:pointer">${c.user}</b>
+              <span style="font-size:10px; color:#888;">${timeAgo(c.time)}</span>
+            </div>
+            <div style="margin-top:2px;">${highlightHashtags(c.text)}</div>
           </div>`).join('')}
         <div style="margin-top:10px">
           <input id="c-${p.rowIndex}" placeholder="Write a comment..." style="margin-bottom:0; font-size:13px !important;">
@@ -470,12 +473,26 @@ function highlightHashtags(t) {
 }
 
 function timeAgo(d) {
-  if(!d) return "just now";
-  const s = Math.floor((Date.now() - new Date(d)) / 1000);
-  if(s < 60) return "just now";
-  if(s < 3600) return Math.floor(s/60) + "m";
-  if(s < 8400) return Math.floor(s/3600) + "h";
-  return Math.floor(s/86400) + "d";
+  if (!d) return "just now";
+  const seconds = Math.floor((Date.now() - new Date(d)) / 1000);
+  
+  if (seconds < 60) return "just now";
+  
+  const intervals = {
+    yr: 31536000,
+    mo: 2592000,
+    d: 86400,
+    h: 3600,
+    m: 60
+  };
+
+  for (let key in intervals) {
+    const counter = Math.floor(seconds / intervals[key]);
+    if (counter > 0) {
+      return counter + key;
+    }
+  }
+  return "just now";
 }
 
 function saveUser() { localStorage.setItem("gb_user", document.getElementById('user').value); loadFeed(); }
