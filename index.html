@@ -378,8 +378,27 @@ function updateSidebar() {
     </div>`;
 }
 function scrollToPost(id) {
-  if (filterVal) { setFilter(null, null); setTimeout(() => performScroll(id), 300); } 
-  else { performScroll(id); }
+  // If we are currently filtered, clear it first so the post is actually visible
+  if (filterVal) { 
+    setFilter(null, null); 
+    setTimeout(() => performScroll(id), 300); 
+  } else { 
+    performScroll(id); 
+  }
+}
+
+function performScroll(id) {
+  const el = document.getElementById(`post-${id}`);
+  if (el) {
+    window.scrollTo({ top: el.offsetTop - 70, behavior: 'smooth' });
+    el.classList.add('highlight-card');
+    setTimeout(() => el.classList.remove('highlight-card'), 2000);
+  } else { 
+    // If post isn't rendered yet (pagination), load more and try again
+    postsToShow += 5; 
+    render(); 
+    setTimeout(() => performScroll(id), 100); 
+  }
 }
 
 function performScroll(id) {
