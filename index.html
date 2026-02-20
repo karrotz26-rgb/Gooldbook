@@ -436,19 +436,75 @@ async function apiCall(action, rowIndex, event) {
 }
 
 async function sharePost(rowIndex, event) {
-  const post = allPosts.find(p => p.rowIndex === rowIndex); if (!post) return;
-  const btn = event.target; btn.innerText = "⏳ Wait...";
-  const card = document.createElement('div'); card.style.cssText = `position: fixed; left: -9999px; width: 400px; background: white; padding: 25px; border-radius: 12px; font-family: sans-serif;`;
-  card.innerHTML = `<h3>🦄 theGooldbook</h3><p>${post.message}</p>${post.image ? `<img src="${post.image}" style="width:100%;">` : ''}<p><small>Post by ${post.user}</small></p>`;
+  const post = allPosts.find(p => p.rowIndex === rowIndex); 
+  if (!post) return;
+  
+  const btn = event.target; 
+  const originalText = btn.innerText;
+  btn.innerText = "⏳ Wait...";
+
+  // Create temporary container for the share image
+  const card = document.createElement('div');
+  card.style.cssText = `
+    position: fixed; 
+    left: -9999px; 
+    width: 400px; 
+    background: white; 
+    padding: 20px; 
+    border-radius: 12px; 
+    font-family: system-ui, -apple-system, sans-serif;
+    color: #1c1e21;
+  `;
+
+  // Construct the HTML for the share card
+  card.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+      ${getAvatarMarkup(post.user, 'avatar-small')}
+      <div>
+        <div style="font-weight: bold; color: #3b5998;">${post.user}</div>
+        <div style="font-size: 11px; color: #888;">theGooldbook 🦄</div>
+      </div>
+    </div>
+    <div style="font-size: 16px; margin-bottom: 15px; line-height: 1.4;">${post.message}</div>
+    ${post.image ? `<img src="${post.image}" style="width:100%; border-radius: 8px; margin-bottom: 10px;">` : ''}
+    <div style="display: flex; gap: 15px; border-top: 1px solid #eee; pt: 10px; padding-top: 10px; font-size: 13px; font-weight: bold; color: #65676b;">
+      <span>❤️ ${post.likes.length} Likes</span>
+      <span>💬 ${post.comments.length} Comments</span>
+    </div>
+  `;
+
   document.body.appendChild(card);
+
   try {
-    const canvas = await html2canvas(card, { useCORS: true });
+    // capturing the card with useCORS enabled for images
+    const canvas = await html2canvas(card, { 
+      useCORS: true,
+      scale: 2, // higher quality
+      backgroundColor: "#ffffff"
+    });
+    
     document.body.removeChild(card);
     const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-    const file = new File([blob], 'post.png', { type: 'image/png' });
-    if (navigator.share) await navigator.share({ files: [file], title: 'theGooldbook' });
-    else window.open(canvas.toDataURL());
-  } catch(e) { alert("Share failed."); } finally { btn.innerText = "🔗 Share"; }
+    const file = new File([blob], `Gooldbook_Post_${rowIndex}.png`, { type: 'image/png' });
+
+    if (navigator.share) {
+      await navigator.share({ 
+        files: [file], 
+        title: `Post by ${post.user} on Gooldbook` 
+      });
+    } else {
+      // Fallback for browsers that don't support Web Share API
+      const link = document.createElement('a');
+      link.download = `Gooldbook_Post_${rowIndex}.png`;
+      link.href = canvas.toDataURL();
+      link.click();
+    }
+  } catch(e) { 
+    console.error(e);
+    alert("Share failed. Please try again."); 
+  } finally { 
+    btn.innerText = originalText; 
+  }
 }
 
 function highlightHashtags(t) { return t.replace(/#(\w+)/g, '<span style="color:var(--gb-hover);font-weight:bold;cursor:pointer" onclick="setFilter(\'hashtag\',\'#$1\')">#$1</span>'); }
