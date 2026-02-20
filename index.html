@@ -460,67 +460,76 @@ async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
   
-  // 1. Immediate UI Feedback
   const btn = event.currentTarget || event.target; 
   const originalText = btn.innerText;
   btn.innerText = "⏳...";
 
-  // 2. Build the snapshot card HTML immediately
+  // 1. Create the container
   const card = document.createElement('div'); 
-  card.style.cssText = `position:fixed; top:-9999px; left:-9999px; width:350px; background:white; padding:20px; border-radius:10px; font-family:sans-serif;`;
+  card.style.cssText = `
+    position: absolute; top: -9999px; left: -9999px; 
+    width: 350px; background: white; padding: 20px; 
+    border-radius: 12px; font-family: sans-serif; color: #1c1e21;
+  `;
 
-  const ava = allAvatars[post.user];
-  const avatarHtml = (ava && ava !== "" && ava !== "undefined") 
-    ? `<img src="${ava}" style="width:40px; height:40px; border-radius:50%;" crossorigin="anonymous">`
-    : `<div style="width:40px; height:40px; border-radius:50%; background:#eee; display:flex; align-items:center; justify-content:center;">🦄</div>`;
-
+  // 2. Build the Content (Restoring Likes/Comments)
   card.innerHTML = `
-    <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-      ${avatarHtml}
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+      <div style="width:40px; height:40px; border-radius:50%; background:#eee; display:flex; align-items:center; justify-content:center; font-size:20px;">🦄</div>
       <b style="font-size:16px;">${post.user}</b>
     </div>
-    <div style="font-size:14px; margin-bottom:10px;">${post.message}</div>
-    ${post.image ? `<img src="${post.image}" style="width:100%; border-radius:5px;" crossorigin="anonymous">` : ''}
-    <div style="margin-top:10px; font-size:12px; color:#666; font-weight:bold; border-top:1px solid #eee; padding-top:10px;">
-      ❤️ ${post.likes.length} Likes &nbsp;&nbsp; 💬 ${post.comments.length} Comments
+    <div style="font-size:15px; line-height:1.4; margin-bottom:12px;">${post.message}</div>
+    ${post.image ? `<img src="${post.image}" style="width:100%; border-radius:8px; margin-bottom:12px;" crossorigin="anonymous">` : ''}
+    <div style="display:flex; gap:15px; border-top:1px solid #eee; padding-top:10px; color:#65676b; font-weight:bold; font-size:12px;">
+      <span>❤️ ${post.likes.length} Likes</span>
+      <span>💬 ${post.comments.length} Comments</span>
     </div>
   `;
 
   document.body.appendChild(card);
 
   try {
-    // 3. Fast Render (Lower scale for speed)
+    // 3. The "Force Resolve" Logic
+    // We tell html2canvas to ignore images that are taking too long to load
     const canvas = await html2canvas(card, { 
       useCORS: true, 
-      scale: 1, 
-      logging: false,
-      backgroundColor: "#ffffff"
+      allowTaint: false,
+      scale: 1.5,
+      backgroundColor: "#ffffff",
+      imageTimeout: 3000 // If images take > 3s, just render the text
     });
     
     document.body.removeChild(card);
     
-    // 4. Immediate Share (Crucial for Safari)
     canvas.toBlob(async (blob) => {
-      if (!blob) return;
-      const file = new File([blob], 'post.png', { type: 'image/png' });
+      if (!blob) {
+         btn.innerText = originalText;
+         return;
+      }
+      const file = new File([blob], `Post.png`, { type: 'image/png' });
 
-      try {
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file] });
-        } else {
-          // If images are blocked, share just text so it doesn't "do nothing"
-          await navigator.share({ text: post.message });
-        }
-      } catch (err) { console.log("User cancelled"); }
-      
+      if (navigator.share) {
+        // If file sharing fails (Safari timeout), it will catch below
+        await navigator.share({ 
+          files: [file],
+          title: 'theGooldbook',
+          text: post.message 
+        });
+      }
       btn.innerText = originalText;
     }, 'image/png');
 
-  } catch(e) {
-    // If the engine fails, share the text instantly
-    document.body.removeChild(card);
-    navigator.share({ text: post.message });
+  } catch(e) { 
+    console.error("Share error:", e);
+    // If the image fails, Safari will still share the text instantly
+    if (navigator.share) {
+      await navigator.share({
+        title: 'theGooldbook',
+        text: `${post.user}: ${post.message}\n\n❤️ ${post.likes.length} Likes`
+      });
+    }
     btn.innerText = originalText;
+    if (card.parentNode) document.body.removeChild(card);
   }
 }
 
