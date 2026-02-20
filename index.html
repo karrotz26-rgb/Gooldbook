@@ -312,11 +312,13 @@ function render() {
 function updateSidebar() {
   const myName = document.getElementById('user').value.trim();
   
+  // 1. My Profile Link Section
   document.getElementById('myProfileLink').innerHTML = myName ? 
     `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', '${myName}')">
       ${getAvatarMarkup(myName, 'avatar-small')} My Profile
     </div>` : "";
   
+  // 2. Trending Activity (CRITICAL: We use [...] to copy the array so we don't mess up the feed order!)
   const topPosts = [...allPosts].sort((a,b) => {
     const scoreA = (a.likes?.length || 0) + (a.comments?.length || 0);
     const scoreB = (b.likes?.length || 0) + (b.comments?.length || 0);
@@ -334,6 +336,7 @@ function updateSidebar() {
         </div>`).join('')}
     </div>`;
 
+  // 3. Top Likers Leaderboard (Also using a copy for safety)
   const lCounts = {}; 
   allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
   const topLikers = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
@@ -347,6 +350,7 @@ function updateSidebar() {
         </div>`).join('')}
     </div>`;
 
+  // 4. #️⃣ Trending Tags
   const hCounts = {}; 
   allPosts.forEach(p => { 
     const fullText = (p.message || "") + " " + p.comments.map(c => c.text).join(" ");
@@ -373,7 +377,6 @@ function updateSidebar() {
       </div>
     </div>`;
 }
-
 function scrollToPost(id) {
   if (filterVal) { setFilter(null, null); setTimeout(() => performScroll(id), 300); } 
   else { performScroll(id); }
