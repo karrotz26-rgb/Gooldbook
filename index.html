@@ -21,6 +21,10 @@
     .nav-icon { background: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
     .nav-badge { background: #e74c3c; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 11px; display: none; align-items: center; justify-content: center; font-weight: bold; margin-left: -8px; margin-top: -16px; }
 
+    /* Back to Top Button */
+    #backToTop { position: fixed; bottom: 20px; right: 20px; width: 45px; height: 45px; background: var(--gb-blue); color: white; border-radius: 50%; display: none; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 2000; transition: transform 0.2s; border: 2px solid white; }
+    #backToTop:hover { transform: scale(1.1); background: var(--gb-hover); }
+
     .notif-banner { position: fixed; top: calc(60px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); background: #1c1e21; color: white; padding: 12px 20px; border-radius: 12px; font-size: 14px; z-index: 9000; display: none; align-items: center; gap: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); max-width: 90vw; cursor: pointer; animation: slideDown 0.3s ease; }
     .notif-banner.show { display: flex; }
     @keyframes slideDown { from { transform: translateX(-50%) translateY(-20px); opacity: 0; } to { transform: translateX(-50%) translateY(0); opacity: 1; } }
@@ -39,7 +43,6 @@
     .user-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
     .user-info { flex-grow: 1; }
     .user-name { color: var(--gb-blue); font-weight:bold; cursor: pointer; display: block; }
-    .user-name:hover { text-decoration: underline; }
     .time-stamp { font-size:11px; color:#888; }
     
     .post-img { width:100%; max-height:500px; object-fit: cover; margin-top:10px; border-radius:4px; display:block; background:#f0f2f5; }
@@ -52,7 +55,6 @@
     .btn-comment { background: var(--gb-blue); color: white; border: none; padding: 8px; border-radius: 4px; width: 100%; font-weight: bold; margin-top: 5px; font-size: 12px; }
 
     .comment-box { background: #f0f2f5; padding: 8px; border-radius: 8px; margin-top: 5px; font-size: 13px; }
-
     .sidebar-item { cursor:pointer; padding:8px 6px; border-bottom:1px solid #eee; transition: background 0.2s; border-radius: 4px; }
     .sidebar-item:hover { background: #f0f2f5; }
     .trend-stats { font-size: 10px; color: #888; display: block; margin-top: 2px; }
@@ -64,6 +66,8 @@
   </style>
 </head>
 <body>
+
+<div id="backToTop" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">⬆️</div>
 
 <div class="notif-banner" id="notifBanner" onclick="dismissNotif()">
   <span id="notifText"></span>
@@ -115,6 +119,15 @@ window.onload = () => {
   setInterval(pollForUpdates, 30000);
 };
 
+window.onscroll = function() {
+  const btn = document.getElementById("backToTop");
+  if (document.body.scrollTop > 400 || document.documentElement.scrollTop > 400) {
+    btn.style.display = "flex";
+  } else {
+    btn.style.display = "none";
+  }
+};
+
 async function loadFeed() {
   try {
     const res = await fetch(SCRIPT_URL);
@@ -162,14 +175,10 @@ function dismissNotif() {
 
 function setFilter(type, val) {
   if (filterVal === val && filterType === type) { 
-    filterVal = null; 
-    filterType = null; 
+    filterVal = null; filterType = null; 
   } else { 
-    filterVal = val; 
-    filterType = type; 
+    filterVal = val; filterType = type; 
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    document.body.scrollTop = 0;
-    document.documentElement.scrollTop = 0;
   }
   render();
 }
@@ -179,8 +188,8 @@ function getAvatarMarkup(user, sizeClass) {
   if (!ava || ava === "" || ava === "undefined") return `<div class="${sizeClass}">🦄</div>`;
   let finalSrc = ava;
   if (ava.includes("googleusercontent.com/profile/picture/0")) {
-     const id = ava.split("picture/0")[1];
-     finalSrc = `https://lh3.googleusercontent.com/d/${id}`;
+     const parts = ava.split("picture/0");
+     finalSrc = parts[0] + "picture/0" + (parts[1] || "");
   }
   const cacheBuster = finalSrc.includes('?') ? `&t=${Date.now()}` : `?t=${Date.now()}`;
   return `<img src="${finalSrc}${cacheBuster}" class="${sizeClass}" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=🦄';">`;
@@ -191,8 +200,6 @@ async function uploadAvatar(user) {
   if(!file) return;
   const btn = document.getElementById('editBioBtn');
   if(btn) btn.innerText = "Processing...";
-  const preview = document.querySelector('.avatar-large');
-  if(preview) preview.style.opacity = "0.3";
   const base64 = await compressImage(file);
   await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'updateBio', username: user, bio: allBios[user] || "", avatar: base64 }) });
   setTimeout(async () => { await loadFeed(); if(btn) btn.innerText = "Edit Bio"; render(); }, 4000); 
@@ -215,187 +222,80 @@ function render() {
   
   feedEl.innerHTML = ""; 
 
-  // Filter based on search bar text
   let filtered = allPosts.filter(p => 
     (p.message || "").toLowerCase().includes(s) || 
     (p.user || "").toLowerCase().includes(s)
   );
   
-  // Apply Sidebar Filters (Author, Likes, Hashtags)
   if (filterVal) {
     composer.style.display = "none";
     if (filterType === 'author') {
         const bio = allBios[filterVal] || "A mysterious Gooldbooker.";
         const isMe = filterVal === u;
-        statusEl.innerHTML = `
-          <div class="card" style="text-align:center;">
-            ${getAvatarMarkup(filterVal, 'avatar-large')}
-            ${isMe ? `<input type="file" id="avaPick" style="display:none" onchange="uploadAvatar('${u}')"><button class="btn-alt" style="margin-bottom:10px" onclick="document.getElementById('avaPick').click()">Change Photo</button>` : ''}
-            <h2 style="margin:0">${filterVal}</h2>
-            <p id="pBio" style="font-style:italic; color:#555">"${bio}"</p>
-            ${isMe ? `<div id="bioEdit" style="display:none"><textarea id="newBio">${bio}</textarea><button class="btn" onclick="saveBio('${u}')">Save</button></div><button class="btn-alt" id="editBioBtn" onclick="document.getElementById('bioEdit').style.display='block'; this.style.display='none'">Edit Bio</button>` : ''}
-            <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
-            <button class="btn-alt" onclick="setFilter(null,null)">← Back to Feed</button>
-          </div>`;
+        statusEl.innerHTML = `<div class="card" style="text-align:center;">${getAvatarMarkup(filterVal, 'avatar-large')}${isMe ? `<input type="file" id="avaPick" style="display:none" onchange="uploadAvatar('${u}')"><button class="btn-alt" style="margin-bottom:10px" onclick="document.getElementById('avaPick').click()">Change Photo</button>` : ''}<h2 style="margin:0">${filterVal}</h2><p style="font-style:italic; color:#555">"${bio}"</p>${isMe ? `<div id="bioEdit" style="display:none"><textarea id="newBio">${bio}</textarea><button class="btn" onclick="saveBio('${u}')">Save</button></div><button class="btn-alt" id="editBioBtn" onclick="document.getElementById('bioEdit').style.display='block'; this.style.display='none'">Edit Bio</button>` : ''}<hr style="border:0; border-top:1px solid #eee; margin:15px 0;"><button class="btn-alt" onclick="setFilter(null,null)">← Back to Feed</button></div>`;
         filtered = filtered.filter(p => p.user === filterVal);
-    } else if (filterType === 'likes') {
-        statusEl.innerHTML = `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>Showing: <b>Liked by ${filterVal}</b></span><button class="btn-alt" onclick="setFilter(null,null)">Clear</button></div>`;
-        filtered = filtered.filter(p => p.likes.includes(filterVal));
-    } else if (filterType === 'hashtag') {
-        statusEl.innerHTML = `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>Showing: <b>Tag ${filterVal}</b></span><button class="btn-alt" onclick="setFilter(null,null)">Clear</button></div>`;
-        const tag = filterVal.toLowerCase();
-        filtered = filtered.filter(p => (p.message || "").toLowerCase().includes(tag));
+    } else {
+        let label = filterType === 'likes' ? `Liked by ${filterVal}` : `Tagged ${filterVal}`;
+        statusEl.innerHTML = `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>Showing: <b>${label}</b></span><button class="btn-alt" onclick="setFilter(null,null)">Clear</button></div>`;
+        if(filterType === 'likes') filtered = filtered.filter(p => p.likes.includes(filterVal));
+        if(filterType === 'hashtag') {
+          const tag = filterVal.toLowerCase();
+          filtered = filtered.filter(p => (p.message || "").toLowerCase().includes(tag));
+        }
     }
-  } else { 
-    composer.style.display = "block"; 
-    statusEl.innerHTML = ""; 
-  }
+  } else { composer.style.display = "block"; statusEl.innerHTML = ""; }
   
-  // BUILD FEED
   const feedHTML = filtered.slice(0, postsToShow).map(p => {
-    // LOCK IMAGE TO POST OBJECT
-    const postImg = (p.image && p.image.length > 10) ? `
-      <div style="margin-top:10px; background:#f0f2f5; border-radius:4px; overflow:hidden;">
-        <img src="${p.image}" class="post-img" crossorigin="anonymous">
-      </div>` : '';
-
+    const postImg = (p.image && p.image.length > 10) ? `<div style="margin-top:10px; background:#f0f2f5; border-radius:4px; overflow:hidden;"><img src="${p.image}" class="post-img" crossorigin="anonymous"></div>` : '';
     return `
       <div class="card" id="post-${p.rowIndex}">
-        <div class="user-header">
-          ${getAvatarMarkup(p.user, 'avatar-small')}
-          <div class="user-info">
-            <span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span>
-            <span class="time-stamp">${timeAgo(p.timestamp)}</span>
-          </div>
-        </div>
+        <div class="user-header">${getAvatarMarkup(p.user, 'avatar-small')}<div class="user-info"><span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span><span class="time-stamp">${timeAgo(p.timestamp)}</span></div></div>
         <p style="margin:10px 0;">${highlightHashtags(p.message)}</p>
         ${postImg}
-        <div style="margin-top:12px;">
+        <div style="margin-top:12px; display:flex; gap:10px;">
           <button class="btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} ${p.likes.length}</button>
           <button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
         </div>
         <div class="comment-section" style="margin-top:10px;">
-          ${p.comments.map(c => `
-            <div class="comment-box">
-              <div style="display:flex; justify-content:space-between;">
-                <b>${c.user}</b>
-                <span style="font-size:10px; color:#888;">${timeAgo(c.time)}</span>
-              </div>
-              <div>${highlightHashtags(c.text)}</div>
-            </div>`).join('')}
-          <input id="c-${p.rowIndex}" placeholder="Reply..." style="margin-top:5px; font-size:13px!important;">
-          <button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button>
+          ${p.comments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">${timeAgo(c.time)}</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}
+          <div style="margin-top:10px"><input id="c-${p.rowIndex}" placeholder="Reply..." style="margin-bottom:0; font-size:13px!important;"><button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button></div>
         </div>
       </div>`;
   }).join('');
 
   feedEl.innerHTML = feedHTML || '<div class="card">No posts found.</div>';
   document.getElementById('loadMore').style.display = filtered.length > postsToShow ? 'block' : 'none';
-  
-  // CRITICAL: Only update sidebar if we aren't currently filtering
   if (!filterVal && !s) updateSidebar();
-}
 }
 
 function updateSidebar() {
   const myName = document.getElementById('user').value.trim();
+  document.getElementById('myProfileLink').innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', '${myName}')">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
   
-  // 1. My Profile Link Section
-  document.getElementById('myProfileLink').innerHTML = myName ? 
-    `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', '${myName}')">
-      ${getAvatarMarkup(myName, 'avatar-small')} My Profile
-    </div>` : "";
-  
-  // 2. Trending Activity (CRITICAL: We use [...] to copy the array so we don't mess up the feed order!)
-  const topPosts = [...allPosts].sort((a,b) => {
-    const scoreA = (a.likes?.length || 0) + (a.comments?.length || 0);
-    const scoreB = (b.likes?.length || 0) + (b.comments?.length || 0);
-    return scoreB - scoreA;
-  }).slice(0,3);
+  const topPosts = [...allPosts].sort((a,b) => ((b.likes?.length||0)+(b.comments?.length||0)) - ((a.likes?.length||0)+(a.comments?.length||0))).slice(0,3);
+  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b><br>${topPosts.map(p => `<div class="sidebar-item" onclick="scrollToPost(${p.rowIndex})"><div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div><div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div><span class="trend-stats">❤️ ${p.likes.length} • 💬 ${p.comments.length}</span></div>`).join('')}</div>`;
 
-  document.getElementById('trending').innerHTML = `
-    <div class="sidebar-card">
-      <b style="color: #e67e22;">🔥 Trending Activity</b><br>
-      ${topPosts.map(p => `
-        <div class="sidebar-item" onclick="scrollToPost(${p.rowIndex})">
-          <div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div>
-          <div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div>
-          <span class="trend-stats">❤️ ${p.likes.length} • 💬 ${p.comments.length}</span>
-        </div>`).join('')}
-    </div>`;
-
-  // 3. Top Likers Leaderboard (Also using a copy for safety)
-  const lCounts = {}; 
-  allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
+  const lCounts = {}; allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
   const topLikers = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
-  
-  document.getElementById('leaderboard').innerHTML = `
-    <div class="sidebar-card">
-      <b>🏆 Top Likers</b><br>
-      ${topLikers.map(([n,c], i) => `
-        <div class="sidebar-item" onclick="setFilter('likes','${n}')">
-          ${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b>
-        </div>`).join('')}
-    </div>`;
+  document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${topLikers.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
 
-  // 4. #️⃣ Trending Tags
-  const hCounts = {}; 
-  allPosts.forEach(p => { 
-    const fullText = (p.message || "") + " " + p.comments.map(c => c.text).join(" ");
-    const tags = fullText.match(/#(\w+)/g) || []; 
-    tags.forEach(t => {
-      const cleanTag = t.toLowerCase().trim();
-      hCounts[cleanTag] = (hCounts[cleanTag] || 0) + 1;
-    });
+  const hCounts = {}; allPosts.forEach(p => { 
+    const tags = ((p.message||"") + " " + p.comments.map(c=>c.text).join(" ")).match(/#(\w+)/g) || []; 
+    tags.forEach(t => { const ct = t.toLowerCase().trim(); hCounts[ct] = (hCounts[ct]||0)+1; });
   });
-
   const topTags = Object.entries(hCounts).sort((a,b) => b[1] - a[1]).slice(0, 8);
-
-  document.getElementById('hashtags').innerHTML = `
-    <div class="sidebar-card">
-      <b>#️⃣ Trending Tags</b>
-      <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
-        ${topTags.map(([tag, count]) => `
-          <div class="sidebar-item" 
-               style="background: #f0f2f5; padding: 5px 10px; border-radius: 15px; border: none; font-size: 12px; margin: 0; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;" 
-               onclick="setFilter('hashtag','${tag}')">
-            <span style="color:var(--gb-hover); font-weight:bold;">${tag}</span> 
-            <span style="color:#888; font-size: 10px;">${count}</span>
-          </div>`).join('') || '<div style="color:#888; font-size:12px;">No tags yet</div>'}
-      </div>
-    </div>`;
+  document.getElementById('hashtags').innerHTML = `<div class="sidebar-card"><b>#️⃣ Trending Tags</b><div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">${topTags.map(([tag, count]) => `<div class="sidebar-item" style="background: #f0f2f5; padding: 5px 10px; border-radius: 15px; font-size: 12px; cursor: pointer;" onclick="setFilter('hashtag','${tag}')"><span style="color:var(--gb-hover); font-weight:bold;">${tag}</span> <span style="color:#888; font-size: 10px;">${count}</span></div>`).join('') || 'None'}</div></div>`;
 }
+
 function scrollToPost(id) {
-  // If we are currently filtered, clear it first so the post is actually visible
-  if (filterVal) { 
-    setFilter(null, null); 
-    setTimeout(() => performScroll(id), 300); 
-  } else { 
-    performScroll(id); 
-  }
+  if (filterVal) { setFilter(null, null); setTimeout(() => performScroll(id), 300); } 
+  else performScroll(id);
 }
 
 function performScroll(id) {
   const el = document.getElementById(`post-${id}`);
-  if (el) {
-    window.scrollTo({ top: el.offsetTop - 70, behavior: 'smooth' });
-    el.classList.add('highlight-card');
-    setTimeout(() => el.classList.remove('highlight-card'), 2000);
-  } else { 
-    // If post isn't rendered yet (pagination), load more and try again
-    postsToShow += 5; 
-    render(); 
-    setTimeout(() => performScroll(id), 100); 
-  }
-}
-
-function performScroll(id) {
-  const el = document.getElementById(`post-${id}`);
-  if (el) {
-    window.scrollTo({ top: el.offsetTop - 70, behavior: 'smooth' });
-    el.classList.add('highlight-card');
-    setTimeout(() => el.classList.remove('highlight-card'), 2000);
-  } else { postsToShow += 5; render(); setTimeout(() => performScroll(id), 100); }
+  if (el) { window.scrollTo({ top: el.offsetTop - 70, behavior: 'smooth' }); el.classList.add('highlight-card'); setTimeout(() => el.classList.remove('highlight-card'), 2000); } 
+  else { postsToShow += 5; render(); setTimeout(() => performScroll(id), 100); }
 }
 
 async function upload() {
@@ -451,46 +351,26 @@ async function apiCall(action, rowIndex, event) {
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
-  const btn = event.target; 
-  const originalText = btn.innerText;
-  btn.innerText = "⏳ Wait...";
-
+  const btn = event.target; btn.innerText = "⏳ Wait...";
   const card = document.createElement('div');
   card.style.cssText = `position: fixed; left: -9999px; width: 400px; background: white; padding: 20px; border-radius: 12px; font-family: system-ui, sans-serif; color: #1c1e21;`;
-
-  card.innerHTML = `
-    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-      ${getAvatarMarkup(post.user, 'avatar-small')}
-      <div>
-        <div style="font-weight: bold; color: #3b5998;">${post.user}</div>
-        <div style="font-size: 11px; color: #888;">theGooldbook 🦄</div>
-      </div>
-    </div>
-    <div style="font-size: 16px; margin-bottom: 15px; line-height: 1.4;">${highlightHashtags(post.message)}</div>
-    ${post.image ? `<img src="${post.image}" style="width:100%; border-radius: 8px; margin-bottom: 10px;">` : ''}
-    <div style="display: flex; gap: 15px; border-top: 1px solid #eee; padding-top: 10px; font-size: 13px; font-weight: bold; color: #65676b;">
-      <span>❤️ ${post.likes.length} Likes</span>
-      <span>💬 ${post.comments.length} Comments</span>
-    </div>`;
-
+  card.innerHTML = `<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">${getAvatarMarkup(post.user, 'avatar-small')}<div><div style="font-weight: bold; color: #3b5998;">${post.user}</div><div style="font-size: 11px; color: #888;">theGooldbook 🦄</div></div></div><div style="font-size: 16px; margin-bottom: 15px; line-height: 1.4;">${post.message}</div>${post.image ? `<img src="${post.image}" style="width:100%; border-radius: 8px;">` : ''}`;
   document.body.appendChild(card);
-
   try {
-    const canvas = await html2canvas(card, { useCORS: true, scale: 2, backgroundColor: "#ffffff" });
+    const canvas = await html2canvas(card, { useCORS: true, scale: 2 });
     document.body.removeChild(card);
     const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-    const file = new File([blob], `Gooldbook_Post_${rowIndex}.png`, { type: 'image/png' });
-    if (navigator.share) await navigator.share({ files: [file], title: `Post by ${post.user}` });
-    else { const link = document.createElement('a'); link.download = `Gooldbook_Post_${rowIndex}.png`; link.href = canvas.toDataURL(); link.click(); }
-  } catch(e) { console.error(e); alert("Share failed."); } finally { btn.innerText = originalText; }
+    const file = new File([blob], `Gooldbook_${rowIndex}.png`, { type: 'image/png' });
+    if (navigator.share) await navigator.share({ files: [file] });
+    else { const link = document.createElement('a'); link.download = `Gooldbook_${rowIndex}.png`; link.href = canvas.toDataURL(); link.click(); }
+  } catch(e) { alert("Share failed."); } finally { btn.innerText = "🔗 Share"; }
 }
 
 function highlightHashtags(t) { 
   if(!t) return "";
   let linkedText = t.replace(/(https?:\/\/[^\s]+)/g, (url) => {
-    const iconUrl = `https://www.google.com/s2/favicons?sz=32&domain=${url}`;
     const shortName = url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
-    return `<a href="${url}" target="_blank" style="display: inline-flex; align-items: center; gap: 5px; color: #3b5998; text-decoration: none; font-weight: 600; background: #f0f2f5; padding: 2px 8px; border-radius: 6px; border: 1px solid #ddd; vertical-align: middle; font-size: 0.9em;"><img src="${iconUrl}" style="width:14px; height:14px; border-radius:2px;" crossorigin="anonymous">${shortName}</a>`;
+    return `<a href="${url}" target="_blank" style="color:#3b5998; text-decoration:none; font-weight:600; background:#f0f2f5; padding:2px 6px; border-radius:4px;">${shortName}</a>`;
   });
   return linkedText.replace(/#(\w+)/g, '<span style="color:var(--gb-hover);font-weight:bold;cursor:pointer" onclick="setFilter(\'hashtag\',\'#$1\')">#$1</span>'); 
 }
@@ -498,22 +378,11 @@ function highlightHashtags(t) {
 function timeAgo(d) {
   if (!d) return "just now";
   const seconds = Math.floor((Date.now() - new Date(d)) / 1000);
-  
   if (seconds < 60) return "just now";
-  
-  const intervals = {
-    yr: 31536000,
-    mo: 2592000,
-    d: 86400,
-    h: 3600,
-    m: 60
-  };
-
+  const intervals = { yr: 31536000, mo: 2592000, d: 86400, h: 3600, m: 60 };
   for (let key in intervals) {
     const counter = Math.floor(seconds / intervals[key]);
-    if (counter > 0) {
-      return counter + key;
-    }
+    if (counter > 0) return counter + key;
   }
   return "just now";
 }
