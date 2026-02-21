@@ -268,7 +268,9 @@ function render() {
         let label = filterType === 'likes' ? `Liked by ${filterVal}` : `Tagged ${filterVal}`;
         statusEl.innerHTML = `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>Showing: <b>${label}</b></span><button class="btn-alt" onclick="setFilter(null,null)">Clear</button></div>`;
         
-        if(filterType === 'likes') filtered = filtered.filter(p => p.likes.includes(filterVal));
+        if(filterType === 'likes') {
+            filtered = allPosts.filter(p => p.likes.includes(filterVal));
+        }
         
         if(filterType === 'hashtag') {
           const tag = filterVal.toLowerCase();
@@ -278,21 +280,22 @@ function render() {
           );
         }
     }
-  } else { composer.style.display = "block"; statusEl.innerHTML = ""; }
+  } else { 
+    composer.style.display = "block"; 
+    statusEl.innerHTML = ""; 
+  }
   
-  const feedHTML = filtered.slice(0, postsToShow).map(p => {
+  const totalInFilter = filtered.length; // Get the total for the counter
+
+  const feedHTML = filtered.slice(0, postsToShow).map((p, index) => {
     try {
-      // Build Media HTML (Image + Lazy YT)
       let mediaHTML = "";
-      
-      // Standard Images
       if (p.image && p.image.length > 10) {
         mediaHTML += `<div class="img-container" style="margin-top:10px; background:#f0f2f5; border-radius:4px; overflow:hidden; min-height:100px;">
           <img src="${p.image}" id="img-${p.rowIndex}-${Date.now()}" class="post-img" crossorigin="anonymous">
         </div>`;
       }
 
-      // YouTube Logic
       const ytMatch = (p.message || "").match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
       if (ytMatch && ytMatch[1]) {
         const videoId = ytMatch[1];
@@ -307,9 +310,22 @@ function render() {
           </div>`;
       }
 
+      // Updated Heart Badge with "Post X of Y" counter
+      const likeBadge = (filterType === 'likes') ? 
+        `<span style="color:#e74c3c; font-size:11px; font-weight:normal; background:#fff0f0; padding:2px 6px; border-radius:10px; margin-left:8px; border:1px solid #ffccd5;">❤️ ${index + 1} of ${totalInFilter}</span>` : '';
+
       return `
         <div class="card" id="post-${p.rowIndex}">
-          <div class="user-header">${getAvatarMarkup(p.user, 'avatar-small')}<div class="user-info"><span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span><span class="time-stamp">${timeAgo(p.timestamp)}</span></div></div>
+          <div class="user-header">
+            ${getAvatarMarkup(p.user, 'avatar-small')}
+            <div class="user-info">
+              <div style="display:flex; align-items:center;">
+                <span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span>
+                ${likeBadge}
+              </div>
+              <span class="time-stamp">${timeAgo(p.timestamp)}</span>
+            </div>
+          </div>
           <p style="margin:10px 0;">${highlightHashtags(p.message)}</p>
           ${mediaHTML}
           <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
