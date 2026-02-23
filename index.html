@@ -141,21 +141,30 @@ async function loadFeed() {
   } catch(e) { console.error("Load failed", e); }
 }
 
+// --- Updated pollForUpdates to prevent wiping out active typing ---
 async function pollForUpdates() {
+  // Check if user is currently typing in ANY input or textarea
+  const isTyping = document.activeElement.tagName === 'INPUT' || 
+                   document.activeElement.tagName === 'TEXTAREA';
+  
+  if (isTyping) return; // Skip the update if the user is busy typing
+
   try {
     const res = await fetch(SCRIPT_URL);
     const data = await res.json();
     const newPosts = data.posts || [];
+    
     if (newPosts.length > lastPostCount && newPosts[0].user !== document.getElementById('user').value.trim()) {
       newPostCount += (newPosts.length - lastPostCount);
       showNotif(`${newPosts[0].user} posted something new!`);
     }
+    
     allPosts = newPosts;
     allBios = data.bios;
     allAvatars = data.avatars || {};
     lastPostCount = newPosts.length;
     render();
-  } catch(e) {}
+  } catch(e) { console.log("Poll failed, will try again..."); }
 }
 
 function showNotif(msg) {
@@ -410,31 +419,42 @@ async function compressImage(file) {
   });
 }
 
+// --- Updated apiCall to ensure Likes and Comments are prioritized ---
 async function apiCall(action, rowIndex, event) {
   const user = document.getElementById('user').value.trim();
   if(!user) return alert("Name required!");
+  
   const p = allPosts.find(x => x.rowIndex === rowIndex);
+  
   if(action==='like') {
     const i = p.likes.indexOf(user);
     i === -1 ? p.likes.push(user) : p.likes.splice(i,1);
+    
+    // Visual feedback for the like
     if(i === -1 && event) {
        const u = document.createElement('div'); u.className='unicorn-pop'; u.textContent='🦄';
        u.style.left=event.clientX+'px'; u.style.top=event.clientY+'px';
        document.body.appendChild(u); setTimeout(()=>u.remove(), 1500);
     }
+    render(); // Update UI immediately
+    
+    // Save to server
+    await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, rowIndex, username:user }) });
+    
   } else if (action === 'comment') {
     const input = document.getElementById(`c-${rowIndex}`);
     if(!input.value) return;
     const txt = input.value;
+    
+    // Add locally first so it feels instant
     p.comments.push({ user, text: txt, time: new Date().toISOString() });
-    input.value = ""; render();
-    fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, rowIndex, username:user, text: txt }) });
-    return;
+    input.value = ""; 
+    render();
+    
+    // Save to server
+    await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, rowIndex, username:user, text: txt }) });
   }
-  render();
-  fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, rowIndex, username:user }) });
 }
-
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
@@ -511,3 +531,7 @@ function saveUser() { localStorage.setItem("gb_user", document.getElementById('u
 </script>
 </body>
 </html>
+
+
+
+
