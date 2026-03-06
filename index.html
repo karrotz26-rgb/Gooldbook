@@ -55,7 +55,6 @@
 
     .comment-box { background: #f0f2f5; padding: 8px; border-radius: 8px; margin-top: 5px; font-size: 13px; }
     
-    /* GIF GRID STYLES */
     #gifResults { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding-bottom: 20px; }
     #gifResults img { width: 100%; height: 120px; object-fit: cover; border-radius: 8px; background: #f0f2f5; transition: transform 0.2s; cursor: pointer; }
     #gifResults img:hover { transform: scale(1.02); }
@@ -204,19 +203,17 @@ function getAvatarMarkup(user, sizeClass) {
   return `<img src="${ava}${cacheBuster}" class="${sizeClass}" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=🦄';">`;
 }
 
-// --- FIXED GIF PICKER LOGIC ---
 function openGifPicker(target) {
   currentGifTarget = target;
   document.getElementById('gifSearch').value = "";
   document.getElementById('gifModal').style.display = 'block';
-  searchGifs(''); // Load trending initially
+  searchGifs(''); 
 }
 function closeGifPicker() { document.getElementById('gifModal').style.display = 'none'; }
 
 async function searchGifs(query) {
   clearTimeout(searchTimeout);
   const resultsEl = document.getElementById('gifResults');
-  
   const isTrending = !query || query.trim() === "";
   const endpoint = isTrending ? 'trending' : 'search';
   const searchParam = isTrending ? '' : `&q=${encodeURIComponent(query)}`;
@@ -227,7 +224,6 @@ async function searchGifs(query) {
       const url = `https://api.giphy.com/v1/gifs/${endpoint}?api_key=${apiKey}&limit=20${searchParam}`;
       const res = await fetch(url);
       const { data } = await res.json();
-      
       if (!data || data.length === 0) {
         resultsEl.innerHTML = "<p style='text-align:center; padding:20px;'>No GIFs found ☹️</p>";
         return;
@@ -270,9 +266,10 @@ function render() {
   const statusEl = document.getElementById('filterStatus');
   const composer = document.getElementById('postComposer');
   const feedEl = document.getElementById('feed');
+  
+  if (!feedEl) return;
   feedEl.innerHTML = ""; 
 
-  // Robust Search Filter
   let filtered = allPosts.filter(p => 
     (p.message || "").toLowerCase().includes(s) || 
     (p.user || "").toLowerCase().includes(s) ||
@@ -305,7 +302,7 @@ function render() {
     const msgGif = (p.message || "").match(gifRegex);
     if (msgGif) mediaHTML += `<img src="${msgGif[0]}" class="post-img" style="border-radius:8px; margin-top:10px;">`;
 
-    const ytMatch = (p.message || "").match(/(?:https?:\/\/)??:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    const ytMatch = (p.message || "").match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
     if (ytMatch) {
         mediaHTML += `<div style="margin-top:10px; position:relative; padding-bottom:56.25%; height:0; overflow:hidden; border-radius:8px; background: #000 url(https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg) center/cover;">
           <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); cursor:pointer; color:white; font-size:40px;" onclick="this.parentElement.innerHTML='<iframe src=\'https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1\' style=\'position:absolute;top:0;left:0;width:100%;height:100%;\' frameborder=\'0\' allowfullscreen></iframe>'">▶️</div>
@@ -347,19 +344,22 @@ function render() {
   if (!filterVal && !s) updateSidebar();
 }
 
-// --- FIXED SIDEBAR LOGIC ---
 function updateSidebar() {
   const myName = document.getElementById('user').value.trim();
-  document.getElementById('myProfileLink').innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; font-weight:bold; display:flex; align-items:center; gap:8px;" onclick="setFilter('author', '${myName}')">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
+  const profileEl = document.getElementById('myProfileLink');
+  const trendingEl = document.getElementById('trending');
+  const leaderboardEl = document.getElementById('leaderboard');
+  const hashtagsEl = document.getElementById('hashtags');
+
+  if(profileEl) profileEl.innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; font-weight:bold; display:flex; align-items:center; gap:8px;" onclick="setFilter('author', '${myName}')">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
   
   const topPosts = [...allPosts].sort((a,b) => ((b.likes?.length||0)+(b.comments?.length||0)) - ((a.likes?.length||0)+(a.comments?.length||0))).slice(0,3);
-  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b>🔥 Trending</b><br>${topPosts.map(p => `<div class="sidebar-item" onclick="performScroll(${p.rowIndex})"><b>${p.user}</b>: ${p.message.substring(0,25)}...</div>`).join('')}</div>`;
+  if(trendingEl) trendingEl.innerHTML = `<div class="sidebar-card"><b>🔥 Trending</b><br>${topPosts.map(p => `<div class="sidebar-item" onclick="performScroll(${p.rowIndex})"><b>${p.user}</b>: ${p.message.substring(0,25)}...</div>`).join('')}</div>`;
 
   const lCounts = {}; allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
   const topLikers = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
-  document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${topLikers.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
+  if(leaderboardEl) leaderboardEl.innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${topLikers.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
 
-  // Restore Hashtag Counter
   const hCounts = {}; 
   allPosts.forEach(p => { 
     const textToScan = (p.message || "") + " " + p.comments.map(c => c.text).join(" ");
@@ -367,7 +367,7 @@ function updateSidebar() {
     tags.forEach(t => { const ct = t.toLowerCase().trim(); hCounts[ct] = (hCounts[ct]||0)+1; });
   });
   const topTags = Object.entries(hCounts).sort((a,b) => b[1] - a[1]).slice(0, 8);
-  document.getElementById('hashtags').innerHTML = `<div class="sidebar-card"><b>#️⃣ Trending Tags</b><div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">${topTags.map(([tag, count]) => `<div class="sidebar-item" style="background: #f0f2f5; padding: 5px 10px; border-radius: 15px; font-size: 11px; cursor: pointer;" onclick="setFilter('hashtag','${tag}')"><span style="color:var(--gb-hover); font-weight:bold;">${tag}</span> <span style="color:#888;">${count}</span></div>`).join('') || 'None yet!'}</div></div>`;
+  if(hashtagsEl) hashtagsEl.innerHTML = `<div class="sidebar-card"><b>#️⃣ Trending Tags</b><div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">${topTags.map(([tag, count]) => `<div class="sidebar-item" style="background: #f0f2f5; padding: 5px 10px; border-radius: 15px; font-size: 11px; cursor: pointer;" onclick="setFilter('hashtag','${tag}')"><span style="color:var(--gb-hover); font-weight:bold;">${tag}</span> <span style="color:#888;">${count}</span></div>`).join('') || 'None yet!'}</div></div>`;
 }
 
 function performScroll(id) {
