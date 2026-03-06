@@ -214,23 +214,41 @@ function closeGifPicker() { document.getElementById('gifModal').style.display = 
 async function searchGifs(query) {
   clearTimeout(searchTimeout);
   const resultsEl = document.getElementById('gifResults');
-  const isTrending = !query || query.trim() === "";
-  const endpoint = isTrending ? 'trending' : 'search';
-  const searchParam = isTrending ? '' : `&q=${encodeURIComponent(query)}`;
+  
+  // Provide immediate feedback
+  if (query && query.length > 0) {
+    resultsEl.innerHTML = "<p style='text-align:center; color:#888;'>Searching...</p>";
+  }
 
   searchTimeout = setTimeout(async () => {
-    const apiKey = 'dc6zaTOxFJmzC'; 
+    // Determine if we are searching for a term or just showing trending
+    const isSearch = query && query.trim().length > 0;
+    const apiKey = 'dc6zaTOxFJmzC'; // Public GIPHY Beta Key
+    const endpoint = isSearch ? 'search' : 'trending';
+    const params = isSearch ? `&q=${encodeURIComponent(query)}` : '';
+    
     try {
-      const url = `https://api.giphy.com/v1/gifs/${endpoint}?api_key=${apiKey}&limit=20${searchParam}`;
+      const url = `https://api.giphy.com/v1/gifs/${endpoint}?api_key=${apiKey}&limit=20${params}`;
       const res = await fetch(url);
-      const { data } = await res.json();
+      const json = await res.json();
+      const data = json.data;
+      
       if (!data || data.length === 0) {
-        resultsEl.innerHTML = "<p style='text-align:center; padding:20px;'>No GIFs found ☹️</p>";
+        resultsEl.innerHTML = "<p style='text-align:center; padding:20px; color:#666;'>No GIFs found ☹️<br><small>Try a different word!</small></p>";
         return;
       }
-      resultsEl.innerHTML = data.map(g => `<img src="${g.images.fixed_height.url}" onclick="selectGif('${g.images.fixed_height.url}')">`).join('');
-    } catch (e) { resultsEl.innerHTML = "<p style='text-align:center;'>API Error.</p>"; }
-  }, 300);
+
+      resultsEl.innerHTML = data.map(g => `
+        <img src="${g.images.fixed_height.url}" 
+             onclick="selectGif('${g.images.fixed_height.url}')" 
+             style="width:100%; height:120px; object-fit:cover; border-radius:8px; cursor:pointer;"
+             onerror="this.src='https://via.placeholder.com/150?text=Error+Loading'">
+      `).join('');
+    } catch (e) {
+      console.error("Giphy API Error:", e);
+      resultsEl.innerHTML = "<p style='text-align:center; color:red;'>API Error. Please try again later.</p>";
+    }
+  }, 500); // 500ms debounce gives the user time to finish typing
 }
 
 function selectGif(url) {
