@@ -258,7 +258,12 @@ function render() {
   const feedEl = document.getElementById('feed');
   feedEl.innerHTML = ""; 
 
-  let filtered = allPosts.filter(p => (p.message || "").toLowerCase().includes(s) || (p.user || "").toLowerCase().includes(s));
+  // --- FIXED SEARCH FILTER ---
+  let filtered = allPosts.filter(p => 
+    (p.message || "").toLowerCase().includes(s) || 
+    (p.user || "").toLowerCase().includes(s) ||
+    p.comments.some(c => (c.text || "").toLowerCase().includes(s))
+  );
   
   if (filterVal) {
     composer.style.display = "none";
@@ -267,24 +272,26 @@ function render() {
         statusEl.innerHTML = `<div class="card" style="text-align:center;">${getAvatarMarkup(filterVal, 'avatar-large')}<h2 style="margin:0">${filterVal}</h2><p style="font-style:italic;">"${bio}"</p><button class="btn-alt" onclick="setFilter(null,null)">← Back</button></div>`;
         filtered = filtered.filter(p => p.user === filterVal);
     } else {
-        statusEl.innerHTML = `<div class="card" style="display:flex; justify-content:space-between;"><span>Showing: <b>${filterVal}</b></span><button class="btn-alt" onclick="setFilter(null,null)">Clear</button></div>`;
+        statusEl.innerHTML = `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>Showing: <b>${filterVal}</b></span><button class="btn-alt" onclick="setFilter(null,null)">Clear</button></div>`;
         if(filterType === 'likes') filtered = allPosts.filter(p => p.likes.includes(filterVal));
-        if(filterType === 'hashtag') filtered = filtered.filter(p => (p.message||"").toLowerCase().includes(filterVal.toLowerCase()));
+        if(filterType === 'hashtag') {
+          const tag = filterVal.toLowerCase();
+          filtered = filtered.filter(p => (p.message||"").toLowerCase().includes(tag));
+        }
     }
   } else { composer.style.display = "block"; statusEl.innerHTML = ""; }
   
   const totalInFilter = filtered.length;
 
+  const gifRegex = /(https?:\/\/[^\s]+giphy\.com[^\s]+|https?:\/\/[^\s]+\.gif)/i;
+
   feedEl.innerHTML = filtered.slice(0, postsToShow).map((p, index) => {
     let mediaHTML = "";
     if (p.image && p.image.length > 10) mediaHTML += `<img src="${p.image}" class="post-img">`;
 
-    // Detect GIFs in message
-    const gifRegex = /(https?:\/\/[^\s]+giphy\.com[^\s]+|https?:\/\/[^\s]+\.gif)/i;
     const msgGif = (p.message || "").match(gifRegex);
     if (msgGif) mediaHTML += `<img src="${msgGif[0]}" class="post-img" style="border-radius:8px; margin-top:10px;">`;
 
-    // YouTube Detection
     const ytMatch = (p.message || "").match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
     if (ytMatch) {
         mediaHTML += `<div style="margin-top:10px; position:relative; padding-bottom:56.25%; height:0; overflow:hidden; border-radius:8px; background: #000 url(https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg) center/cover;">
@@ -329,9 +336,25 @@ function render() {
 
 function updateSidebar() {
   const myName = document.getElementById('user').value.trim();
-  document.getElementById('myProfileLink').innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; font-weight:bold;" onclick="setFilter('author', '${myName}')">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
+  document.getElementById('myProfileLink').innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; font-weight:bold; display:flex; align-items:center; gap:8px;" onclick="setFilter('author', '${myName}')">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
+  
+  // Trending Posts
   const topPosts = [...allPosts].sort((a,b) => ((b.likes?.length||0)+(b.comments?.length||0)) - ((a.likes?.length||0)+(a.comments?.length||0))).slice(0,3);
-  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b>🔥 Trending</b><br>${topPosts.map(p => `<div class="sidebar-item" onclick="performScroll(${p.rowIndex})"><b>${p.user}</b>: ${p.message.substring(0,20)}...</div>`).join('')}</div>`;
+  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b>🔥 Trending</b><br>${topPosts.map(p => `<div class="sidebar-item" onclick="performScroll(${p.rowIndex})"><b>${p.user}</b>: ${p.message.substring(0,25)}...</div>`).join('')}</div>`;
+
+  // Leaderboard (Top Likers)
+  const lCounts = {}; allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
+  const topLikers = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${topLikers.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
+
+  // --- RESTORED HASHTAGS ---
+  const hCounts = {}; 
+  allPosts.forEach(p => { 
+    const tags = ((p.message||"") + " " + p.comments.map(c=>c.text).join(" ")).match(/#(\w+)/g) || []; 
+    tags.forEach(t => { const ct = t.toLowerCase().trim(); hCounts[ct] = (hCounts[ct]||0)+1; });
+  });
+  const topTags = Object.entries(hCounts).sort((a,b) => b[1] - a[1]).slice(0, 8);
+  document.getElementById('hashtags').innerHTML = `<div class="sidebar-card"><b>#️⃣ Trending Tags</b><div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">${topTags.map(([tag, count]) => `<div class="sidebar-item" style="background: #f0f2f5; padding: 5px 10px; border-radius: 15px; font-size: 11px; cursor: pointer;" onclick="setFilter('hashtag','${tag}')"><span style="color:var(--gb-hover); font-weight:bold;">${tag}</span> <span style="color:#888;">${count}</span></div>`).join('') || 'None yet!'}</div></div>`;
 }
 
 function performScroll(id) {
