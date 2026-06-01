@@ -28,6 +28,9 @@
     .notif-banner.show { display: flex; }
     @keyframes slideDown { from { transform: translateX(-50%) translateY(-20px); opacity: 0; } to { transform: translateX(-50%) translateY(0); opacity: 1; } }
 
+    .refresh-pill { position: fixed; top: calc(70px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%) translateY(-20px); background: var(--gb-hover); color: white; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 1500; display: flex; align-items: center; gap: 6px; cursor: pointer; opacity: 0; pointer-events: none; transition: transform 0.3s, opacity 0.3s; border: 1px solid rgba(255,255,255,0.2); }
+    .refresh-pill.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+
     .container { max-width:900px; margin:auto; display:flex; gap:20px; padding:10px; }
     .sidebar { width:280px; position:sticky; top:70px; height: fit-content; }
     .main-feed { flex-grow:1; max-width:550px; width:100%; }
@@ -44,7 +47,14 @@
     .user-name { color: var(--gb-blue); font-weight:bold; cursor: pointer; display: block; }
     .time-stamp { font-size:11px; color:#888; }
     
-    .post-img { width:100%; max-height:500px; object-fit: cover; margin-top:10px; border-radius:4px; display:block; background:#f0f2f5; }
+    .post-img { width:100%; max-height:500px; object-fit: cover; margin-top:10px; border-radius:4px; display:block; background:#f0f2f5; opacity: 0; transition: opacity 0.3s ease; }
+    .post-img.loaded { opacity: 1; }
+
+    .skeleton-loader { width: 100%; height: 220px; background: linear-gradient(90deg, #f0f2f5 25%, #e1e4e8 50%, #f0f2f5 75%); background-size: 200% 100%; animation: loadingPulse 1.5s infinite; border-radius: 4px; margin-top: 10px; }
+    @keyframes loadingPulse { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    .like-btn { transition: transform 0.1s ease; }
+    .like-btn.pop { transform: scale(1.25); }
     
     input, textarea { width:100%; padding:10px; margin-bottom:8px; border:1px solid #ddd; border-radius:6px; box-sizing: border-box; font-family: inherit; font-size: 16px !important; }
     button { touch-action: manipulation; cursor: pointer; }
@@ -70,6 +80,10 @@
 
 <div class="notif-banner" id="notifBanner" onclick="dismissNotif()">
   <span id="notifText"></span>
+</div>
+
+<div class="refresh-pill" id="refreshPill" onclick="acceptNewPosts()">
+  ✨ New posts available! Click to view
 </div>
 
 <div class="nav">
@@ -106,27 +120,52 @@
 <script>
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyVzuJyTHHyN_au6-yXnqBkSKKNcXr35CrouluFkwArYyjsaKx1TAqlXCfwhBP8GfTE/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
+let incomingPostsCache = null; 
 let allBios = {}, allAvatars = {};
 let postsToShow = 5;
 let filterType = null, filterVal = null;
 let lastPostCount = allPosts.length;
 let newPostCount = 0;
+let isInfiniteScrollLoading = false;
 
 window.onload = () => {
   document.getElementById('user').value = localStorage.getItem("gb_user") || "";
   if(allPosts.length > 0) { render(); }
   loadFeed(); 
   setInterval(pollForUpdates, 30000);
+  window.addEventListener('scroll', handleWindowScroll);
 };
 
-window.onscroll = function() {
+function handleWindowScroll() {
   const btn = document.getElementById("backToTop");
   if (document.body.scrollTop > 400 || document.documentElement.scrollTop > 400) {
     btn.style.display = "flex";
   } else {
     btn.style.display = "none";
   }
-};
+
+  if ((window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight - 150) {
+    const s = document.getElementById('searchBar').value.toLowerCase();
+    let filtered = allPosts.filter(p => 
+      (p.message || "").toLowerCase().includes(s) || (p.user || "").toLowerCase().includes(s)
+    );
+    if (filterVal) {
+      if (filterType === 'author') filtered = filtered.filter(p => p.user === filterVal);
+      if (filterType === 'likes') filtered = allPosts.filter(p => p.likes.includes(filterVal));
+      if (filterType === 'hashtag') {
+        const tag = filterVal.toLowerCase();
+        filtered = filtered.filter(p => (p.message || "").toLowerCase().includes(tag));
+      }
+    }
+    
+    if (postsToShow < filtered.length && !isInfiniteScrollLoading) {
+      isInfiniteScrollLoading = true;
+      postsToShow += 5;
+      render();
+      setTimeout(() => { isInfiniteScrollLoading = false; }, 200);
+    }
+  }
+}
 
 async function loadFeed() {
   try {
@@ -137,6 +176,8 @@ async function loadFeed() {
     allAvatars = data.avatars || {};
     localStorage.setItem("gb_cache", JSON.stringify(allPosts));
     lastPostCount = allPosts.length;
+    incomingPostsCache = null;
+    document.getElementById('refreshPill').classList.remove('show');
     render();
   } catch(e) { console.error("Load failed", e); }
 }
@@ -156,7 +197,10 @@ async function pollForUpdates() {
       const activeUser = document.getElementById('user').value.trim();
       if (newPosts[0] && newPosts[0].user !== activeUser) {
         newPostCount += (newPosts.length - lastPostCount);
+        incomingPostsCache = data;
+        document.getElementById('refreshPill').classList.add('show');
         showNotif(`${newPosts[0].user} posted something new!`);
+        return; 
       }
     }
     
@@ -166,6 +210,20 @@ async function pollForUpdates() {
     lastPostCount = newPosts.length;
     render();
   } catch(e) { console.log("Poll failed, will try again..."); }
+}
+
+function acceptNewPosts() {
+  if (incomingPostsCache) {
+    allPosts = incomingPostsCache.posts || [];
+    allBios = incomingPostsCache.bios || {};
+    allAvatars = incomingPostsCache.avatars || {};
+    localStorage.setItem("gb_cache", JSON.stringify(allPosts));
+    lastPostCount = allPosts.length;
+    incomingPostsCache = null;
+  }
+  document.getElementById('refreshPill').classList.remove('show');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  render();
 }
 
 function showNotif(msg) {
@@ -201,7 +259,6 @@ function getAvatarMarkup(user, sizeClass) {
      const parts = ava.split("picture/0");
      finalSrc = parts[0] + "picture/0" + (parts[1] || "");
   }
-  // Removed cache-buster parameter to allow browsers to cache images locally
   return `<img src="${finalSrc}" class="${sizeClass}" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=🦄';">`;
 }
 
@@ -252,6 +309,14 @@ function highlightHashtags(t) {
   });
 }
 
+function onImageLoad(imgElement) {
+  imgElement.classList.add('loaded');
+  const skeleton = imgElement.previousElementSibling;
+  if (skeleton && skeleton.classList.contains('skeleton-loader')) {
+    skeleton.style.display = 'none';
+  }
+}
+
 function render() {
   const u = document.getElementById('user').value.trim();
   const s = document.getElementById('searchBar').value.toLowerCase();
@@ -298,8 +363,9 @@ function render() {
     try {
       let mediaHTML = "";
       if (p.image && p.image.length > 10) {
-        mediaHTML += `<div class="img-container" style="margin-top:10px; background:#f0f2f5; border-radius:4px; overflow:hidden; min-height:100px;">
-          <img src="${p.image}" class="post-img" loading="lazy" crossorigin="anonymous">
+        mediaHTML += `<div class="img-container" style="margin-top:10px; position:relative; overflow:hidden;">
+          <div class="skeleton-loader"></div>
+          <img src="${p.image}" class="post-img" loading="lazy" crossorigin="anonymous" onload="onImageLoad(this)">
         </div>`;
       }
 
@@ -357,7 +423,7 @@ function render() {
   }).join('');
 
   feedEl.innerHTML = feedHTML || '<div class="card">No posts found.</div>';
-  document.getElementById('loadMore').style.display = filtered.length > postsToShow ? 'block' : 'none';
+  document.getElementById('loadMore').style.display = 'none';
   if (!filterVal && !s) updateSidebar();
 }
 
@@ -416,7 +482,6 @@ async function compressImage(file) {
   });
 }
 
-// Targeted DOM injection for instant visual updates without wiping out page state
 async function apiCall(action, rowIndex, event) {
   const user = document.getElementById('user').value.trim();
   if(!user) return alert("Name required!");
@@ -428,18 +493,14 @@ async function apiCall(action, rowIndex, event) {
     const i = p.likes.indexOf(user);
     i === -1 ? p.likes.push(user) : p.likes.splice(i,1);
     
-    if(i === -1 && event) {
-       const u = document.createElement('div'); u.className='unicorn-pop'; u.textContent='🦄';
-       u.style.left=event.clientX+'px'; u.style.top=event.clientY+'px';
-       document.body.appendChild(u); setTimeout(()=>u.remove(), 1500);
-    }
-    
-    // Direct DOM Injection for likes
     if (postEl) {
       const btn = postEl.querySelector('.like-btn');
-      if(btn) {
+      if (btn) {
+        btn.classList.add('pop');
+        setTimeout(() => btn.classList.remove('pop'), 120);
         btn.innerHTML = (p.likes.includes(user) ? '❤️ ' : '👍 ') + `<span>${p.likes.length}</span>`;
       }
+      
       const container = postEl.querySelector('.liked-by-container');
       const listSpan = postEl.querySelector('.liked-by-list');
       if (container && listSpan) {
@@ -450,6 +511,12 @@ async function apiCall(action, rowIndex, event) {
           container.style.display = 'none';
         }
       }
+    }
+
+    if(i === -1 && event) {
+       const u = document.createElement('div'); u.className='unicorn-pop'; u.textContent='🦄';
+       u.style.left=event.clientX+'px'; u.style.top=event.clientY+'px';
+       document.body.appendChild(u); setTimeout(()=>u.remove(), 1500);
     }
     
     await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, rowIndex, username:user }) });
@@ -463,7 +530,6 @@ async function apiCall(action, rowIndex, event) {
     p.comments.push(newCommentObj);
     input.value = ""; 
     
-    // Direct DOM Injection for comments
     if (postEl) {
       const list = postEl.querySelector('.comments-list');
       if (list) {
@@ -543,11 +609,24 @@ async function sharePost(rowIndex, event) {
   }
 }
 
+// ✨ UPDATED: Formats times over 30 days old into MM/DD/YY format
 function timeAgo(d) {
   if (!d) return "just now";
-  const seconds = Math.floor((Date.now() - new Date(d)) / 1000);
+  const dateObj = new Date(d);
+  const diffMs = Date.now() - dateObj.getTime();
+  const seconds = Math.floor(diffMs / 1000);
   if (seconds < 60) return "just now";
+
   const intervals = { yr: 31536000, mo: 2592000, d: 86400, h: 3600, m: 60 };
+  
+  // Checking if the item's age is greater than or equal to roughly 1 month (30 days)
+  if (seconds >= intervals.mo) {
+    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const dd = String(dateObj.getDate()).padStart(2, '0');
+    const yy = String(dateObj.getFullYear()).slice(-2);
+    return `${mm}/${dd}/${yy}`;
+  }
+
   for (let key in intervals) {
     const counter = Math.floor(seconds / intervals[key]);
     if (counter > 0) return counter + key;
