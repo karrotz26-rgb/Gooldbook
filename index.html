@@ -35,12 +35,14 @@
     .sidebar { width:280px; position:sticky; top:70px; height: fit-content; }
     .main-feed { flex-grow:1; max-width:550px; width:100%; }
     
-    .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: background 0.5s; content-visibility: auto; contain-intrinsic-size: 0 500px; will-change: transform; }
+    /* FIX: Adjusted layout constraints to prevent jumpy rendering loops */
+    .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: background 0.5s; content-visibility: auto; contain-intrinsic-size: auto 300px; }
     .highlight-card { background: #fffbe6 !important; border-color: #ffe58f !important; }
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:12px; margin-bottom:10px; border-radius:8px; font-size:13px; }
     
-    .avatar-small { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #eee; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
-    .avatar-large { width: 90px; height: 90px; border-radius: 50%; object-fit: cover; background: #eee; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.15); margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 45px; }
+    /* FIX: Added concrete layout boundaries to avoid image generation popping */
+    .avatar-small { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #eee; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; aspect-ratio: 1/1; }
+    .avatar-large { width: 90px; height: 90px; border-radius: 50%; object-fit: cover; background: #eee; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.15); margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 45px; aspect-ratio: 1/1; }
 
     .user-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
     .user-info { flex-grow: 1; }
@@ -210,11 +212,14 @@ async function pollForUpdates() {
       }
     }
     
-    allPosts = newPosts;
-    allBios = data.bios || {};
-    allAvatars = data.avatars || {};
-    lastPostCount = newPosts.length;
-    render();
+    // FIX: Compare arrays roughly to prevent periodic data-polling from wiping out user's display state unnecessarily
+    if (JSON.stringify(allPosts) !== JSON.stringify(newPosts)) {
+      allPosts = newPosts;
+      allBios = data.bios || {};
+      allAvatars = data.avatars || {};
+      lastPostCount = newPosts.length;
+      render();
+    }
   } catch(e) { console.log("Poll failed, will try again..."); }
 }
 
@@ -242,7 +247,9 @@ function showNotif(msg) {
 }
 
 function dismissNotif() {
-  document.getElementById('notifBanner').classList.remove('show');
+  document.getElementById('notifBanner').classList.remove('remove');
+  const b = document.getElementById('notifBanner');
+  if(b) b.classList.remove('show');
   document.getElementById('navBadge').style.display = 'none';
   newPostCount = 0;
 }
@@ -379,8 +386,9 @@ function render() {
       if (ytMatch && ytMatch[1]) {
         const videoId = ytMatch[1];
         const thumbUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+        // FIX: Applied an explicit 16/9 aspect-ratio wrap element here so loading YouTube content won't jump layouts.
         mediaHTML += `
-          <div style="margin-top:10px; position:relative; padding-bottom:56.25%; height:0; overflow:hidden; border-radius:8px; background: #000 url(${thumbUrl}) center/cover no-repeat; cursor:pointer;" 
+          <div style="margin-top:10px; position:relative; aspect-ratio: 16/9; width:100%; overflow:hidden; border-radius:8px; background: #000 url(${thumbUrl}) center/cover no-repeat; cursor:pointer;" 
                onclick="this.innerHTML='<iframe src=\'https://www.youtube.com/embed/${videoId}?autoplay=1\' style=\'position:absolute;top:0;left:0;width:100%;height:100%;\' frameborder=\'0\' allow=\'autoplay; encrypted-media\' allowfullscreen></iframe>'; this.onclick=null;">
             <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:60px; height:60px; background:rgba(0,0,0,0.7); border-radius:50%; display:flex; align-items:center; justify-content:center; border:3px solid white;">
               <div style="width: 0; height: 0; border-top: 15px solid transparent; border-bottom: 15px solid transparent; border-left: 25px solid white; margin-left: 5px;"></div>
