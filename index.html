@@ -97,7 +97,7 @@
     .crop-workspace { width: 100%; max-width: 420px; aspect-ratio: 1/1; background: #000; margin-bottom: 15px; overflow: hidden; border-radius: 8px; position: relative; }
     .crop-workspace img { max-width: 100%; display: block; }
     
-    /* FIX: Added scrollable Instagram-style filter shortcut preview tray classes */
+    /* Scrollable Instagram-style filter shortcut preview tray classes */
     .filter-tray { display: flex; gap: 10px; width: 100%; max-width: 420px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 15px; scrollbar-width: none; }
     .filter-tray::-webkit-scrollbar { display: none; }
     .filter-option { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; font-size: 11px; color: #ccc; cursor: pointer; width: 65px; font-weight: bold; }
@@ -221,6 +221,8 @@ window.onload = () => {
   loadFeed(); 
   window.addEventListener('scroll', handleWindowScroll, { passive: true });
   window.onscroll = handleWindowScroll; 
+  // Automatically poll for updates every 30 seconds
+  setInterval(pollForUpdates, 30000);
 };
 
 function initiateCropper(event) {
@@ -259,7 +261,6 @@ function initiateCropper(event) {
   reader.readAsDataURL(file);
 }
 
-/* FIX: Connect live filter switching CSS class bindings to Workspace boundaries */
 function selectPostFilter(filterType, triggerElement) {
   chosenFilterStyleName = filterType;
   document.querySelectorAll('.filter-option').forEach(el => el.classList.remove('active'));
@@ -272,21 +273,20 @@ function selectPostFilter(filterType, triggerElement) {
 function closeCropModal() {
   document.getElementById('cropModal').style.display = 'none';
   document.getElementById('file').value = "";
+  processedBase64Image = "";
   if(activeCropperInstance) activeCropperInstance.destroy();
 }
 
-/* FIX: Bake the filter settings directly onto the export Canvas pixel layer */
 function applyImageCropAndFilter() {
   if (!activeCropperInstance) return;
   
   // Create an explicit high-res 1:1 image canvas
-  const croppedCanvas = activeCropperInstance.getCroppedCanvas({ width: 640, height: 640 });
-  const finalContext = croppedCanvas.getContext('2d');
+  const croppedCanvas = activeCropperInstance.getCroppedCanvas({ width: 800, height: 800 });
   
   // Setup an offscreen temporary target canvas to run context translations
   const outputCanvas = document.createElement('canvas');
-  outputCanvas.width = 640;
-  outputCanvas.height = 640;
+  outputCanvas.width = 800;
+  outputCanvas.height = 800;
   const outContext = outputCanvas.getContext('2d');
   
   // Feed pixel processing formulas into the output canvas context
@@ -437,12 +437,7 @@ function setFilter(type, val) {
 function getAvatarMarkup(user, sizeClass) {
   const ava = allAvatars[user];
   if (!ava || ava === "" || ava === "undefined") return `<div class="${sizeClass}">🦄</div>`;
-  let finalSrc = ava;
-  if (ava.includes("googleusercontent.com/profile/picture/0")) {
-     const parts = ava.split("picture/0");
-     finalSrc = parts[0] + "picture/0" + (parts[1] || "");
-  }
-  return `<img src="${finalSrc}" class="${sizeClass}" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=🦄';">`;
+  return `<img src="${ava}" class="${sizeClass}" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=🦄';">`;
 }
 
 async function uploadAvatar(user) {
@@ -450,8 +445,18 @@ async function uploadAvatar(user) {
   if(!file) return;
   const btn = document.getElementById('editBioBtn');
   if(btn) btn.innerText = "Processing...";
+  
   const base64 = await compressImage(file);
-  await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'updateBio', username: user, bio: allBios[user] || "", avatar: base64 }) });
+  await fetch(SCRIPT_URL, { 
+    method: 'POST', 
+    mode: 'no-cors', 
+    body: JSON.stringify({ 
+      action: 'updateBio', 
+      username: user, 
+      bio: allBios[user] || "", 
+      avatar: base64 
+    }) 
+  });
   setTimeout(async () => { await loadFeed(); if(btn) btn.innerText = "Edit Bio"; render(); }, 4000); 
 }
 
@@ -459,7 +464,16 @@ async function saveBio(user) {
   const bio = document.getElementById('newBio').value;
   allBios[user] = bio;
   render();
-  await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'updateBio', username: user, bio: bio, avatar: allAvatars[user] || "" }) });
+  await fetch(SCRIPT_URL, { 
+    method: 'POST', 
+    mode: 'no-cors', 
+    body: JSON.stringify({ 
+      action: 'updateBio', 
+      username: user, 
+      bio: bio, 
+      avatar: allAvatars[user] || "" 
+    }) 
+  });
   setTimeout(loadFeed, 2000);
 }
 
@@ -665,8 +679,18 @@ async function upload() {
   if(!user || !msg) return alert("Fill in name and message!");
   document.getElementById('postBtn').innerText = "Posting...";
   
-  const img = processedBase64Image;
-  await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action:'post', username:user, message:msg, image:img }) });
+  const imgPayload = (processedBase64Image && processedBase64Image.startsWith("data:image")) ? processedBase64Image : "";
+  
+  await fetch(SCRIPT_URL, { 
+    method: 'POST', 
+    mode: 'no-cors', 
+    body: JSON.stringify({ 
+      action: 'post', 
+      username: user, 
+      message: msg, 
+      image: imgPayload 
+    }) 
+  });
   
   document.getElementById('msg').value = ""; 
   document.getElementById('file').value = "";
@@ -682,10 +706,11 @@ async function compressImage(file) {
     r.onload = (e) => {
       const i = new Image(); i.src = e.target.result;
       i.onload = () => {
-        const c = document.createElement('canvas'); const m = 800;
-        let w = i.width, h = i.height; if(w > m){ h *= m/w; w = m; }
+        const c = document.createElement('canvas'); const m = 400;
+        let w = i.width, h = i.height; if(w > h){ w = h; } else { h = w; } 
+        if(w > m){ w = m; h = m; }
         c.width = w; c.height = h; c.getContext('2d').drawImage(i,0,0,w,h);
-        res(c.toDataURL('image/jpeg', 0.7));
+        res(c.toDataURL('image/jpeg', 0.8));
       };
     };
   });
