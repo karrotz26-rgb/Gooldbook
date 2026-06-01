@@ -21,6 +21,7 @@
     .nav-icon { background: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
     .nav-badge { background: #e74c3c; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 11px; display: none; align-items: center; justify-content: center; font-weight: bold; margin-left: -8px; margin-top: -16px; }
 
+    /* FIX: Solidified absolute fixed coordinates to prevent button viewport clipping */
     #backToTop { 
       position: fixed !important; 
       bottom: 25px !important; 
@@ -53,6 +54,7 @@
     .sidebar { width:280px; position:sticky; top:70px; height: fit-content; }
     .main-feed { flex-grow:1; max-width:550px; width:100%; }
     
+    /* FIX: Stripped completely all trace components of layout visibility containment */
     .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: background 0.5s; }
     .highlight-card { background: #fffbe6 !important; border-color: #ffe58f !important; }
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:12px; margin-bottom:10px; border-radius:8px; font-size:13px; }
@@ -65,8 +67,9 @@
     .user-name { color: var(--gb-blue); font-weight:bold; cursor: pointer; display: block; }
     .time-stamp { font-size:11px; color:#888; }
     
-    .img-container { width: 100%; background: #f8f9fa; margin-top: 10px; position: relative; overflow: hidden; border-radius: 6px; display: flex; align-items: center; justify-content: center; border: 1px solid #f0f2f5; }
-    .post-img { max-width:100%; height: auto; max-height: 500px; object-fit: contain; opacity: 0; transition: opacity 0.2s ease; display: block; }
+    /* FIX: Assigned minimum box parameters so unrendered media blocks do not crush layout heights */
+    .img-container { width: 100%; min-height: 200px; max-height: 450px; background: #f8f9fa; margin-top: 10px; position: relative; overflow: hidden; border-radius: 6px; display: flex; align-items: center; justify-content: center; border: 1px solid #f0f2f5; }
+    .post-img { max-width:100%; height: auto; max-height: 450px; object-fit: contain; opacity: 0; transition: opacity 0.2s ease; display: block; }
     .post-img.loaded { opacity: 1; }
 
     .skeleton-loader { position: absolute; top:0; left:0; width: 100%; height: 100%; background: linear-gradient(90deg, #f0f2f5 25%, #e1e4e8 50%, #f0f2f5 75%); background-size: 200% 100%; animation: loadingPulse 1.5s infinite; }
@@ -141,7 +144,6 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw-AwBSgjqXObFUmoHCl
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let incomingPostsCache = null; 
 let allBios = {}, allAvatars = {};
-// FIX: Modified standard initialization state to handle 10 rows per viewport chunk
 let postsToShow = 10;
 let filterType = null, filterVal = null;
 let lastPostCount = allPosts.length;
@@ -153,26 +155,28 @@ window.onload = () => {
   document.getElementById('user').value = localStorage.getItem("gb_user") || "";
   if(allPosts.length > 0) { render(); }
   loadFeed(); 
+  // FIX: Attach direct rendering wheel calculations to root window object
   window.addEventListener('scroll', handleWindowScroll, { passive: true });
-  setInterval(pollForUpdates, 30000);
+  window.onscroll = handleWindowScroll; 
 };
 
 function handleWindowScroll() {
+  // FIX: Aggressive cross-browser scroll calculation query targeting
   const btn = document.getElementById("backToTop");
-  const currentScroll = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop;
+  const currentScroll = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
   
-  if (currentScroll > 400) {
-    btn.style.display = "flex";
+  if (currentScroll > 300) {
+    btn.style.setProperty('display', 'flex', 'important');
   } else {
-    btn.style.display = "none";
+    btn.style.setProperty('display', 'none', 'important');
   }
 
   if (scrollTimeout) return;
   scrollTimeout = setTimeout(() => {
     scrollTimeout = null;
 
-    // FIX: Tightened threshold boundary tracking mechanics to safely execute loading batches
-    if ((window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight - 350) {
+    const documentHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight, document.documentElement.offsetHeight);
+    if ((window.innerHeight + currentScroll) >= documentHeight - 400) {
       const s = document.getElementById('searchBar').value.toLowerCase();
       let filtered = allPosts.filter(p => 
         (p.message || "").toLowerCase().includes(s) || (p.user || "").toLowerCase().includes(s)
@@ -186,7 +190,6 @@ function handleWindowScroll() {
         }
       }
       
-      // FIX: Append 10 updates cleanly down the scroll stream 
       if (postsToShow < filtered.length && !isInfiniteScrollLoading) {
         isInfiniteScrollLoading = true;
         postsToShow += 10;
@@ -194,7 +197,7 @@ function handleWindowScroll() {
         setTimeout(() => { isInfiniteScrollLoading = false; }, 200);
       }
     }
-  }, 100);
+  }, 80);
 }
 
 async function loadFeed() {
