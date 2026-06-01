@@ -21,8 +21,10 @@
     .nav-icon { background: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
     .nav-badge { background: #e74c3c; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 11px; display: none; align-items: center; justify-content: center; font-weight: bold; margin-left: -8px; margin-top: -16px; }
 
-    #backToTop { position: fixed; bottom: 20px; right: 20px; width: 45px; height: 45px; background: var(--gb-blue); color: white; border-radius: 50%; display: none; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 2000; transition: transform 0.2s; border: 2px solid white; }
+    /* FIX: Configured transition visibility properties to handle smooth fading instead of sudden snapping layouts */
+    #backToTop { position: fixed; bottom: 20px; right: 20px; width: 45px; height: 45px; background: var(--gb-blue); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 2000; opacity: 0; pointer-events: none; transition: transform 0.2s, opacity 0.3s ease, visibility 0.3s; visibility: hidden; border: 2px solid white; }
     #backToTop:hover { transform: scale(1.1); background: var(--gb-hover); }
+    #backToTop.show { opacity: 1; pointer-events: auto; visibility: visible; }
 
     .notif-banner { position: fixed; top: calc(60px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); background: #1c1e21; color: white; padding: 12px 20px; border-radius: 12px; font-size: 14px; z-index: 9000; display: none; align-items: center; gap: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); max-width: 90vw; cursor: pointer; animation: slideDown 0.3s ease; }
     .notif-banner.show { display: flex; }
@@ -35,12 +37,10 @@
     .sidebar { width:280px; position:sticky; top:70px; height: fit-content; }
     .main-feed { flex-grow:1; max-width:550px; width:100%; }
     
-    /* FIX: Adjusted layout constraints to prevent jumpy rendering loops */
     .card { background:#fff; border:1px solid #ddd; padding:15px; margin-bottom:15px; border-radius:8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); transition: background 0.5s; content-visibility: auto; contain-intrinsic-size: auto 300px; }
     .highlight-card { background: #fffbe6 !important; border-color: #ffe58f !important; }
     .sidebar-card { background:#fff; border:1px solid #ddd; padding:12px; margin-bottom:10px; border-radius:8px; font-size:13px; }
     
-    /* FIX: Added concrete layout boundaries to avoid image generation popping */
     .avatar-small { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #eee; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; aspect-ratio: 1/1; }
     .avatar-large { width: 90px; height: 90px; border-radius: 50%; object-fit: cover; background: #eee; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.15); margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 45px; aspect-ratio: 1/1; }
 
@@ -145,10 +145,12 @@ function handleWindowScroll() {
   scrollTimeout = setTimeout(() => {
     scrollTimeout = null;
     const btn = document.getElementById("backToTop");
+    
+    // FIX: Swapped out legacy inline display styles for class lists to match smooth opacity fading
     if (document.body.scrollTop > 400 || document.documentElement.scrollTop > 400) {
-      btn.style.display = "flex";
+      btn.classList.add("show");
     } else {
-      btn.style.display = "none";
+      btn.classList.remove("show");
     }
 
     if ((window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight - 150) {
@@ -212,7 +214,6 @@ async function pollForUpdates() {
       }
     }
     
-    // FIX: Compare arrays roughly to prevent periodic data-polling from wiping out user's display state unnecessarily
     if (JSON.stringify(allPosts) !== JSON.stringify(newPosts)) {
       allPosts = newPosts;
       allBios = data.bios || {};
@@ -247,7 +248,6 @@ function showNotif(msg) {
 }
 
 function dismissNotif() {
-  document.getElementById('notifBanner').classList.remove('remove');
   const b = document.getElementById('notifBanner');
   if(b) b.classList.remove('show');
   document.getElementById('navBadge').style.display = 'none';
@@ -386,7 +386,6 @@ function render() {
       if (ytMatch && ytMatch[1]) {
         const videoId = ytMatch[1];
         const thumbUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-        // FIX: Applied an explicit 16/9 aspect-ratio wrap element here so loading YouTube content won't jump layouts.
         mediaHTML += `
           <div style="margin-top:10px; position:relative; aspect-ratio: 16/9; width:100%; overflow:hidden; border-radius:8px; background: #000 url(${thumbUrl}) center/cover no-repeat; cursor:pointer;" 
                onclick="this.innerHTML='<iframe src=\'https://www.youtube.com/embed/${videoId}?autoplay=1\' style=\'position:absolute;top:0;left:0;width:100%;height:100%;\' frameborder=\'0\' allow=\'autoplay; encrypted-media\' allowfullscreen></iframe>'; this.onclick=null;">
