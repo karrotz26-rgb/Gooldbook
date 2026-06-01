@@ -174,7 +174,7 @@
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwmFaAr_7gWDiytQOzQJWfP7KMusBYc68Mi23KVssNZUs-F42Scc_PP06bLnDgsQ8mP/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxE0RxCEvjPawStAOJFXXVz2NbLhxGGvl827wdt5AAqGi7Iz0fROVRwYgnvKpoeejKw/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let incomingPostsCache = null; 
 let allBios = {}, allAvatars = {};
@@ -424,6 +424,7 @@ function setFilter(type, val) {
 function getAvatarMarkup(user, sizeClass) {
   const ava = allAvatars[user];
   if (!ava || ava === "" || ava === "undefined") return `<div class="${sizeClass}">🦄</div>`;
+  // REMOVED crossOrigin from profile avatars to bypass blocks
   return `<img src="${ava}" class="${sizeClass}" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=🦄';">`;
 }
 
@@ -551,9 +552,10 @@ function render() {
         if (existingImg && existingImg.getAttribute('src') === p.image) {
           mediaHTML = existingImg.closest('.img-container').outerHTML;
         } else {
+          // FIX: Removed crossorigin="anonymous" from main feed to allow google drive direct downloads to display natively
           mediaHTML += `<div class="img-container">
             <div class="skeleton-loader"></div>
-            <img src="${p.image}" class="post-img" loading="lazy" crossorigin="anonymous" onload="onImageLoad(this)">
+            <img src="${p.image}" class="post-img" loading="lazy" onload="onImageLoad(this)">
           </div>`;
         }
       }
@@ -790,6 +792,9 @@ async function sharePost(rowIndex, event) {
     </div>
   `).join('');
 
+  // FIX: Using a CORS image proxy pipeline ONLY for html2canvas generation to ensure shares do not print out blank layouts
+  const proxyImageURL = post.image ? "https://images1-focus-opensocial.googleusercontent.com/gadgets/proxy?container=focus&refresh=2592000&url=" + encodeURIComponent(post.image) : "";
+
   card.innerHTML = `
     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
       ${getAvatarMarkup(post.user, 'avatar-small')}
@@ -799,7 +804,7 @@ async function sharePost(rowIndex, event) {
       </div>
     </div>
     <div style="font-size: 16px; margin-bottom: 15px; line-height: 1.4;">${post.message}</div>
-    ${post.image ? `<img src="${post.image}" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius: 8px; margin-bottom: 10px;">` : ''}
+    ${post.image ? `<img src="${proxyImageURL}" crossOrigin="anonymous" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius: 8px; margin-bottom: 10px;">` : ''}
     
     <div style="border-top: 2px solid #f0f2f5; padding-top: 12px; margin-top: 5px;">
       <div style="display: flex; gap: 15px; font-size: 14px; font-weight: bold; color: #65676b; margin-bottom: 4px;">
