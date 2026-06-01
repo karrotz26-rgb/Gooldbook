@@ -21,7 +21,6 @@
     .nav-icon { background: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
     .nav-badge { background: #e74c3c; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 11px; display: none; align-items: center; justify-content: center; font-weight: bold; margin-left: -8px; margin-top: -16px; }
 
-    /* Back to Top Button */
     #backToTop { position: fixed; bottom: 20px; right: 20px; width: 45px; height: 45px; background: var(--gb-blue); color: white; border-radius: 50%; display: none; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 2000; transition: transform 0.2s; border: 2px solid white; }
     #backToTop:hover { transform: scale(1.1); background: var(--gb-hover); }
 
@@ -105,16 +104,17 @@
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxODpOIwMYlIgYlC35z3qfoOCjY-gJ3-p1QchZQ9brt1Hb5Q-nosPRSnw5wbQCDzGRu/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyVzuJyTHHyN_au6-yXnqBkSKKNcXr35CrouluFkwArYyjsaKx1TAqlXCfwhBP8GfTE/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let allBios = {}, allAvatars = {};
 let postsToShow = 5;
 let filterType = null, filterVal = null;
-let lastPostCount = 0;
+let lastPostCount = allPosts.length;
 let newPostCount = 0;
 
 window.onload = () => {
   document.getElementById('user').value = localStorage.getItem("gb_user") || "";
+  if(allPosts.length > 0) { render(); }
   loadFeed(); 
   setInterval(pollForUpdates, 30000);
 };
@@ -141,26 +141,27 @@ async function loadFeed() {
   } catch(e) { console.error("Load failed", e); }
 }
 
-// --- Updated pollForUpdates to prevent wiping out active typing ---
 async function pollForUpdates() {
-  // Check if user is currently typing in ANY input or textarea
   const isTyping = document.activeElement.tagName === 'INPUT' || 
                    document.activeElement.tagName === 'TEXTAREA';
   
-  if (isTyping) return; // Skip the update if the user is busy typing
+  if (isTyping) return; 
 
   try {
     const res = await fetch(SCRIPT_URL);
     const data = await res.json();
     const newPosts = data.posts || [];
     
-    if (newPosts.length > lastPostCount && newPosts[0].user !== document.getElementById('user').value.trim()) {
-      newPostCount += (newPosts.length - lastPostCount);
-      showNotif(`${newPosts[0].user} posted something new!`);
+    if (newPosts.length > lastPostCount) {
+      const activeUser = document.getElementById('user').value.trim();
+      if (newPosts[0] && newPosts[0].user !== activeUser) {
+        newPostCount += (newPosts.length - lastPostCount);
+        showNotif(`${newPosts[0].user} posted something new!`);
+      }
     }
     
     allPosts = newPosts;
-    allBios = data.bios;
+    allBios = data.bios || {};
     allAvatars = data.avatars || {};
     lastPostCount = newPosts.length;
     render();
@@ -200,8 +201,8 @@ function getAvatarMarkup(user, sizeClass) {
      const parts = ava.split("picture/0");
      finalSrc = parts[0] + "picture/0" + (parts[1] || "");
   }
-  const cacheBuster = finalSrc.includes('?') ? `&t=${Date.now()}` : `?t=${Date.now()}`;
-  return `<img src="${finalSrc}${cacheBuster}" class="${sizeClass}" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=🦄';">`;
+  // Removed cache-buster parameter to allow browsers to cache images locally
+  return `<img src="${finalSrc}" class="${sizeClass}" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=🦄';">`;
 }
 
 async function uploadAvatar(user) {
@@ -232,7 +233,6 @@ function highlightHashtags(t) {
         const urlObj = new URL(url);
         let shortName = urlObj.hostname.replace('www.', '');
         
-        // YouTube Recognition
         const isYT = shortName.includes('youtube.com') || shortName.includes('youtu.be');
         if (isYT) {
             return `<a href="${url}" target="_blank" style="color:#ff0000; text-decoration:none; font-weight:600; background:#fff0f0; padding:2px 8px; border-radius:4px; display:inline-block; margin:2px 0;">🎬 YouTube</a>`;
@@ -259,8 +259,6 @@ function render() {
   const composer = document.getElementById('postComposer');
   const feedEl = document.getElementById('feed');
   
-  feedEl.innerHTML = ""; 
-
   let filtered = allPosts.filter(p => 
     (p.message || "").toLowerCase().includes(s) || 
     (p.user || "").toLowerCase().includes(s)
@@ -294,14 +292,14 @@ function render() {
     statusEl.innerHTML = ""; 
   }
   
-  const totalInFilter = filtered.length; // Get the total for the counter
+  const totalInFilter = filtered.length;
 
   const feedHTML = filtered.slice(0, postsToShow).map((p, index) => {
     try {
       let mediaHTML = "";
       if (p.image && p.image.length > 10) {
         mediaHTML += `<div class="img-container" style="margin-top:10px; background:#f0f2f5; border-radius:4px; overflow:hidden; min-height:100px;">
-          <img src="${p.image}" id="img-${p.rowIndex}-${Date.now()}" class="post-img" crossorigin="anonymous">
+          <img src="${p.image}" class="post-img" loading="lazy" crossorigin="anonymous">
         </div>`;
       }
 
@@ -319,9 +317,10 @@ function render() {
           </div>`;
       }
 
-      // Updated Heart Badge with "Post X of Y" counter
       const likeBadge = (filterType === 'likes') ? 
         `<span style="color:#e74c3c; font-size:11px; font-weight:normal; background:#fff0f0; padding:2px 6px; border-radius:10px; margin-left:8px; border:1px solid #ffccd5;">❤️ ${index + 1} of ${totalInFilter}</span>` : '';
+
+      const likeNames = p.likes.length > 0 ? p.likes.map(name => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()}</b>`).join(', ') : '';
 
       return `
         <div class="card" id="post-${p.rowIndex}">
@@ -339,17 +338,15 @@ function render() {
           ${mediaHTML}
           <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
             <div style="display:flex; gap:10px; align-items:center;">
-              <button class="btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} ${p.likes.length}</button>
+              <button class="like-btn btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} <span>${p.likes.length}</span></button>
               <button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
             </div>
-            ${p.likes.length > 0 ? `
-              <div style="font-size:11px; color:#65676b; margin-left:5px; line-height:1.4;">
-                Liked by: ${p.likes.map(name => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()}</b>`).join(', ')}
-              </div>
-            ` : ''}
+            <div class="liked-by-container" style="font-size:11px; color:#65676b; margin-left:5px; line-height:1.4; display: ${p.likes.length > 0 ? 'block' : 'none'};">
+              Liked by: <span class="liked-by-list">${likeNames}</span>
+            </div>
           </div>
           <div class="comment-section" style="margin-top:10px;">
-            ${p.comments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">${timeAgo(c.time)}</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}
+            <div class="comments-list">${p.comments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">${timeAgo(c.time)}</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}</div>
             <div style="margin-top:10px"><input id="c-${p.rowIndex}" placeholder="Reply..." style="margin-bottom:0; font-size:13px!important;"><button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button></div>
           </div>
         </div>`;
@@ -419,42 +416,68 @@ async function compressImage(file) {
   });
 }
 
-// --- Updated apiCall to ensure Likes and Comments are prioritized ---
+// Targeted DOM injection for instant visual updates without wiping out page state
 async function apiCall(action, rowIndex, event) {
   const user = document.getElementById('user').value.trim();
   if(!user) return alert("Name required!");
   
   const p = allPosts.find(x => x.rowIndex === rowIndex);
+  const postEl = document.getElementById(`post-${rowIndex}`);
   
   if(action==='like') {
     const i = p.likes.indexOf(user);
     i === -1 ? p.likes.push(user) : p.likes.splice(i,1);
     
-    // Visual feedback for the like
     if(i === -1 && event) {
        const u = document.createElement('div'); u.className='unicorn-pop'; u.textContent='🦄';
        u.style.left=event.clientX+'px'; u.style.top=event.clientY+'px';
        document.body.appendChild(u); setTimeout(()=>u.remove(), 1500);
     }
-    render(); // Update UI immediately
     
-    // Save to server
+    // Direct DOM Injection for likes
+    if (postEl) {
+      const btn = postEl.querySelector('.like-btn');
+      if(btn) {
+        btn.innerHTML = (p.likes.includes(user) ? '❤️ ' : '👍 ') + `<span>${p.likes.length}</span>`;
+      }
+      const container = postEl.querySelector('.liked-by-container');
+      const listSpan = postEl.querySelector('.liked-by-list');
+      if (container && listSpan) {
+        if (p.likes.length > 0) {
+          listSpan.innerHTML = p.likes.map(name => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()}</b>`).join(', ');
+          container.style.display = 'block';
+        } else {
+          container.style.display = 'none';
+        }
+      }
+    }
+    
     await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, rowIndex, username:user }) });
     
   } else if (action === 'comment') {
     const input = document.getElementById(`c-${rowIndex}`);
-    if(!input.value) return;
+    if(!input || !input.value) return;
     const txt = input.value;
     
-    // Add locally first so it feels instant
-    p.comments.push({ user, text: txt, time: new Date().toISOString() });
+    const newCommentObj = { user, text: txt, time: new Date().toISOString() };
+    p.comments.push(newCommentObj);
     input.value = ""; 
-    render();
     
-    // Save to server
+    // Direct DOM Injection for comments
+    if (postEl) {
+      const list = postEl.querySelector('.comments-list');
+      if (list) {
+        const div = document.createElement('div');
+        div.className = 'comment-box';
+        div.innerHTML = `<div style="display:flex; justify-content:space-between;"><b>${user}</b><span style="font-size:10px; color:#888;">just now</span></div><div>${highlightHashtags(txt)}</div>`;
+        list.appendChild(div);
+      }
+    }
+    
     await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, rowIndex, username:user, text: txt }) });
   }
 }
+
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
@@ -462,7 +485,6 @@ async function sharePost(rowIndex, event) {
   const originalText = btn.innerText;
   btn.innerText = "⏳ Wait...";
 
-  // Create the temporary card for the screenshot
   const card = document.createElement('div');
   card.style.cssText = `position: fixed; left: -9999px; width: 400px; background: white; padding: 20px; border-radius: 12px; font-family: system-ui, sans-serif; color: #1c1e21;`;
 
@@ -500,13 +522,12 @@ async function sharePost(rowIndex, event) {
     const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
     const file = new File([blob], `Gooldbook_${rowIndex}.png`, { type: 'image/png' });
     
-    // --- UPDATED SHARE LOGIC ---
     if (navigator.share) {
       await navigator.share({ 
         files: [file], 
         title: `Post by ${post.user}`,
-        text: `Check out this post on The Gooldbook! 🦄`, // Added text
-        url: window.location.href // This adds the URL to the text message
+        text: `Check out this post on The Gooldbook! 🦄`, 
+        url: window.location.href 
       });
     } else {
       const link = document.createElement('a');
@@ -514,8 +535,6 @@ async function sharePost(rowIndex, event) {
       link.href = canvas.toDataURL();
       link.click();
     }
-    // ---------------------------
-    
   } catch(e) { 
     console.error(e);
     alert("Share failed."); 
