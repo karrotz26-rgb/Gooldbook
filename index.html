@@ -107,7 +107,7 @@
     .f-normal .cropper-view-box img { filter: none; }
     .f-film1982 .cropper-view-box img { filter: sepia(0.55) contrast(0.85) brightness(1.1) saturate(0.85) hue-rotate(-5deg); }
     .f-vhs90s .cropper-view-box img { filter: contrast(1.1) saturate(1.3) brightness(1.05) blur(0.3px); }
-    .f-technopunk .cropper-view-box img { filter: contrast(1.9) brightness(0.7) grayscale(1) invert(0.05); }
+    .f-technopunk .cropper-view-box img { filter: contrast(1.9) brightness(0.7) grayscale(1); }
     .f-aiportrait .cropper-view-box img { filter: saturate(1.4) contrast(1.25) brightness(1.05); }
 
     @media(max-width:700px){ .container { flex-direction:column; } .sidebar { width:100%; position:static; } }
@@ -728,22 +728,22 @@ async function applyImageCropAndFilter() {
       selfieSegmentationModelInstance.onResults((results) => {
         outContext.clearRect(0, 0, 800, 800);
         
-        // 1. Draw Highly Saturated, Electric Hue Background
+        // 1. Render vibrant neon hue matrix into blurred background
         outContext.save();
-        outContext.filter = 'blur(16px) brightness(0.7) saturate(3) hue-rotate(130deg)';
+        outContext.filter = 'blur(16px) brightness(0.75) saturate(3) hue-rotate(135deg)';
         outContext.drawImage(results.image, 0, 0, 800, 800);
         outContext.restore();
         
-        // 2. Composite Layer Mask for clean cutout bounds
+        // 2. Setup composite window mask
         outContext.save();
         outContext.globalCompositeOperation = 'destination-in';
         outContext.drawImage(results.segmentationMask, 0, 0, 800, 800);
         outContext.restore();
         
-        // 3. Render Crisp, Vibrant Foregrounds overlaying background
+        // 3. Render high-contrast crisp subject onto the mask bounds
         outContext.save();
         outContext.globalCompositeOperation = 'destination-over';
-        outContext.filter = 'contrast(1.25) saturate(1.4) brightness(1.05)';
+        outContext.filter = 'contrast(1.25) saturate(1.45) brightness(1.05)';
         outContext.drawImage(results.image, 0, 0, 800, 800);
         outContext.restore();
         
@@ -791,31 +791,29 @@ async function applyImageCropAndFilter() {
         modificationAmount = scanlineDrop + subtleNoise;
       } 
       else if (chosenFilterStyleName === 'technopunk') {
-        // Compute precise luminosity
+        // High-contrast gritty black & white engine
         let luminance = (r * 0.299) + (g * 0.587) + (b * 0.114);
+        let gray = luminance < 115 ? (luminance * 0.35) : (luminance * 1.85);
         
-        // Form a harsh gritty black & white canvas base
-        let contrastGray = luminance < 110 ? (luminance * 0.4) : (luminance * 1.8);
-        
-        // Add heavy analog grain & noise artifacts
-        let grainChance = Math.random();
-        if (grainChance > 0.92) contrastGray += 45;
-        if (grainChance < 0.08) contrastGray -= 45;
+        // Digital analog static & grain generation blocks
+        let staticGrain = Math.random();
+        if (staticGrain > 0.93) gray += 50;
+        if (staticGrain < 0.07) gray -= 50;
 
-        // Apply a grid pattern mapping for 90s digital line streaks
-        if (rowY % 5 === 0) contrastGray -= 25;
+        // Gritty horizontal line structures
+        if (rowY % 5 === 0) gray -= 30;
 
-        // Inject vibrant hot pink & electric cyan neon leaks into highlights/streaks
+        // Peak highlights get mapped into vibrant neon pink/cyan streaks
         if (luminance > 175) {
-          if ((rowY + colX) % 14 < 7) {
-            r = 255;  g = 0;    b = 180; // Saturated Neon Pink Streak
+          if ((rowY + colX) % 16 < 8) {
+            r = 255;  g = 0;    b = 160; // Hot Magenta Cyber Neon
           } else {
-            r = 0;    g = 255;  b = 235; // Bright Neon Cyan Streak
+            r = 0;    g = 255;  b = 220; // Electric Cyan Cyber Neon
           }
         } else {
-          r = contrastGray;
-          g = contrastGray;
-          b = contrastGray;
+          r = gray;
+          g = gray;
+          b = gray;
         }
       }
 
@@ -832,13 +830,6 @@ async function applyImageCropAndFilter() {
   document.getElementById('cropModal').style.display = 'none';
   if(activeCropperInstance) activeCropperInstance.destroy();
   activeCropperInstance = null;
-}
-
-function timeAgo(d) {
-  if (!d) return "just now"; const dateObj = new Date(d); const diffMs = Date.now() - dateObj.getTime(); const seconds = Math.floor(diffMs / 1000); if (seconds < 60) return "just now";
-  const intervals = { yr: 31536000, mo: 2592000, d: 86400, h: 3600, m: 60 };
-  if (seconds >= intervals.mo) { return `${String(dateObj.getMonth() + 1).padStart(2, '0')}/${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getFullYear()).slice(-2)}`; }
-  for (let key in intervals) { const counter = Math.floor(seconds / intervals[key]); if (counter > 0) return counter + key; } return "just now";
 }
 
 function saveUser() { localStorage.setItem("gb_user", document.getElementById('user').value); loadFeed(); }
