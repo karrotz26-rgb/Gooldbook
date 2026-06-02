@@ -200,6 +200,7 @@ let activeCropperInstance = null;
 let processedBase64Image = "";
 let chosenFilterStyleName = "normal";
 
+// Matrix maps applied natively during context processing runs
 const filterMatrixConfigurations = {
   normal: 'none',
   film1982: 'sepia(0.55) contrast(0.85) brightness(1.1) saturate(0.85) hue-rotate(-5deg)',
@@ -280,6 +281,7 @@ function applyImageCropAndFilter() {
   outContext.filter = filterMatrixConfigurations[chosenFilterStyleName] || 'none';
   outContext.drawImage(croppedCanvas, 0, 0);
   
+  // Custom texture modifiers for specialized presets (Grain & Scanlines)
   if (chosenFilterStyleName === 'film1982' || chosenFilterStyleName === 'vhs90s') {
     const imgData = outContext.getImageData(0, 0, 800, 800);
     const pixels = imgData.data;
@@ -290,9 +292,11 @@ function applyImageCropAndFilter() {
 
       let modificationAmount = 0;
 
+      // Heavy fading grain for old school photo print look
       if (chosenFilterStyleName === 'film1982') {
         modificationAmount = (Math.random() - 0.5) * 24; 
       } 
+      // Multi-line row drops simulating tracking scanlines + fine static noise
       else if (chosenFilterStyleName === 'vhs90s') {
         const isScanlineRow = rowY % 4 === 0; 
         const scanlineDrop = isScanlineRow ? -15 : 0;
