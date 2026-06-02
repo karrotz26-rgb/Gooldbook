@@ -795,20 +795,22 @@ async function apiCall(action, rowIndex, event) {
   }
 }
 
-// Inline Base64 image converter to bypass cross-origin browser rules
-async function fetchImageAsBase64(url) {
+// Layout visibility extractor that copies active pixels directly from the screen
+function cloneRenderedTimelineImage(rowIndex) {
   try {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
+    const liveTimelineImage = document.querySelector(`#post-${rowIndex} .post-img`);
+    if (!liveTimelineImage || !liveTimelineImage.complete || liveTimelineImage.naturalWidth === 0) return "";
+    
+    const scratchCanvas = document.createElement('canvas');
+    scratchCanvas.width = liveTimelineImage.naturalWidth;
+    scratchCanvas.height = liveTimelineImage.naturalHeight;
+    
+    const ctx = scratchCanvas.getContext('2d');
+    ctx.drawImage(liveTimelineImage, 0, 0);
+    return scratchCanvas.toDataURL('image/jpeg', 0.9);
   } catch (err) {
-    console.error("CORS proxy conversion failed, falling back to direct link string", err);
-    return url; 
+    console.warn("Direct layout pixel extraction blocked, falling back to basic layout.", err);
+    return "";
   }
 }
 
@@ -817,13 +819,10 @@ async function sharePost(rowIndex, event) {
   if (!post) return;
   const btn = event.target; 
   const originalText = btn.innerText;
-  btn.innerText = "⏳ Wait...";
+  btn.innerText = "⏳ Processing...";
 
-  let shareImageSource = "";
-  if (post.image && post.image.length > 10) {
-    // Convert to Base64 to give html2canvas full local viewing permissions
-    shareImageSource = await fetchImageAsBase64(post.image);
-  }
+  // Clones the visible image from the timeline container to bypass CORS network blocks entirely
+  const safeBase64Image = cloneRenderedTimelineImage(rowIndex);
 
   const card = document.createElement('div');
   card.style.cssText = `position: fixed; left: -9999px; width: 400px; background: white; padding: 20px; border-radius: 12px; font-family: system-ui, sans-serif; color: #1c1e21;`;
@@ -849,7 +848,7 @@ async function sharePost(rowIndex, event) {
       </div>
     </div>
     <div style="font-size: 16px; margin-bottom: 15px; line-height: 1.4;">${post.message}</div>
-    ${shareImageSource ? `<img src="${shareImageSource}" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius: 8px; margin-bottom: 10px;">` : ''}
+    ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius: 8px; margin-bottom: 10px;">` : ''}
     
     <div style="border-top: 2px solid #f0f2f5; padding-top: 12px; margin-top: 5px;">
       <div style="display: flex; gap: 15px; font-size: 14px; font-weight: bold; color: #65676b; margin-bottom: 4px;">
@@ -866,7 +865,8 @@ async function sharePost(rowIndex, event) {
 
   try {
     const canvas = await html2canvas(card, { 
-      useCORS: true, 
+      useCORS: false, 
+      allowTaint: true,
       scale: 2, 
       backgroundColor: "#ffffff",
       logging: false 
@@ -890,7 +890,7 @@ async function sharePost(rowIndex, event) {
     }
   } catch(e) { 
     console.error(e);
-    alert("Share failed."); 
+    alert("Share card extraction encountered an error."); 
   } finally { 
     btn.innerText = originalText; 
   }
