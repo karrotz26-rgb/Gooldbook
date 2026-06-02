@@ -411,7 +411,7 @@ async function pollForUpdates() {
 function acceptNewPosts() {
   if (incomingPostsCache) {
     allPosts = incomingPostsCache.posts || [];
-    allBios = incomingPostsCache.bios || {};
+    allBios = incomingPostsCache.posts || {};
     allAvatars = incomingPostsCache.avatars || {};
     localStorage.setItem("gb_cache", JSON.stringify(allPosts));
     lastPostCount = allPosts.length;
@@ -422,7 +422,6 @@ function acceptNewPosts() {
   render();
 }
 
-// CACHE/HELPER ENGINE: Turns an image URL into a local un-tainted string context seamlessly
 function base64CacheProxy(url) {
   return new Promise((resolve) => {
     if (!url || url.length < 10) return resolve("");
@@ -827,28 +826,26 @@ async function apiCall(action, rowIndex, event) {
   }
 }
 
-// 🛡️ RE-ARCHITECTED SINGLE-TOUCH SHARE ENGINE: Compiles layout cards instantly into memory files
+// 🔥 CLIPBOARD SOCIAL CARD ENGINE: Copies the image and post text details automatically
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
   const btn = event.target; 
   const originalText = btn.innerText;
-  
-  btn.innerText = "⏳ Building Card...";
+  btn.innerText = "⏳ Copying Card...";
 
   const names = post.likes.length > 0 ? post.likes.join(', ') : '';
   const hasPhoto = post.image && post.image.length > 10;
   const targetImageUrl = hasPhoto ? post.image : "";
 
-  // Compile sharing text layout variables right away
-  let textTextMsg = `🦄 Gooldbook Post by ${post.user}:\n\n"${post.message}"\n`;
-  const postUrl = post.image || window.location.href;
+  // Compile clipboard body layout text parameters 
+  let textTextMsg = `🦄 Gooldbook Post by ${post.user}:\n\n"${post.message}"\n\nLink: ${postUrl = post.image || window.location.href}`;
 
   try {
-    // 1. Pre-load and secure un-tainted data URL pixels BEFORE triggering navigator.share
+    // 1. Process picture elements locally through cross-origin stream helpers
     const safeBase64Image = await base64CacheProxy(targetImageUrl);
 
-    // 2. Generate a clean off-screen DOM canvas snapshot node structure
+    // 2. Set up the design workspace element node to capture coordinates smoothly
     const renderFrame = document.createElement('div');
     renderFrame.style.cssText = `
       position: absolute;
@@ -856,7 +853,7 @@ async function sharePost(rowIndex, event) {
       left: 0;
       width: 400px;
       background: #ffffff !important;
-      padding: 20px;
+      padding: 24px;
       border-radius: 12px;
       font-family: system-ui, -apple-system, sans-serif;
       color: #1c1e21;
@@ -864,7 +861,6 @@ async function sharePost(rowIndex, event) {
       z-index: -99999;
       visibility: hidden;
       overflow: hidden;
-      height: auto;
     `;
 
     const allCommentsHTML = post.comments.slice(0, 3).map(c => `
@@ -900,7 +896,7 @@ async function sharePost(rowIndex, event) {
 
     document.body.appendChild(renderFrame);
 
-    // 3. Compile layout pixels directly into binary blob streams
+    // 3. Render container layout properties to image canvas block
     const canvas = await html2canvas(renderFrame, { 
       useCORS: true,
       allowTaint: true,
@@ -912,29 +908,26 @@ async function sharePost(rowIndex, event) {
     
     document.body.removeChild(renderFrame);
     
-    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-    const file = new File([blob], `Gooldbook_${rowIndex}.png`, { type: 'image/png' });
+    // 4. STEP FOUR: Copy the binary PNG directly to the device clipboard context maps
+    const imageBlob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        [imageBlob.type]: imageBlob
+      })
+    ]);
+    
+    // Success confirmation
+    alert("✨ Branded card image copied to your clipboard automatically! Just open any chat and click Paste.");
 
-    // 4. STEP FOUR: Execution of the file sharing action block
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ 
-        files: [file], 
-        title: `Post by ${post.user}`,
-        text: textTextMsg, 
-        url: window.location.href 
-      });
-    } else {
-      // Desktop file fallback downloader parameters
-      const link = document.createElement('a');
-      link.download = `Gooldbook_${rowIndex}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    }
   } catch(e) { 
-    console.error("Card processing failure:", e);
-    // Hard structural clipboard fallback layer
-    if (navigator.share) {
-      await navigator.share({ title: `Gooldbook`, text: textTextMsg, url: window.location.href });
+    console.error("Clipboard routing obstacle:", e);
+    // Hard fallback text delivery loop
+    try {
+      await navigator.clipboard.writeText(textTextMsg);
+      alert("📋 Image blocked by your browser settings. Post text details copied instead!");
+    } catch(txtErr) {
+      alert("Clipboard access disabled. Check app site permissions.");
     }
   } finally { 
     btn.innerText = originalText; 
