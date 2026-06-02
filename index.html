@@ -329,7 +329,7 @@ function applyImageCropAndFilter() {
       modificationAmount = scanlineDrop + subtleNoise;
     } 
     
-      else if (chosenFilterStyleName === 'technopunk') {
+    else if (chosenFilterStyleName === 'technopunk') {
       // 1. Calculate a gritty, high-contrast grayscale base
       let luminance = (r * 0.299) + (g * 0.587) + (b * 0.114);
       
@@ -338,7 +338,6 @@ function applyImageCropAndFilter() {
       gray = Math.min(255, Math.max(0, gray));
 
       // 2. Multi-Channel Neon Highlight Accent Engine
-      // Check if the pixel has a distinct, strong color bias or high intensity
       let colorIntensity = Math.max(r, g, b) - Math.min(r, g, b);
 
       if (colorIntensity > 35 || luminance > 170) {
@@ -359,7 +358,6 @@ function applyImageCropAndFilter() {
           b = 0;
         }
       } else {
-        // Otherwise, compress it into the gritty street-style black and white mix
         r = gray;
         g = gray;
         b = gray;
@@ -368,7 +366,13 @@ function applyImageCropAndFilter() {
       // 3. Inject a heavy layer of digital matrix noise grain
       modificationAmount = (Math.random() - 0.5) * 35;
     }
- 
+
+    // Apply adjustments and clamp color values between 0 and 255
+    pixels[i]     = Math.min(255, Math.max(0, r + modificationAmount));     
+    pixels[i + 1] = Math.min(255, Math.max(0, g + modificationAmount)); 
+    pixels[i + 2] = Math.min(255, Math.max(0, b + modificationAmount)); 
+  }
+  
   // 3. Bake modified data back into destination canvas
   outContext.putImageData(imgData, 0, 0);
   
