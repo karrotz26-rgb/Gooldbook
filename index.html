@@ -832,6 +832,18 @@ async function applyImageCropAndFilter() {
   activeCropperInstance = null;
 }
 
+function timeAgo(d) {
+  if (!d) return "just now"; 
+  const dateObj = new Date(d); 
+  const diffMs = Date.now() - dateObj.getTime(); 
+  const seconds = Math.floor(diffMs / 1000); 
+  if (seconds < 60) return "just now";
+  const intervals = { yr: 31536000, mo: 2592000, d: 86400, h: 3600, m: 60 };
+  if (seconds >= intervals.mo) { return `${String(dateObj.getMonth() + 1).padStart(2, '0')}/${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getFullYear()).slice(-2)}`; }
+  for (let key in intervals) { const counter = Math.floor(seconds / intervals[key]); if (counter > 0) return counter + key; } 
+  return "just now";
+}
+
 function saveUser() { localStorage.setItem("gb_user", document.getElementById('user').value); loadFeed(); }
 </script>
 </body>
