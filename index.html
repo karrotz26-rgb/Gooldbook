@@ -268,58 +268,88 @@ function closeCropModal() {
 function applyImageCropAndFilter() {
   if (!activeCropperInstance) return;
   
-  // 1. Get the cropped canvas data from CropperJS
+  // 1. Fetch raw canvas cut data from cropper engine
   const croppedCanvas = activeCropperInstance.getCroppedCanvas({ width: 800, height: 800 });
   
-  // 2. Set up our destination workspace canvas
   const outputCanvas = document.createElement('canvas');
   outputCanvas.width = 800;
   outputCanvas.height = 800;
   const outContext = outputCanvas.getContext('2d');
   
-  // 🔥 FIX 1: The native canvas filter property MUST be declared BEFORE calling drawImage()
-  // Otherwise, the canvas captures the raw image data without applying the filter matrix!
-  const currentFilterConfig = filterMatrixConfigurations[chosenFilterStyleName] || 'none';
-  outContext.filter = currentFilterConfig;
-  
-  // 3. Draw the image onto the canvas with the filter context active
+  // Draw raw image to our workstation canvas grid first
   outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
   
-  // 🔥 FIX 2: Clear out the context filter afterward so subsequent pixel manipulations blend properly
-  outContext.filter = 'none';
+  // 2. Extract raw pixel buffers to manually process the filters
+  const imgData = outContext.getImageData(0, 0, 800, 800);
+  const pixels = imgData.data;
   
-  // 4. Handle secondary custom noise/scanline pixel modifications
-  if (chosenFilterStyleName === 'film1982' || chosenFilterStyleName === 'vhs90s') {
-    const imgData = outContext.getImageData(0, 0, 800, 800);
-    const pixels = imgData.data;
+  for (let i = 0; i < pixels.length; i += 4) {
+    let r = pixels[i];
+    let g = pixels[i + 1];
+    let b = pixels[i + 2];
     
-    for (let i = 0; i < pixels.length; i += 4) {
-      const currentPixelIndex = i / 4;
-      const rowY = Math.floor(currentPixelIndex / 800);
+    const currentPixelIndex = i / 4;
+    const rowY = Math.floor(currentPixelIndex / 800);
+    let modificationAmount = 0;
 
-      let modificationAmount = 0;
-
-      if (chosenFilterStyleName === 'film1982') {
-        modificationAmount = (Math.random() - 0.5) * 24; 
-      } 
-      else if (chosenFilterStyleName === 'vhs90s') {
-        const isScanlineRow = rowY % 4 === 0; 
-        const scanlineDrop = isScanlineRow ? -15 : 0;
-        const subtleNoise = (Math.random() - 0.5) * 8;
-        modificationAmount = scanlineDrop + subtleNoise;
-      }
-
-      pixels[i]     = Math.min(255, Math.max(0, pixels[i] + modificationAmount));     
-      pixels[i + 1] = Math.min(255, Math.max(0, pixels[i + 1] + modificationAmount)); 
-      pixels[i + 2] = Math.min(255, Math.max(0, pixels[i + 2] + modificationAmount)); 
+    // --- MATHEMATICAL FILTER MATRICES (iOS Safari Safe) ---
+    if (chosenFilterStyleName === 'film1982') {
+      // Sepia mix base presets
+      let tr = (r * 0.393) + (g * 0.769) + (b * 0.189);
+      let tg = (r * 0.349) + (g * 0.686) + (b * 0.168);
+      let tb = (r * 0.272) + (g * 0.534) + (b * 0.131);
+      
+      // Blend sepia with base image (approx 55% look) + adjust brightness
+      r = (tr * 0.55 + r * 0.45) * 1.1;
+      g = (tg * 0.55 + g * 0.45) * 1.1;
+      b = (tb * 0.55 + b * 0.45) * 1.1;
+      
+      // Add vintage grain noise
+      modificationAmount = (Math.random() - 0.5) * 24;
+    } 
+    
+    else if (chosenFilterStyleName === 'cyberpunk') {
+      // Hue-rotate shift green/blue profiles + heavy saturation/contrast boost
+      let rShift = r * 0.3 + g * 0.5 + b * 0.2;
+      r = Math.min(255, ((rShift - 128) * 1.3) + 128 + 30);
+      g = Math.min(255, ((g - 128) * 1.5) + 128 - 20);
+      b = Math.min(255, ((b - 128) * 1.8) + 128 + 40);
+    } 
+    
+    else if (chosenFilterStyleName === 'vhs90s') {
+      // Saturation + contrast pump
+      r = ((r - 128) * 1.2) + 128;
+      g = ((g - 128) * 1.2) + 128;
+      b = ((b - 128) * 1.2) + 128;
+      
+      // Add CRT horizontal scanline effect + grain noise
+      const isScanlineRow = rowY % 4 === 0; 
+      const scanlineDrop = isScanlineRow ? -15 : 0;
+      const subtleNoise = (Math.random() - 0.5) * 8;
+      modificationAmount = scanlineDrop + subtleNoise;
+    } 
+    
+    else if (chosenFilterStyleName === 'vaporwave') {
+      // Shift hue blueward + crank up lighting saturation channels
+      let avg = (r + g + b) / 3;
+      r = Math.min(255, r * 1.2 + 20);
+      g = Math.min(255, g * 0.8 + 10);
+      b = Math.min(255, b * 1.6 + 50);
     }
-    outContext.putImageData(imgData, 0, 0);
+
+    // Apply adjustments and clamp color values between 0 and 255
+    pixels[i]     = Math.min(255, Math.max(0, r + modificationAmount));     
+    pixels[i + 1] = Math.min(255, Math.max(0, g + modificationAmount)); 
+    pixels[i + 2] = Math.min(255, Math.max(0, b + modificationAmount)); 
   }
   
-  // 5. Convert to Base64 and assign it to the upload stream payload
+  // 3. Bake modified data back into destination canvas
+  outContext.putImageData(imgData, 0, 0);
+  
+  // 4. Save base64 string to global variable
   processedBase64Image = outputCanvas.toDataURL('image/jpeg', 0.85);
   
-  // 6. Tear down modal states cleanly
+  // 5. Tear down modal states cleanly
   document.getElementById('cropModal').style.display = 'none';
   if(activeCropperInstance) activeCropperInstance.destroy();
   activeCropperInstance = null;
