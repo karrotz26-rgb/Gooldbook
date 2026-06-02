@@ -268,16 +268,27 @@ function closeCropModal() {
 function applyImageCropAndFilter() {
   if (!activeCropperInstance) return;
   
+  // 1. Get the cropped canvas data from CropperJS
   const croppedCanvas = activeCropperInstance.getCroppedCanvas({ width: 800, height: 800 });
   
+  // 2. Set up our destination workspace canvas
   const outputCanvas = document.createElement('canvas');
   outputCanvas.width = 800;
   outputCanvas.height = 800;
   const outContext = outputCanvas.getContext('2d');
   
-  outContext.filter = filterMatrixConfigurations[chosenFilterStyleName] || 'none';
-  outContext.drawImage(croppedCanvas, 0, 0);
+  // 🔥 FIX 1: The native canvas filter property MUST be declared BEFORE calling drawImage()
+  // Otherwise, the canvas captures the raw image data without applying the filter matrix!
+  const currentFilterConfig = filterMatrixConfigurations[chosenFilterStyleName] || 'none';
+  outContext.filter = currentFilterConfig;
   
+  // 3. Draw the image onto the canvas with the filter context active
+  outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
+  
+  // 🔥 FIX 2: Clear out the context filter afterward so subsequent pixel manipulations blend properly
+  outContext.filter = 'none';
+  
+  // 4. Handle secondary custom noise/scanline pixel modifications
   if (chosenFilterStyleName === 'film1982' || chosenFilterStyleName === 'vhs90s') {
     const imgData = outContext.getImageData(0, 0, 800, 800);
     const pixels = imgData.data;
@@ -305,10 +316,13 @@ function applyImageCropAndFilter() {
     outContext.putImageData(imgData, 0, 0);
   }
   
+  // 5. Convert to Base64 and assign it to the upload stream payload
   processedBase64Image = outputCanvas.toDataURL('image/jpeg', 0.85);
   
+  // 6. Tear down modal states cleanly
   document.getElementById('cropModal').style.display = 'none';
   if(activeCropperInstance) activeCropperInstance.destroy();
+  activeCropperInstance = null;
 }
 
 function toggleCommentsVisibility(rowIndex) {
