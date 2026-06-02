@@ -809,39 +809,138 @@ async function apiCall(action, rowIndex, event) {
 }
 
 // FIXED: Native, text-based fallback share option that executes in under 200ms without freezing or cluttering the layout
+// PROFESSIONAL IMAGE CARD GENERATOR (Bypasses html2canvas/CORS completely)
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
   const btn = event.target; 
   const originalText = btn.innerText;
-  
-  btn.innerText = "⏳ Processing...";
+  btn.innerText = "⏳ Building Card...";
 
-  let shareText = `🦄 Gooldbook Post by ${post.user}:\n\n`;
-  shareText += `"${post.message}"\n\n`;
-  shareText += `❤️ LIKES: ${post.likes.length}\n`;
-  shareText += `💬 COMMENTS (${post.comments.length}):\n`;
-  
-  const commentPreview = post.comments.slice(-3);
-  commentPreview.forEach(c => {
-    shareText += `- ${c.user}: ${c.text}\n`;
-  });
+  // 1. Grab the live post image from the screen if it exists
+  let loadedImgElement = document.querySelector(`#post-${rowIndex} .post-img`);
+  let base64Photo = "";
 
-  const imageSrc = post.image || "";
+  if (loadedImgElement && loadedImgElement.complete && loadedImgElement.naturalWidth !== 0) {
+    try {
+      const canvasTmp = document.createElement('canvas');
+      canvasTmp.width = loadedImgElement.naturalWidth;
+      canvasTmp.height = loadedImgElement.naturalHeight;
+      const ctxTmp = canvasTmp.getContext('2d');
+      ctxTmp.drawImage(loadedImgElement, 0, 0);
+      base64Photo = canvasTmp.toDataURL('image/jpeg', 0.9);
+    } catch(e) {
+      console.warn("Could not clone post image pixels locally:", e);
+    }
+  }
 
+  // 2. Setup crisp layout measurements
+  const cardWidth = 500;
+  let cardHeight = 180; // Baseline padding for headers + borders
+  if (base64Photo) cardHeight += 440; // Space for the square picture slot
+
+  // Calculate dynamic comment heights (allowing up to 3 comments on the card)
+  const sharedComments = post.comments.slice(0, 3);
+  const commentLineHeight = 38;
+  cardHeight += (sharedComments.length * commentLineHeight);
+  if (sharedComments.length === 0) cardHeight += 30;
+
+  // 3. Build a clean, professional vector graphic structure string
+  let svgMarkup = `<svg xmlns="http://www.w3.org/2000/svg" width="${cardWidth}" height="${cardHeight}" viewBox="0 0 ${cardWidth} ${cardHeight}">
+    <rect width="100%" height="100%" fill="#ffffff" rx="16" />
+    <rect width="100%" height="100%" fill="none" stroke="#e9ebee" stroke-width="4" rx="16" />
+    
+    <circle cx="45" cy="45" r="20" fill="#3b5998" />
+    <text x="45" y="51" font-family="system-ui, sans-serif" font-size="20" fill="#ffffff" text-anchor="middle">🦄</text>
+    
+    <text x="80" y="42" font-family="system-ui, sans-serif" font-weight="bold" font-size="16" fill="#3b5998">${post.user}</text>
+    <text x="80" y="58" font-family="system-ui, sans-serif" font-size="12" fill="#888888">theGooldbook • Timeline Card</text>
+    
+    <text x="25" y="100" font-family="system-ui, sans-serif" font-size="15" fill="#1c1e21">${post.message.length > 55 ? post.message.substring(0, 52) + '...' : post.message}</text>
+  `;
+
+  let currentY = 125;
+
+  // 4. Inject Image Frame securely if a post photo exists
+  if (base64Photo) {
+    svgMarkup += `
+      <clipPath id="imgClip">
+        <rect x="25" y="${currentY}" width="450" height="420" rx="8" />
+      </clipPath>
+      <image href="${base64Photo}" x="25" y="${currentY}" width="450" height="420" preserveAspectRatio="xMidYMid slice" clip-path="url(#imgClip)" />
+    `;
+    currentY += 440;
+  }
+
+  // 5. Engagement Interaction Bar Layout Setup
+  svgMarkup += `
+    <line x1="25" y1="${currentY}" x2="475" y2="${currentY}" stroke="#f0f2f5" stroke-width="2" />
+    <text x="25" y="${currentY + 22}" font-family="system-ui, sans-serif" font-weight="bold" font-size="13" fill="#65676b">❤️ ${post.likes.length} Likes</text>
+    <text x="120" y="${currentY + 22}" font-family="system-ui, sans-serif" font-weight="bold" font-size="13" fill="#65676b">💬 ${post.comments.length} Comments</text>
+    <line x1="25" y1="${currentY + 35}" x2="475" y2="${currentY + 35}" stroke="#f0f2f5" stroke-width="2" />
+  `;
+  currentY += 60;
+
+  // 6. Draw dynamic comment sections inside the layout map cleanly
+  if (sharedComments.length > 0) {
+    sharedComments.forEach(c => {
+      let cleanCommentText = c.text.length > 45 ? c.text.substring(0, 42) + '...' : c.text;
+      svgMarkup += `
+        <rect x="25" y="${currentY}" width="450" height="30" rx="6" fill="#f0f2f5" />
+        <text x="35" y="${currentY + 19}" font-family="system-ui, sans-serif" font-weight="bold" font-size="12" fill="#3b5998">${c.user}:</text>
+        <text x="${c.user.length * 7 + 45}" y="${currentY + 19}" font-family="system-ui, sans-serif" font-size="12" fill="#1c1e21">${cleanCommentText}</text>
+      `;
+      currentY += commentLineHeight;
+    });
+  } else {
+    svgMarkup += `<text x="25" y="${currentY + 10}" font-family="system-ui, sans-serif" font-style="italic" font-size="13" fill="#888888">No comments yet...</text>`;
+  }
+
+  svgMarkup += `</svg>`;
+
+  // 7. Compile the SVG directly into a shareable binary PNG asset array flow
   try {
-    if (navigator.share) {
+    const finalBlob = await new Promise((resolve, reject) => {
+      const shareCanvas = document.createElement('canvas');
+      shareCanvas.width = cardWidth * 2; // Scaled up 2x for professional high-definition display resolution
+      shareCanvas.height = cardHeight * 2;
+      const finalCtx = shareCanvas.getContext('2d');
+      finalCtx.scale(2, 2);
+
+      const svgBlob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+      const URL = window.URL || window.webkitURL || window;
+      const blobURL = URL.createObjectURL(svgBlob);
+      
+      const renderImg = new Image();
+      renderImg.src = blobURL;
+      
+      renderImg.onload = () => {
+        finalCtx.drawImage(renderImg, 0, 0);
+        URL.revokeObjectURL(blobURL);
+        shareCanvas.toBlob(b => resolve(b), 'image/png');
+      };
+      renderImg.onerror = (err) => reject(err);
+    });
+
+    const file = new File([finalBlob], `Gooldbook_Card_${rowIndex}.png`, { type: 'image/png' });
+
+    // 8. Open device share drawer
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
       await navigator.share({
-        title: `Gooldbook - ${post.user}`,
-        text: shareText,
-        url: imageSrc || window.location.href 
+        files: [file],
+        title: `${post.user}'s Post`,
+        text: `Check out this post from The Gooldbook! 🦄`
       });
     } else {
-      await navigator.clipboard.writeText(`${shareText}\nLink: ${imageSrc || window.location.href}`);
-      alert("📋 Post details and image links copied to clipboard successfully!");
+      // Laptop / PC Auto Download Fallback
+      const downloadLink = document.createElement('a');
+      downloadLink.download = `Gooldbook_Card_${rowIndex}.png`;
+      downloadLink.href = window.URL.createObjectURL(finalBlob);
+      downloadLink.click();
     }
-  } catch (e) {
-    console.error("Native device sharing cancelled or failed:", e);
+  } catch (err) {
+    console.error("Card compiler broken:", err);
+    alert("Could not assemble card image asset context.");
   } finally {
     btn.innerText = originalText;
   }
