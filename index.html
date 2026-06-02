@@ -186,7 +186,7 @@
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzR2XHcV4OYJYXChx-oxydQwP3UdpGaygJ4PFHmD-7Fngm6wGGJhdTXQLqGpAw6rtfL/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwZ_Wx_ec91YH-eF_fHm51mcrRid_nYw57LhJ69tXE4dm4n_G5cKFwuDpVJIpXkss02/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let incomingPostsCache = null; 
 let allBios = {}, allAvatars = {};
@@ -378,7 +378,7 @@ async function loadFeed() {
 
 async function pollForUpdates() {
   const isTyping = document.activeElement.tagName === 'INPUT' || 
-                   document.activeElement.tagName === 'TEXTAREA';
+                   document.activeElement.toggleAttribute === 'TEXTAREA';
   
   if (isTyping) return; 
 
@@ -451,6 +451,7 @@ function setFilter(type, val) {
 function getAvatarMarkup(user, sizeClass) {
   const ava = allAvatars[user];
   if (!ava || ava === "" || ava === "undefined") return `<div class="${sizeClass}">🦄</div>`;
+  // CRITICAL FIX 1: Add crossorigin flag to user profile icons too to prevent canvas taint
   return `<img src="${ava}" crossorigin="anonymous" class="${sizeClass}" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=🦄';">`;
 }
 
@@ -578,7 +579,7 @@ function render() {
         if (existingImg && existingImg.getAttribute('src') === p.image) {
           mediaHTML = existingImg.closest('.img-container').outerHTML;
         } else {
-          // FIXED: Added crossorigin parameter to avoid security canvas errors
+          // CRITICAL FIX 2: Added crossorigin="anonymous" directly to the primary live feed timeline layout stream 
           mediaHTML += `<div class="img-container">
             <div class="skeleton-loader"></div>
             <img src="${p.image}" class="post-img" crossorigin="anonymous" loading="lazy" onload="onImageLoad(this)">
@@ -796,7 +797,7 @@ async function apiCall(action, rowIndex, event) {
   }
 }
 
-// FIXED: Cleaned up share card rendering environment to guarantee html2canvas compatibility
+// CRITICAL FIX 3: Fully updated and standalone share execution function
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
@@ -804,8 +805,20 @@ async function sharePost(rowIndex, event) {
   const originalText = btn.innerText;
   btn.innerText = "⏳ Processing...";
 
-  const liveTimelineImage = document.querySelector(`#post-${rowIndex} .post-img`);
-  const imageSrc = liveTimelineImage ? liveTimelineImage.getAttribute('src') : "";
+  let safeBase64Image = "";
+  try {
+    const liveTimelineImage = document.querySelector(`#post-${rowIndex} .post-img`);
+    if (liveTimelineImage && liveTimelineImage.complete && liveTimelineImage.naturalWidth !== 0) {
+      const canvasTmp = document.createElement('canvas');
+      canvasTmp.width = liveTimelineImage.naturalWidth;
+      canvasTmp.height = liveTimelineImage.naturalHeight;
+      const ctxTmp = canvasTmp.getContext('2d');
+      ctxTmp.drawImage(liveTimelineImage, 0, 0);
+      safeBase64Image = canvasTmp.toDataURL('image/jpeg', 0.9);
+    }
+  } catch (imgErr) {
+    console.warn("Could not copy local image pixels directly:", imgErr);
+  }
 
   const card = document.createElement('div');
   card.style.cssText = `
@@ -843,7 +856,7 @@ async function sharePost(rowIndex, event) {
       </div>
     </div>
     <div style="font-size: 16px; margin-bottom: 15px; line-height: 1.4;">${post.message}</div>
-    ${imageSrc ? `<img src="${imageSrc}" crossorigin="anonymous" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius: 8px; margin-bottom: 10px;">` : ''}
+    ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius: 8px; margin-bottom: 10px;">` : ''}
     
     <div style="border-top: 2px solid #f0f2f5; padding-top: 12px; margin-top: 5px;">
       <div style="display: flex; gap: 15px; font-size: 14px; font-weight: bold; color: #65676b; margin-bottom: 4px;">
@@ -860,8 +873,8 @@ async function sharePost(rowIndex, event) {
 
   try {
     const canvas = await html2canvas(card, { 
-      useCORS: true, 
-      allowTaint: false,
+      useCORS: true,         
+      allowTaint: true,       
       scale: 2, 
       backgroundColor: "#ffffff",
       logging: false 
@@ -886,7 +899,7 @@ async function sharePost(rowIndex, event) {
     }
   } catch(e) { 
     console.error("Card compilation encountered an error:", e);
-    alert("Could not generate share card."); 
+    alert("Could not generate share card: " + e.message); 
     if (card.parentNode) document.body.removeChild(card);
   } finally { 
     btn.innerText = originalText; 
