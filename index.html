@@ -810,6 +810,7 @@ async function apiCall(action, rowIndex, event) {
 
 // FIXED: Native, text-based fallback share option that executes in under 200ms without freezing or cluttering the layout
 // PROFESSIONAL IMAGE CARD GENERATOR (Bypasses html2canvas/CORS completely)
+// PROFESSIONAL IMAGE CARD GENERATOR (Bypasses html2canvas/CORS completely)
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
