@@ -107,8 +107,8 @@
     .f-normal .cropper-view-box img { filter: none; }
     .f-film1982 .cropper-view-box img { filter: sepia(0.55) contrast(0.85) brightness(1.1) saturate(0.85) hue-rotate(-5deg); }
     .f-vhs90s .cropper-view-box img { filter: contrast(1.1) saturate(1.3) brightness(1.05) blur(0.3px); }
-    .f-technopunk .cropper-view-box img { filter: contrast(1.8) brightness(0.85) hue-rotate(90deg); }
-    .f-aiportrait .cropper-view-box img { filter: saturate(1.2) contrast(1.1); box-shadow: inset 0 0 20px rgba(52, 152, 219, 0.5); }
+    .f-technopunk .cropper-view-box img { filter: contrast(1.9) brightness(0.7) grayscale(1) invert(0.05); }
+    .f-aiportrait .cropper-view-box img { filter: saturate(1.4) contrast(1.25) brightness(1.05); }
 
     @media(max-width:700px){ .container { flex-direction:column; } .sidebar { width:100%; position:static; } }
   </style>
@@ -136,7 +136,7 @@
       <div class="filter-preview-box" style="background-color: #555; filter: contrast(1.1) saturate(1.3) brightness(1.05);"></div>90s VHS 📼
     </div>
     <div class="filter-option" onclick="selectPostFilter('technopunk', this)">
-      <div class="filter-preview-box" style="background-color: #111; border: 1px solid #00ffcc; filter: contrast(2) brightness(0.8) grayscale(1);"></div>Technopunk ⚡
+      <div class="filter-preview-box" style="background-color: #111; border: 1px solid #ff00ff; filter: contrast(1.9) brightness(0.7) grayscale(1);"></div>Technopunk ⚡
     </div>
     <div class="filter-option" onclick="selectPostFilter('aiportrait', this)">
       <div class="filter-preview-box" style="background-color: #2c3e50; border: 1px dashed #3498db;"></div>AI Portrait 🧠
@@ -280,121 +280,6 @@ function closeCropModal() {
   document.getElementById('file').value = "";
   processedBase64Image = "";
   if(activeCropperInstance) activeCropperInstance.destroy();
-}
-
-async function applyImageCropAndFilter() {
-  if (!activeCropperInstance) return;
-  
-  const saveBtn = document.getElementById('applyCropBtn');
-  const originalBtnText = saveBtn.innerText;
-  saveBtn.innerText = "🧠 AI Processing...";
-  saveBtn.disabled = true;
-
-  const croppedCanvas = activeCropperInstance.getCroppedCanvas({ width: 800, height: 800 });
-  
-  const outputCanvas = document.createElement('canvas');
-  outputCanvas.width = 800;
-  outputCanvas.height = 800;
-  const outContext = outputCanvas.getContext('2d');
-  
-  if (chosenFilterStyleName === 'aiportrait' && selfieSegmentationModelInstance) {
-    outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
-    
-    await new Promise((resolve) => {
-      selfieSegmentationModelInstance.onResults((results) => {
-        outContext.clearRect(0, 0, 800, 800);
-        
-        outContext.save();
-        outContext.filter = 'blur(12px) brightness(0.9) saturate(0.85)';
-        outContext.drawImage(results.image, 0, 0, 800, 800);
-        outContext.restore();
-        
-        outContext.save();
-        outContext.globalCompositeOperation = 'destination-in';
-        outContext.drawImage(results.segmentationMask, 0, 0, 800, 800);
-        outContext.restore();
-        
-        outContext.save();
-        outContext.globalCompositeOperation = 'destination-over';
-        outContext.drawImage(results.image, 0, 0, 800, 800);
-        outContext.restore();
-        
-        resolve();
-      });
-      selfieSegmentationModelInstance.send({ image: croppedCanvas });
-    });
-  } else {
-    outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
-    const imgData = outContext.getImageData(0, 0, 800, 800);
-    const pixels = imgData.data;
-    
-    for (let i = 0; i < pixels.length; i += 4) {
-      let r = pixels[i];
-      let g = pixels[i + 1];
-      let b = pixels[i + 2];
-      
-      const currentPixelIndex = i / 4;
-      const rowY = Math.floor(currentPixelIndex / 800);
-      let modificationAmount = 0;
-
-      if (chosenFilterStyleName === 'film1982') {
-        let tr = (r * 0.393) + (g * 0.769) + (b * 0.189);
-        let tg = (r * 0.349) + (g * 0.686) + (b * 0.168);
-        let tb = (r * 0.272) + (g * 0.534) + (b * 0.131);
-        r = (tr * 0.55 + r * 0.45) * 1.1;
-        g = (tg * 0.55 + g * 0.45) * 1.1;
-        b = (tb * 0.55 + b * 0.45) * 1.1;
-        modificationAmount = (Math.random() - 0.5) * 24;
-      } 
-
-      else if (chosenFilterStyleName === 'vhs90s') {
-        r = ((r - 128) * 1.2) + 128;
-        g = ((g - 128) * 1.2) + 128;
-        b = ((b - 128) * 1.2) + 128;
-        const isScanlineRow = rowY % 4 === 0; 
-        const scanlineDrop = isScanlineRow ? -15 : 0;
-        const subtleNoise = (Math.random() - 0.5) * 8;
-        modificationAmount = scanlineDrop + subtleNoise;
-      } 
-      else if (chosenFilterStyleName === 'technopunk') {
-        let luminance = (r * 0.299) + (g * 0.587) + (b * 0.114);
-        
-        let gray = luminance < 128 ? (luminance * 0.5) : (luminance * 1.6);
-        gray = Math.min(255, Math.max(0, gray));
-
-        // Forced Threshold Mapping Loop (Bypasses browser grayscale blocks)
-        if (luminance > 185) {
-          // Intense Cyber Cyan Highlights
-          r = 0;
-          g = 225;
-          b = 255;
-        } else if (luminance < 65 && luminance > 15) {
-          // Saturated Radioactive Pink Mid-shadow Layers
-          r = 255;
-          g = 0;
-          b = 150;
-        } else {
-          r = gray;
-          g = gray;
-          b = gray;
-        }
-        modificationAmount = (Math.random() - 0.5) * 35;
-      }
-
-      pixels[i]     = Math.min(255, Math.max(0, r + modificationAmount));     
-      pixels[i + 1] = Math.min(255, Math.max(0, g + modificationAmount)); 
-      pixels[i + 2] = Math.min(255, Math.max(0, b + modificationAmount)); 
-    }
-    outContext.putImageData(imgData, 0, 0);
-  }
-  
-  processedBase64Image = outputCanvas.toDataURL('image/jpeg', 0.85);
-  
-  saveBtn.innerText = originalBtnText;
-  saveBtn.disabled = false;
-  document.getElementById('cropModal').style.display = 'none';
-  if(activeCropperInstance) activeCropperInstance.destroy();
-  activeCropperInstance = null;
 }
 
 function toggleCommentsVisibility(rowIndex) {
@@ -777,7 +662,7 @@ async function apiCall(action, rowIndex, event) {
   }
 }
 
-// 🦄 RE-ARCHITECTED NATIVE IOS SHARE SHEET ENGINE
+// 🦄 NATIVE IOS SHARE SHEET ENGINE
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
@@ -821,7 +706,7 @@ async function sharePost(rowIndex, event) {
   } finally { btn.innerText = originalText; }
 }
 
-function applyImageCropAndFilter() {
+async function applyImageCropAndFilter() {
   if (!activeCropperInstance) return;
   
   const saveBtn = document.getElementById('applyCropBtn');
@@ -839,35 +724,32 @@ function applyImageCropAndFilter() {
   if (chosenFilterStyleName === 'aiportrait' && selfieSegmentationModelInstance) {
     outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
     
-    new Promise((resolve) => {
+    await new Promise((resolve) => {
       selfieSegmentationModelInstance.onResults((results) => {
         outContext.clearRect(0, 0, 800, 800);
         
+        // 1. Draw Highly Saturated, Electric Hue Background
         outContext.save();
-        outContext.filter = 'blur(12px) brightness(0.9) saturate(0.85)';
+        outContext.filter = 'blur(16px) brightness(0.7) saturate(3) hue-rotate(130deg)';
         outContext.drawImage(results.image, 0, 0, 800, 800);
         outContext.restore();
         
+        // 2. Composite Layer Mask for clean cutout bounds
         outContext.save();
         outContext.globalCompositeOperation = 'destination-in';
         outContext.drawImage(results.segmentationMask, 0, 0, 800, 800);
         outContext.restore();
         
+        // 3. Render Crisp, Vibrant Foregrounds overlaying background
         outContext.save();
         outContext.globalCompositeOperation = 'destination-over';
+        outContext.filter = 'contrast(1.25) saturate(1.4) brightness(1.05)';
         outContext.drawImage(results.image, 0, 0, 800, 800);
         outContext.restore();
         
         resolve();
       });
       selfieSegmentationModelInstance.send({ image: croppedCanvas });
-    }).then(() => {
-      processedBase64Image = outputCanvas.toDataURL('image/jpeg', 0.85);
-      saveBtn.innerText = originalBtnText;
-      saveBtn.disabled = false;
-      document.getElementById('cropModal').style.display = 'none';
-      if(activeCropperInstance) activeCropperInstance.destroy();
-      activeCropperInstance = null;
     });
   } else {
     outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
@@ -881,6 +763,7 @@ function applyImageCropAndFilter() {
       
       const currentPixelIndex = i / 4;
       const rowY = Math.floor(currentPixelIndex / 800);
+      const colX = currentPixelIndex % 800;
       let modificationAmount = 0;
 
       if (chosenFilterStyleName === 'film1982') {
@@ -908,29 +791,32 @@ function applyImageCropAndFilter() {
         modificationAmount = scanlineDrop + subtleNoise;
       } 
       else if (chosenFilterStyleName === 'technopunk') {
+        // Compute precise luminosity
         let luminance = (r * 0.299) + (g * 0.587) + (b * 0.114);
-        let gray = luminance < 128 ? (luminance * 0.5) : (luminance * 1.6);
-        gray = Math.min(255, Math.max(0, gray));
         
-        let colorIntensity = Math.max(r, g, b) - Math.min(r, g, b);
+        // Form a harsh gritty black & white canvas base
+        let contrastGray = luminance < 110 ? (luminance * 0.4) : (luminance * 1.8);
+        
+        // Add heavy analog grain & noise artifacts
+        let grainChance = Math.random();
+        if (grainChance > 0.92) contrastGray += 45;
+        if (grainChance < 0.08) contrastGray -= 45;
 
-        // Forced color parsing loop overrides grayscale variables cleanly
-        if (colorIntensity > 20 || luminance > 190) {
-          if (r > g && r > b) {
-            r = 255;
-            g = 0;
-            b = 140;
+        // Apply a grid pattern mapping for 90s digital line streaks
+        if (rowY % 5 === 0) contrastGray -= 25;
+
+        // Inject vibrant hot pink & electric cyan neon leaks into highlights/streaks
+        if (luminance > 175) {
+          if ((rowY + colX) % 14 < 7) {
+            r = 255;  g = 0;    b = 180; // Saturated Neon Pink Streak
           } else {
-            r = 0;
-            g = 230;
-            b = 255;
+            r = 0;    g = 255;  b = 235; // Bright Neon Cyan Streak
           }
         } else {
-          r = gray;
-          g = gray;
-          b = gray;
+          r = contrastGray;
+          g = contrastGray;
+          b = contrastGray;
         }
-        modificationAmount = (Math.random() - 0.5) * 35;
       }
 
       pixels[i]     = Math.min(255, Math.max(0, r + modificationAmount));     
@@ -938,14 +824,14 @@ function applyImageCropAndFilter() {
       pixels[i + 2] = Math.min(255, Math.max(0, b + modificationAmount)); 
     }
     outContext.putImageData(imgData, 0, 0);
-    processedBase64Image = outputCanvas.toDataURL('image/jpeg', 0.85);
-    
-    saveBtn.innerText = originalBtnText;
-    saveBtn.disabled = false;
-    document.getElementById('cropModal').style.display = 'none';
-    if(activeCropperInstance) activeCropperInstance.destroy();
-    activeCropperInstance = null;
   }
+  
+  processedBase64Image = outputCanvas.toDataURL('image/jpeg', 0.85);
+  saveBtn.innerText = originalBtnText;
+  saveBtn.disabled = false;
+  document.getElementById('cropModal').style.display = 'none';
+  if(activeCropperInstance) activeCropperInstance.destroy();
+  activeCropperInstance = null;
 }
 
 function timeAgo(d) {
