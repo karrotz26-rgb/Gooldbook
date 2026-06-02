@@ -204,7 +204,7 @@ let activeCropperInstance = null;
 let processedBase64Image = "";
 let chosenFilterStyleName = "normal";
 
-// Core AI Instance Placeholder
+// Core Neural Instance Network Array
 let selfieSegmentationModelInstance = null;
 
 const filterMatrixConfigurations = {
@@ -223,8 +223,6 @@ window.onload = () => {
   window.addEventListener('scroll', handleWindowScroll, { passive: true });
   window.onscroll = handleWindowScroll; 
   setInterval(pollForUpdates, 30000);
-  
-  // Lazy pre-compile Google's neural network structure in the browser background
   initializeSelfieSegmentationAI();
 };
 
@@ -285,7 +283,6 @@ function closeCropModal() {
   if(activeCropperInstance) activeCropperInstance.destroy();
 }
 
-// ASYNC ENHANCED: Built to accommodate the asynchronous callbacks required by neural models
 async function applyImageCropAndFilter() {
   if (!activeCropperInstance) return;
   
@@ -301,29 +298,23 @@ async function applyImageCropAndFilter() {
   outputCanvas.height = 800;
   const outContext = outputCanvas.getContext('2d');
   
-  // Intercept and run separate AI routines if selected
   if (chosenFilterStyleName === 'aiportrait' && selfieSegmentationModelInstance) {
     outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
     
-    // Set up a promise wrapper so the UI sequence waits synchronously for the Neural Net execution
     await new Promise((resolve) => {
       selfieSegmentationModelInstance.onResults((results) => {
-        // Clear workspace
         outContext.clearRect(0, 0, 800, 800);
         
-        // 1. Draw blurred backdrop layer onto workspace canvas
         outContext.save();
         outContext.filter = 'blur(12px) brightness(0.9) saturate(0.85)';
         outContext.drawImage(results.image, 0, 0, 800, 800);
         outContext.restore();
         
-        // 2. Use segmentation alpha masks to clip out the person boundary curves
         outContext.save();
         outContext.globalCompositeOperation = 'destination-in';
         outContext.drawImage(results.segmentationMask, 0, 0, 800, 800);
         outContext.restore();
         
-        // 3. Composite the unblurred crisp original subject directly on top
         outContext.save();
         outContext.globalCompositeOperation = 'destination-over';
         outContext.drawImage(results.image, 0, 0, 800, 800);
@@ -331,12 +322,9 @@ async function applyImageCropAndFilter() {
         
         resolve();
       });
-      
-      // Feed the source imagery array blocks directly into the neural network
       selfieSegmentationModelInstance.send({ image: croppedCanvas });
     });
   } else {
-    // Standard Pixel Filter Routines
     outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
     const imgData = outContext.getImageData(0, 0, 800, 800);
     const pixels = imgData.data;
@@ -375,41 +363,27 @@ async function applyImageCropAndFilter() {
         modificationAmount = scanlineDrop + subtleNoise;
       } 
       else if (chosenFilterStyleName === 'technopunk') {
-        // 1. Calculate a crisp grayscale base value
         let luminance = (r * 0.299) + (g * 0.587) + (b * 0.114);
         
-        // Heavy street-photography contrast adjustment
         let gray = luminance < 128 ? (luminance * 0.5) : (luminance * 1.6);
         gray = Math.min(255, Math.max(0, gray));
 
-        // 2. Multi-Channel Neon Highlight Accent Engine
-        let colorIntensity = Math.max(r, g, b) - Math.min(r, g, b);
-
-        // 🔥 FORCED HIGHLIGHT SHIFT: Forces color targets to blaze out across every image context
-        if (colorIntensity > 35 || luminance > 170) {
-          if (r > b && r > g) {
-            // Warm tones transform directly to vibrant Hot Neon Pink
-            r = 255;
-            g = 0;
-            b = 180;
-          } else if (b > r) {
-            // Cool tones drop directly to Cyber Neon Cyan
-            r = 0;
-            g = 230;
-            b = 255;
-          } else {
-            // Mid-bright frames become Radioactive Neon Green
-            r = 50;
-            g = 255;
-            b = 0;
-          }
+        // Forced Threshold Mapping Loop (Bypasses browser grayscale blocks)
+        if (luminance > 185) {
+          // Intense Cyber Cyan Highlights
+          r = 0;
+          g = 225;
+          b = 255;
+        } else if (luminance < 65 && luminance > 15) {
+          // Saturated Radioactive Pink Mid-shadow Layers
+          r = 255;
+          g = 0;
+          b = 150;
         } else {
           r = gray;
           g = gray;
           b = gray;
         }
-
-        // 3. Inject matrix grid background static grain noise
         modificationAmount = (Math.random() - 0.5) * 35;
       }
 
@@ -727,7 +701,7 @@ function render() {
       let toggleLabelHTML = "";
       if(totalCommentsCount > 2) { toggleLabelHTML = `<div id="toggle-label-${p.rowIndex}" style="color:var(--gb-blue); font-size:12px; font-weight:bold; margin-top:8px; cursor:pointer;" onclick="toggleCommentsVisibility(${p.rowIndex})">💬 View all ${totalCommentsCount} comments</div>`; }
 
-      return `<div class="card" id="post-${p.rowIndex}"><div class="user-header">${getAvatarMarkup(p.user, 'avatar-small')}<div class="user-info"><div style="display:flex; align-items:center;"><span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span>${likeBadge}</div><span class="time-stamp">${timeAgo(p.timestamp)}</span></div></div><p style="margin:10px 0;">${highlightHashtags(p.message)}</p>${mediaHTML}<div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;"><div style="display:flex; gap:10px; align-items:center;"><button class="like-btn btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} <span>${p.likes.length}</span></button><button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button></div><div class="liked-by-container" style="font-size:11px; color:#65676b; margin-left:5px; line-height:1.4; display: ${p.likes.length > 0 ? 'block' : 'none'};">Liked by: <span class="liked-by-list">${likeNames}</span></div></div><div class="comment-section" style="margin-top:10px;"><div class="comments-list">${initialComments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">timeAgo(c.time)</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}${toggleLabelHTML}<div id="comments-tray-${p.rowIndex}" style="display:none;">${hiddenComments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">timeAgo(c.time)</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}</div></div><div style="margin-top:10px"><input id="c-${p.rowIndex}" placeholder="Reply..." style="margin-bottom:0; font-size:13px!important;"><button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button></div></div></div>`;
+      return `<div class="card" id="post-${p.rowIndex}"><div class="user-header">${getAvatarMarkup(p.user, 'avatar-small')}<div class="user-info"><div style="display:flex; align-items:center;"><span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span>${likeBadge}</div><span class="time-stamp">${timeAgo(p.timestamp)}</span></div></div><p style="margin:10px 0;">${highlightHashtags(p.message)}</p>${mediaHTML}<div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;"><div style="display:flex; gap:10px; align-items:center;"><button class="like-btn btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} <span>${p.likes.length}</span></button><button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button></div><div class="liked-by-container" style="font-size:11px; color:#65676b; margin-left:5px; line-height:1.4; display: ${p.likes.length > 0 ? 'block' : 'none'};">Liked by: <span class="liked-by-list">${likeNames}</span></div></div><div class="comment-section" style="margin-top:10px;"><div class="comments-list">${initialComments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">${timeAgo(c.time)}</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}${toggleLabelHTML}<div id="comments-tray-${p.rowIndex}" style="display:none;">${hiddenComments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">${timeAgo(c.time)}</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}</div></div><div style="margin-top:10px"><input id="c-${p.rowIndex}" placeholder="Reply..." style="margin-bottom:0; font-size:13px!important;"><button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button></div></div></div>`;
     } catch (err) { console.error("Error rendering post:", err); return `<div class="card">Error loading this post.</div>`; }
   }).join('');
 
@@ -851,6 +825,133 @@ async function sharePost(rowIndex, event) {
   } catch(e) {
     try { if (navigator.share) { await navigator.share({ title: 'TheGooldbook Post', text: textTextMsg + `\n\nLink: ${post.image || window.location.href}` }); } } catch(txtErr) { alert("Sharing declined."); }
   } finally { btn.innerText = originalText; }
+}
+
+function applyImageCropAndFilter() {
+  if (!activeCropperInstance) return;
+  
+  const saveBtn = document.getElementById('applyCropBtn');
+  const originalBtnText = saveBtn.innerText;
+  saveBtn.innerText = "🧠 AI Processing...";
+  saveBtn.disabled = true;
+
+  const croppedCanvas = activeCropperInstance.getCroppedCanvas({ width: 800, height: 800 });
+  
+  const outputCanvas = document.createElement('canvas');
+  outputCanvas.width = 800;
+  outputCanvas.height = 800;
+  const outContext = outputCanvas.getContext('2d');
+  
+  if (chosenFilterStyleName === 'aiportrait' && selfieSegmentationModelInstance) {
+    outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
+    
+    new Promise((resolve) => {
+      selfieSegmentationModelInstance.onResults((results) => {
+        outContext.clearRect(0, 0, 800, 800);
+        
+        outContext.save();
+        outContext.filter = 'blur(12px) brightness(0.9) saturate(0.85)';
+        outContext.drawImage(results.image, 0, 0, 800, 800);
+        outContext.restore();
+        
+        outContext.save();
+        outContext.globalCompositeOperation = 'destination-in';
+        outContext.drawImage(results.segmentationMask, 0, 0, 800, 800);
+        outContext.restore();
+        
+        outContext.save();
+        outContext.globalCompositeOperation = 'destination-over';
+        outContext.drawImage(results.image, 0, 0, 800, 800);
+        outContext.restore();
+        
+        resolve();
+      });
+      selfieSegmentationModelInstance.send({ image: croppedCanvas });
+    }).then(() => {
+      processedBase64Image = outputCanvas.toDataURL('image/jpeg', 0.85);
+      saveBtn.innerText = originalBtnText;
+      saveBtn.disabled = false;
+      document.getElementById('cropModal').style.display = 'none';
+      if(activeCropperInstance) activeCropperInstance.destroy();
+      activeCropperInstance = null;
+    });
+  } else {
+    outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
+    const imgData = outContext.getImageData(0, 0, 800, 800);
+    const pixels = imgData.data;
+    
+    for (let i = 0; i < pixels.length; i += 4) {
+      let r = pixels[i];
+      let g = pixels[i + 1];
+      let b = pixels[i + 2];
+      
+      const currentPixelIndex = i / 4;
+      const rowY = Math.floor(currentPixelIndex / 800);
+      let modificationAmount = 0;
+
+      if (chosenFilterStyleName === 'film1982') {
+        let tr = (r * 0.393) + (g * 0.769) + (b * 0.189);
+        let tg = (r * 0.349) + (g * 0.686) + (b * 0.168);
+        let tb = (r * 0.272) + (g * 0.534) + (b * 0.131);
+        r = (tr * 0.55 + r * 0.45) * 1.1;
+        g = (tg * 0.55 + g * 0.45) * 1.1;
+        b = (tb * 0.55 + b * 0.45) * 1.1;
+        modificationAmount = (Math.random() - 0.5) * 24;
+      } 
+      else if (chosenFilterStyleName === 'cyberpunk') {
+        let rShift = r * 0.3 + g * 0.5 + b * 0.2;
+        r = Math.min(255, ((rShift - 128) * 1.3) + 128 + 30);
+        g = Math.min(255, ((g - 128) * 1.5) + 128 - 20);
+        b = Math.min(255, ((b - 128) * 1.8) + 128 + 40);
+      } 
+      else if (chosenFilterStyleName === 'vhs90s') {
+        r = ((r - 128) * 1.2) + 128;
+        g = ((g - 128) * 1.2) + 128;
+        b = ((b - 128) * 1.2) + 128;
+        const isScanlineRow = rowY % 4 === 0; 
+        const scanlineDrop = isScanlineRow ? -15 : 0;
+        const subtleNoise = (Math.random() - 0.5) * 8;
+        modificationAmount = scanlineDrop + subtleNoise;
+      } 
+      else if (chosenFilterStyleName === 'technopunk') {
+        let luminance = (r * 0.299) + (g * 0.587) + (b * 0.114);
+        let gray = luminance < 128 ? (luminance * 0.5) : (luminance * 1.6);
+        gray = Math.min(255, Math.max(0, gray));
+        
+        let colorIntensity = Math.max(r, g, b) - Math.min(r, g, b);
+
+        // Forced color parsing loop overrides grayscale variables cleanly
+        if (colorIntensity > 20 || luminance > 190) {
+          if (r > g && r > b) {
+            r = 255;
+            g = 0;
+            b = 140;
+          } else {
+            r = 0;
+            g = 230;
+            b = 255;
+          }
+        } else {
+          r = gray;
+          g = gray;
+          b = gray;
+        }
+        modificationAmount = (Math.random() - 0.5) * 35;
+      }
+
+      pixels[i]     = Math.min(255, Math.max(0, r + modificationAmount));     
+      pixels[i + 1] = Math.min(255, Math.max(0, g + modificationAmount)); 
+      pixels[i + 2] = Math.min(255, Math.max(0, b + modificationAmount)); 
+    }
+    outContext.putImageData(imgData, 0, 0);
+    processedBase64Image = outputCanvas.toDataURL('image/jpeg', 0.85);
+    
+    saveBtn.innerText = originalBtnText;
+    saveBtn.disabled = false;
+    document.getElementById('cropModal').style.display = 'none';
+    if(activeCropperInstance) activeCropperInstance.destroy();
+    activeCropperInstance = null;
+  }
 }
 
 function timeAgo(d) {
