@@ -15,6 +15,8 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
 
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation"></script>
+
   <style>
     :root { --gb-blue: #3b5998; --gb-hover: #4267b2; --gb-bg: #e9ebee; }
     body { background: var(--gb-bg); font-family: system-ui, -apple-system, sans-serif; margin:0; padding-bottom:50px; overflow-x: hidden; }
@@ -107,6 +109,7 @@
     .f-cyberpunk .cropper-view-box img { filter: hue-rotate(140deg) saturate(1.8) contrast(1.3) brightness(0.9); }
     .f-vhs90s .cropper-view-box img { filter: contrast(1.1) saturate(1.3) brightness(1.05) blur(0.3px); }
     .f-technopunk .cropper-view-box img { filter: contrast(1.8) brightness(0.85) hue-rotate(90deg); }
+    .f-aiportrait .cropper-view-box img { filter: saturate(1.2) contrast(1.1); box-shadow: inset 0 0 20px rgba(52, 152, 219, 0.5); }
 
     @media(max-width:700px){ .container { flex-direction:column; } .sidebar { width:100%; position:static; } }
   </style>
@@ -136,11 +139,14 @@
     <div class="filter-option" onclick="selectPostFilter('technopunk', this)">
       <div class="filter-preview-box" style="background-color: #111; border: 1px solid #00ffcc; filter: contrast(2) brightness(0.8) grayscale(1);"></div>Technopunk ⚡
     </div>
+    <div class="filter-option" onclick="selectPostFilter('aiportrait', this)">
+      <div class="filter-preview-box" style="background-color: #2c3e50; border: 1px dashed #3498db;"></div>AI Portrait 🧠
+    </div>
   </div>
 
   <div style="display:flex; gap:10px; width:100%; max-width:420px;">
     <button class="btn btn-alt" style="flex:1;" onclick="closeCropModal()">Cancel</button>
-    <button class="btn" style="flex:1; background:#2ecc71;" onclick="applyImageCropAndFilter()">Apply & Save ✨</button>
+    <button class="btn" id="applyCropBtn" style="flex:1; background:#2ecc71;" onclick="applyImageCropAndFilter()">Apply & Save ✨</button>
   </div>
 </div>
 
@@ -198,12 +204,16 @@ let activeCropperInstance = null;
 let processedBase64Image = "";
 let chosenFilterStyleName = "normal";
 
+// Core AI Instance Placeholder
+let selfieSegmentationModelInstance = null;
+
 const filterMatrixConfigurations = {
   normal: 'none',
   film1982: 'sepia(0.55) contrast(0.85) brightness(1.1) saturate(0.85) hue-rotate(-5deg)',
   cyberpunk: 'hue-rotate(140deg) saturate(1.8) contrast(1.3) brightness(0.9)',
   vhs90s: 'contrast(1.1) saturate(1.3) brightness(1.05)',
-  technopunk: 'none' 
+  technopunk: 'none',
+  aiportrait: 'none'
 };
 
 window.onload = () => {
@@ -213,7 +223,17 @@ window.onload = () => {
   window.addEventListener('scroll', handleWindowScroll, { passive: true });
   window.onscroll = handleWindowScroll; 
   setInterval(pollForUpdates, 30000);
+  
+  // Lazy pre-compile Google's neural network structure in the browser background
+  initializeSelfieSegmentationAI();
 };
+
+function initializeSelfieSegmentationAI() {
+  selfieSegmentationModelInstance = new SelfieSegmentation({
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
+  });
+  selfieSegmentationModelInstance.setOptions({ modelSelection: 1 });
+}
 
 function initiateCropper(event) {
   const file = event.target.files[0];
@@ -265,10 +285,15 @@ function closeCropModal() {
   if(activeCropperInstance) activeCropperInstance.destroy();
 }
 
-function applyImageCropAndFilter() {
+// ASYNC ENHANCED: Built to accommodate the asynchronous callbacks required by neural models
+async function applyImageCropAndFilter() {
   if (!activeCropperInstance) return;
   
-  // 1. Fetch raw canvas cut data from cropper engine
+  const saveBtn = document.getElementById('applyCropBtn');
+  const originalBtnText = saveBtn.innerText;
+  saveBtn.innerText = "🧠 AI Processing...";
+  saveBtn.disabled = true;
+
   const croppedCanvas = activeCropperInstance.getCroppedCanvas({ width: 800, height: 800 });
   
   const outputCanvas = document.createElement('canvas');
@@ -276,107 +301,108 @@ function applyImageCropAndFilter() {
   outputCanvas.height = 800;
   const outContext = outputCanvas.getContext('2d');
   
-  // Draw raw image to our workstation canvas grid first
-  outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
-  
-  // 2. Extract raw pixel buffers to manually process the filters
-  const imgData = outContext.getImageData(0, 0, 800, 800);
-  const pixels = imgData.data;
-  
-  for (let i = 0; i < pixels.length; i += 4) {
-    let r = pixels[i];
-    let g = pixels[i + 1];
-    let b = pixels[i + 2];
+  // Intercept and run separate AI routines if selected
+  if (chosenFilterStyleName === 'aiportrait' && selfieSegmentationModelInstance) {
+    outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
     
-    const currentPixelIndex = i / 4;
-    const rowY = Math.floor(currentPixelIndex / 800);
-    let modificationAmount = 0;
+    // Set up a promise wrapper so the UI sequence waits synchronously for the Neural Net execution
+    await new Promise((resolve) => {
+      selfieSegmentationModelInstance.onResults((results) => {
+        // Clear workspace
+        outContext.clearRect(0, 0, 800, 800);
+        
+        // 1. Draw blurred backdrop layer onto workspace canvas
+        outContext.save();
+        outContext.filter = 'blur(12px) brightness(0.9) saturate(0.85)';
+        outContext.drawImage(results.image, 0, 0, 800, 800);
+        outContext.restore();
+        
+        // 2. Use segmentation alpha masks to clip out the person boundary curves
+        outContext.save();
+        outContext.globalCompositeOperation = 'destination-in';
+        outContext.drawImage(results.segmentationMask, 0, 0, 800, 800);
+        outContext.restore();
+        
+        // 3. Composite the unblurred crisp original subject directly on top
+        outContext.save();
+        outContext.globalCompositeOperation = 'destination-over';
+        outContext.drawImage(results.image, 0, 0, 800, 800);
+        outContext.restore();
+        
+        resolve();
+      });
+      
+      // Feed the source imagery array blocks directly into the neural network
+      selfieSegmentationModelInstance.send({ image: croppedCanvas });
+    });
+  } else {
+    // Standard Pixel Filter Routines
+    outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
+    const imgData = outContext.getImageData(0, 0, 800, 800);
+    const pixels = imgData.data;
+    
+    for (let i = 0; i < pixels.length; i += 4) {
+      let r = pixels[i];
+      let g = pixels[i + 1];
+      let b = pixels[i + 2];
+      
+      const currentPixelIndex = i / 4;
+      const rowY = Math.floor(currentPixelIndex / 800);
+      let modificationAmount = 0;
 
-    // --- MATHEMATICAL FILTER MATRICES (iOS Safari Safe) ---
-    if (chosenFilterStyleName === 'film1982') {
-      // Sepia mix base presets
-      let tr = (r * 0.393) + (g * 0.769) + (b * 0.189);
-      let tg = (r * 0.349) + (g * 0.686) + (b * 0.168);
-      let tb = (r * 0.272) + (g * 0.534) + (b * 0.131);
-      
-      // Blend sepia with base image (approx 55% look) + adjust brightness
-      r = (tr * 0.55 + r * 0.45) * 1.1;
-      g = (tg * 0.55 + g * 0.45) * 1.1;
-      b = (tb * 0.55 + b * 0.45) * 1.1;
-      
-      // Add vintage grain noise
-      modificationAmount = (Math.random() - 0.5) * 24;
-    } 
-    
-    else if (chosenFilterStyleName === 'cyberpunk') {
-      // Hue-rotate shift green/blue profiles + heavy saturation/contrast boost
-      let rShift = r * 0.3 + g * 0.5 + b * 0.2;
-      r = Math.min(255, ((rShift - 128) * 1.3) + 128 + 30);
-      g = Math.min(255, ((g - 128) * 1.5) + 128 - 20);
-      b = Math.min(255, ((b - 128) * 1.8) + 128 + 40);
-    } 
-    
-    else if (chosenFilterStyleName === 'vhs90s') {
-      // Saturation + contrast pump
-      r = ((r - 128) * 1.2) + 128;
-      g = ((g - 128) * 1.2) + 128;
-      b = ((b - 128) * 1.2) + 128;
-      
-      // Add CRT horizontal scanline effect + grain noise
-      const isScanlineRow = rowY % 4 === 0; 
-      const scanlineDrop = isScanlineRow ? -15 : 0;
-      const subtleNoise = (Math.random() - 0.5) * 8;
-      modificationAmount = scanlineDrop + subtleNoise;
-    } 
-    
-    else if (chosenFilterStyleName === 'technopunk') {
-      // Calculate a crisp grayscale base value
-      let luminance = (r * 0.299) + (g * 0.587) + (b * 0.114);
-      
-      // Push high street contrast
-      let gray = luminance < 128 ? (luminance * 0.4) : (luminance * 1.6);
-      gray = Math.min(255, Math.max(0, gray));
+      if (chosenFilterStyleName === 'film1982') {
+        let tr = (r * 0.393) + (g * 0.769) + (b * 0.189);
+        let tg = (r * 0.349) + (g * 0.686) + (b * 0.168);
+        let tb = (r * 0.272) + (g * 0.534) + (b * 0.131);
+        r = (tr * 0.55 + r * 0.45) * 1.1;
+        g = (tg * 0.55 + g * 0.45) * 1.1;
+        b = (tb * 0.55 + b * 0.45) * 1.1;
+        modificationAmount = (Math.random() - 0.5) * 24;
+      } 
+      else if (chosenFilterStyleName === 'cyberpunk') {
+        let rShift = r * 0.3 + g * 0.5 + b * 0.2;
+        r = Math.min(255, ((rShift - 128) * 1.3) + 128 + 30);
+        g = Math.min(255, ((g - 128) * 1.5) + 128 - 20);
+        b = Math.min(255, ((b - 128) * 1.8) + 128 + 40);
+      } 
+      else if (chosenFilterStyleName === 'vhs90s') {
+        r = ((r - 128) * 1.2) + 128;
+        g = ((g - 128) * 1.2) + 128;
+        b = ((b - 128) * 1.2) + 128;
+        const isScanlineRow = rowY % 4 === 0; 
+        const scanlineDrop = isScanlineRow ? -15 : 0;
+        const subtleNoise = (Math.random() - 0.5) * 8;
+        modificationAmount = scanlineDrop + subtleNoise;
+      } 
+      else if (chosenFilterStyleName === 'technopunk') {
+        let luminance = (r * 0.299) + (g * 0.587) + (b * 0.114);
+        let gray = luminance < 128 ? (luminance * 0.4) : (luminance * 1.6);
+        gray = Math.min(255, Math.max(0, gray));
+        let colorIntensity = Math.max(r, g, b) - Math.min(r, g, b);
 
-      // Scan for real underlying color intensity
-      let colorIntensity = Math.max(r, g, b) - Math.min(r, g, b);
-
-      // Forces color targets to blaze out
-      if (colorIntensity > 20 || luminance > 190) {
-        if (r > g && r > b) {
-          // Warm accents flare to Blazing Hot Neon Pink/Magenta
-          r = 255;
-          g = 0;
-          b = 140;
+        if (colorIntensity > 20 || luminance > 190) {
+          if (r > g && r > b) {
+            r = 255; g = 0; b = 140;
+          } else {
+            r = 0; g = 230; b = 255;
+          }
         } else {
-          // Cool tones and bright high points snap to Cyber Neon Cyan
-          r = 0;
-          g = 230;
-          b = 255;
+          r = gray; g = gray; b = gray;
         }
-      } else {
-        // Flat backgrounds drop to heavy gritty black and white
-        r = gray;
-        g = gray;
-        b = gray;
+        modificationAmount = (Math.random() - 0.5) * 35;
       }
 
-      // Inject a heavy layer of digital matrix noise grain
-      modificationAmount = (Math.random() - 0.5) * 35;
+      pixels[i]     = Math.min(255, Math.max(0, r + modificationAmount));     
+      pixels[i + 1] = Math.min(255, Math.max(0, g + modificationAmount)); 
+      pixels[i + 2] = Math.min(255, Math.max(0, b + modificationAmount)); 
     }
-
-    // Apply adjustments and clamp color values between 0 and 255
-    pixels[i]     = Math.min(255, Math.max(0, r + modificationAmount));     
-    pixels[i + 1] = Math.min(255, Math.max(0, g + modificationAmount)); 
-    pixels[i + 2] = Math.min(255, Math.max(0, b + modificationAmount)); 
+    outContext.putImageData(imgData, 0, 0);
   }
   
-  // 3. Bake modified data back into destination canvas
-  outContext.putImageData(imgData, 0, 0);
-  
-  // 4. Save base64 string to global variable
   processedBase64Image = outputCanvas.toDataURL('image/jpeg', 0.85);
   
-  // 5. Tear down modal states cleanly
+  saveBtn.innerText = originalBtnText;
+  saveBtn.disabled = false;
   document.getElementById('cropModal').style.display = 'none';
   if(activeCropperInstance) activeCropperInstance.destroy();
   activeCropperInstance = null;
@@ -505,9 +531,6 @@ function base64CacheProxy(url) {
         const canvas = document.createElement('canvas');
         canvas.width = img.naturalWidth;
         canvas.height = img.naturalHeight;
-        const ctx = canvas.createElement('canvas').getContext('2d');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
         const outCtx = canvas.getContext('2d');
         outCtx.drawImage(img, 0, 0);
         resolve(canvas.toDataURL('image/jpeg', 0.9));
@@ -598,12 +621,10 @@ function highlightHashtags(t) {
       try {
         const urlObj = new URL(url);
         let shortName = urlObj.hostname.replace('www.', '');
-        
         const isYT = shortName.includes('youtube.com') || shortName.includes('youtu.be');
         if (isYT) {
             return `<a href="${url}" target="_blank" style="color:#ff0000; text-decoration:none; font-weight:600; background:#fff0f0; padding:2px 8px; border-radius:4px; display:inline-block; margin:2px 0;">🎬 YouTube</a>`;
         }
-
         if (shortName.length > 20) shortName = shortName.substring(0, 18) + '...';
         return `<a href="${url}" target="_blank" style="color:#3b5998; text-decoration:none; font-weight:600; background:#f0f2f5; padding:2px 8px; border-radius:4px; white-space:nowrap; display:inline-block; margin:2px 0;">🔗 ${shortName}</a>`;
       } catch(e) {
@@ -634,8 +655,7 @@ function render() {
   const feedEl = document.getElementById('feed');
   
   let filtered = allPosts.filter(p => 
-    (p.message || "").toLowerCase().includes(s) || 
-    (p.user || "").toLowerCase().includes(s)
+    (p.message || "").toLowerCase().includes(s) || (p.user || "").toLowerCase().includes(s)
   );
   
   if (filterVal) {
@@ -648,23 +668,13 @@ function render() {
     } else {
         let label = filterType === 'likes' ? `Liked by ${filterVal}` : `Tagged ${filterVal}`;
         statusEl.innerHTML = `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>Showing: <b>${label}</b></span><button class="btn-alt" onclick="setFilter(null,null)">Clear</button></div>`;
-        
-        if(filterType === 'likes') {
-            filtered = allPosts.filter(p => p.likes.includes(filterVal));
-        }
-        
+        if(filterType === 'likes') { filtered = allPosts.filter(p => p.likes.includes(filterVal)); }
         if(filterType === 'hashtag') {
           const tag = filterVal.toLowerCase();
-          filtered = filtered.filter(p => 
-            (p.message || "").toLowerCase().includes(tag) || 
-            p.comments.some(c => (c.text || "").toLowerCase().includes(tag))
-          );
+          filtered = filtered.filter(p => (p.message || "").toLowerCase().includes(tag) || p.comments.some(c => (c.text || "").toLowerCase().includes(tag)));
         }
     }
-  } else { 
-    composer.style.display = "block"; 
-    statusEl.innerHTML = ""; 
-  }
+  } else { composer.style.display = "block"; statusEl.innerHTML = ""; }
   
   const totalInFilter = filtered.length;
 
@@ -676,10 +686,7 @@ function render() {
         if (existingImg && existingImg.getAttribute('src') === p.image) {
           mediaHTML = existingImg.closest('.img-container').outerHTML;
         } else {
-          mediaHTML += `<div class="img-container">
-            <div class="skeleton-loader"></div>
-            <img src="${p.image}" class="post-img" loading="lazy" onload="onImageLoad(this)">
-          </div>`;
+          mediaHTML += `<div class="img-container"><div class="skeleton-loader"></div><img src="${p.image}" class="post-img" loading="lazy" onload="onImageLoad(this)"></div>`;
         }
       }
 
@@ -687,68 +694,20 @@ function render() {
       if (ytMatch && ytMatch[1]) {
         const videoId = ytMatch[1];
         const thumbUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-        mediaHTML += `
-          <div style="margin-top:10px; position:relative; aspect-ratio: 16/9; width:100%; overflow:hidden; border-radius:8px; background: #000 url(${thumbUrl}) center/cover no-repeat; cursor:pointer;" 
-               onclick="this.innerHTML='<iframe src=\'https://www.youtube.com/embed/${videoId}?autoplay=1\' style=\'position:absolute;top:0;left:0;width:100%;height:100%;\' frameborder=\'0\' allow=\'autoplay; encrypted-media\' allowfullscreen></iframe>'; this.onclick=null;">
-            <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:60px; height:60px; background:rgba(0,0,0,0.7); border-radius:50%; display:flex; align-items:center; justify-content:center; border:3px solid white;">
-              <div style="width: 0; height: 0; border-top: 15px solid transparent; border-bottom: 15px solid transparent; border-left: 25px solid white; margin-left: 5px;"></div>
-            </div>
-            <div style="position:absolute; bottom:10px; right:10px; background:rgba(0,0,0,0.8); color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold;">▶ WATCH</div>
-          </div>`;
+        mediaHTML += `<div style="margin-top:10px; position:relative; aspect-ratio: 16/9; width:100%; overflow:hidden; border-radius:8px; background: #000 url(${thumbUrl}) center/cover no-repeat; cursor:pointer;" onclick="this.innerHTML='<iframe src=\'https://www.youtube.com/embed/${videoId}?autoplay=1\' style=\'position:absolute;top:0;left:0;width:100%;height:100%;\' frameborder=\'0\' allow=\'autoplay; encrypted-media\' allowfullscreen></iframe>'; this.onclick=null;"><div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:60px; height:60px; background:rgba(0,0,0,0.7); border-radius:50%; display:flex; align-items:center; justify-content:center; border:3px solid white;"><div style="width: 0; height: 0; border-top: 15px solid transparent; border-bottom: 15px solid transparent; border-left: 25px solid white; margin-left: 5px;"></div></div><div style="position:absolute; bottom:10px; right:10px; background:rgba(0,0,0,0.8); color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold;">▶ WATCH</div></div>`;
       }
 
-      const likeBadge = (filterType === 'likes') ? 
-        `<span style="color:#e74c3c; font-size:11px; font-weight:normal; background:#fff0f0; padding:2px 6px; border-radius:10px; margin-left:8px; border:1px solid #ffccd5;">❤️ ${index + 1} of ${totalInFilter}</span>` : '';
-
+      const likeBadge = (filterType === 'likes') ? `<span style="color:#e74c3c; font-size:11px; font-weight:normal; background:#fff0f0; padding:2px 6px; border-radius:10px; margin-left:8px; border:1px solid #ffccd5;">❤️ ${index + 1} of ${totalInFilter}</span>` : '';
       const likeNames = p.likes.length > 0 ? p.likes.map(name => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()}</b>`).join(', ') : '';
-
       const totalCommentsCount = p.comments.length;
       const initialComments = p.comments.slice(0, 2);
       const hiddenComments = p.comments.slice(2);
       
       let toggleLabelHTML = "";
-      if(totalCommentsCount > 2) {
-         toggleLabelHTML = `<div id="toggle-label-${p.rowIndex}" style="color:var(--gb-blue); font-size:12px; font-weight:bold; margin-top:8px; cursor:pointer;" onclick="toggleCommentsVisibility(${p.rowIndex})">💬 View all ${totalCommentsCount} comments</div>`;
-      }
+      if(totalCommentsCount > 2) { toggleLabelHTML = `<div id="toggle-label-${p.rowIndex}" style="color:var(--gb-blue); font-size:12px; font-weight:bold; margin-top:8px; cursor:pointer;" onclick="toggleCommentsVisibility(${p.rowIndex})">💬 View all ${totalCommentsCount} comments</div>`; }
 
-      return `
-        <div class="card" id="post-${p.rowIndex}">
-          <div class="user-header">
-            ${getAvatarMarkup(p.user, 'avatar-small')}
-            <div class="user-info">
-              <div style="display:flex; align-items:center;">
-                <span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span>
-                ${likeBadge}
-              </div>
-              <span class="time-stamp">${timeAgo(p.timestamp)}</span>
-            </div>
-          </div>
-          <p style="margin:10px 0;">${highlightHashtags(p.message)}</p>
-          ${mediaHTML}
-          <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
-            <div style="display:flex; gap:10px; align-items:center;">
-              <button class="like-btn btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} <span>${p.likes.length}</span></button>
-              <button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button>
-            </div>
-            <div class="liked-by-container" style="font-size:11px; color:#65676b; margin-left:5px; line-height:1.4; display: ${p.likes.length > 0 ? 'block' : 'none'};">
-              Liked by: <span class="liked-by-list">${likeNames}</span>
-            </div>
-          </div>
-          <div class="comment-section" style="margin-top:10px;">
-            <div class="comments-list">
-               ${initialComments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">${timeAgo(c.time)}</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}
-               ${toggleLabelHTML}
-               <div id="comments-tray-${p.rowIndex}" style="display:none;">
-                 ${hiddenComments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">${timeAgo(c.time)}</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}
-               </div>
-            </div>
-            <div style="margin-top:10px"><input id="c-${p.rowIndex}" placeholder="Reply..." style="margin-bottom:0; font-size:13px!important;"><button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button></div>
-          </div>
-        </div>`;
-    } catch (err) {
-      console.error("Error rendering post:", err);
-      return `<div class="card">Error loading this post.</div>`;
-    }
+      return `<div class="card" id="post-${p.rowIndex}"><div class="user-header">${getAvatarMarkup(p.user, 'avatar-small')}<div class="user-info"><div style="display:flex; align-items:center;"><span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span>${likeBadge}</div><span class="time-stamp">${timeAgo(p.timestamp)}</span></div></div><p style="margin:10px 0;">${highlightHashtags(p.message)}</p>${mediaHTML}<div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;"><div style="display:flex; gap:10px; align-items:center;"><button class="like-btn btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} <span>${p.likes.length}</span></button><button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button></div><div class="liked-by-container" style="font-size:11px; color:#65676b; margin-left:5px; line-height:1.4; display: ${p.likes.length > 0 ? 'block' : 'none'};">Liked by: <span class="liked-by-list">${likeNames}</span></div></div><div class="comment-section" style="margin-top:10px;"><div class="comments-list">${initialComments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">${timeAgo(c.time)}</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}${toggleLabelHTML}<div id="comments-tray-${p.rowIndex}" style="display:none;">${hiddenComments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">${timeAgo(c.time)}</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}</div></div><div style="margin-top:10px"><input id="c-${p.rowIndex}" placeholder="Reply..." style="margin-bottom:0; font-size:13px!important;"><button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button></div></div></div>`;
+    } catch (err) { console.error("Error rendering post:", err); return `<div class="card">Error loading this post.</div>`; }
   }).join('');
 
   feedEl.innerHTML = feedHTML || '<div class="card">No posts found.</div>';
@@ -759,73 +718,34 @@ function render() {
 function updateSidebar() {
   const myName = document.getElementById('user').value.trim();
   document.getElementById('myProfileLink').innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', '${myName}')">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
-  
   const topPosts = [...allPosts].sort((a,b) => ((b.likes?.length||0)+(b.comments?.length||0)) - ((a.likes?.length||0)+(a.comments?.length||0))).slice(0,3);
   document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b><br>${topPosts.map(p => `<div class="sidebar-item" onclick="scrollToPost(${p.rowIndex})"><div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div><div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div><span class="trend-stats">❤️ ${p.likes.length} • 💬 ${p.comments.length}</span></div>`).join('')}</div>`;
-
   const lCounts = {}; allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
   const topLikers = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
   document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${topLikers.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
-
-  const hCounts = {}; allPosts.forEach(p => { 
-    const tags = ((p.message||"") + " " + p.comments.map(c=>c.text).join(" ")).match(/#(\w+)/g) || []; 
-    tags.forEach(t => { const ct = t.toLowerCase().trim(); hCounts[ct] = (hCounts[ct]||0)+1; });
-  });
+  const hCounts = {}; allPosts.forEach(p => { const tags = ((p.message||"") + " " + p.comments.map(c=>c.text).join(" ")).match(/#(\w+)/g) || []; tags.forEach(t => { const ct = t.toLowerCase().trim(); hCounts[ct] = (hCounts[ct]||0)+1; }); });
   const topTags = Object.entries(hCounts).sort((a,b) => b[1] - a[1]).slice(0, 8);
   document.getElementById('hashtags').innerHTML = `<div class="sidebar-card"><b>#️⃣ Trending Tags</b><div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">${topTags.map(([tag, count]) => `<div class="sidebar-item" style="background: #f0f2f5; padding: 5px 10px; border-radius: 15px; font-size: 12px; cursor: pointer;" onclick="setFilter('hashtag','${tag}')"><span style="color:var(--gb-hover); font-weight:bold;">${tag}</span> <span style="color:#888; font-size: 10px;">${count}</span></div>`).join('') || 'None'}</div></div>`;
 }
 
-function scrollToPost(id) {
-  if (filterVal) { setFilter(null, null); setTimeout(() => performScroll(id), 300); } 
-  else performScroll(id);
-}
-
-function performScroll(id) {
-  const el = document.getElementById(`post-${id}`);
-  if (el) { window.scrollTo({ top: el.offsetTop - 70, behavior: 'smooth' }); el.classList.add('highlight-card'); setTimeout(() => el.classList.remove('highlight-card'), 2000); } 
-  else { postsToShow += 10; render(); setTimeout(() => performScroll(id), 100); }
-}
+function scrollToPost(id) { if (filterVal) { setFilter(null, null); setTimeout(() => performScroll(id), 300); } else performScroll(id); }
+function performScroll(id) { const el = document.getElementById(`post-${id}`); if (el) { window.scrollTo({ top: el.offsetTop - 70, behavior: 'smooth' }); el.classList.add('highlight-card'); setTimeout(() => el.classList.remove('highlight-card'), 2000); } else { postsToShow += 10; render(); setTimeout(() => performScroll(id), 100); } }
 
 async function upload() {
   const user = document.getElementById('user').value.trim();
   const msg = document.getElementById('msg').value.trim();
   if(!user || !msg) return alert("Fill in name and message!");
-  
   const postBtn = document.getElementById('postBtn');
   postBtn.innerText = "⏳ Uploading...";
   postBtn.disabled = true;
-  
   const imgPayload = (processedBase64Image && processedBase64Image.startsWith("data:image")) ? processedBase64Image : "";
-  
   try {
-    await fetch(SCRIPT_URL, { 
-      method: 'POST', 
-      headers: {
-        'Content-Type': 'text/plain;charset=utf-8'
-      },
-      body: JSON.stringify({ 
-        action: 'post', 
-        username: user, 
-        message: msg, 
-        image: imgPayload 
-      }) 
-    });
-    
-    document.getElementById('msg').value = ""; 
-    document.getElementById('file').value = "";
-    processedBase64Image = ""; 
-    
+    await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'post', username: user, message: msg, image: imgPayload }) });
+    document.getElementById('msg').value = ""; document.getElementById('file').value = ""; processedBase64Image = ""; 
     postBtn.innerText = "✨ Finalizing post...";
     await new Promise(resolve => setTimeout(resolve, 2500));
-    
     await loadFeed(); 
-  } catch(e) {
-    console.error("Upload failed:", e);
-    alert("Post creation failed. Please try again.");
-  } finally {
-    postBtn.innerText = "Post Update";
-    postBtn.disabled = false;
-  }
+  } catch(e) { console.error("Upload failed:", e); alert("Post creation failed. Please try again."); } finally { postBtn.innerText = "Post Update"; postBtn.disabled = false; }
 }
 
 async function compressImage(file) {
@@ -836,8 +756,7 @@ async function compressImage(file) {
       i.onload = () => {
         const c = document.createElement('canvas'); const m = 400;
         let w = i.width, h = i.height; if(w > h){ w = h; } else { h = w; } 
-        if(w > m){ w = m; h = m; }
-        c.width = w; c.height = h; c.getContext('2d').drawImage(i,0,0,w,h);
+        if(w > m){ w = m; h = m; } c.width = w; c.height = h; c.getContext('2d').drawImage(i,0,0,w,h);
         res(c.toDataURL('image/jpeg', 0.8));
       };
     };
@@ -847,61 +766,24 @@ async function compressImage(file) {
 async function apiCall(action, rowIndex, event) {
   const user = document.getElementById('user').value.trim();
   if(!user) return alert("Name required!");
-  
   const p = allPosts.find(x => x.rowIndex === rowIndex);
   const postEl = document.getElementById(`post-${rowIndex}`);
   
   if(action==='like') {
     const i = p.likes.indexOf(user);
     i === -1 ? p.likes.push(user) : p.likes.splice(i,1);
-    
     if (postEl) {
       const btn = postEl.querySelector('.like-btn');
-      if (btn) {
-        btn.classList.add('pop');
-        setTimeout(() => btn.classList.remove('pop'), 120);
-        btn.innerHTML = (p.likes.includes(user) ? '❤️ ' : '👍 ') + `<span>${p.likes.length}</span>`;
-      }
-      
-      const container = postEl.querySelector('.liked-by-container');
-      const listSpan = postEl.querySelector('.liked-by-list');
-      if (container && listSpan) {
-        if (p.likes.length > 0) {
-          listSpan.innerHTML = p.likes.map(name => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()}</b>`).join(', ');
-          container.style.display = 'block';
-        } else {
-          container.style.display = 'none';
-        }
-      }
+      if (btn) { btn.classList.add('pop'); setTimeout(() => btn.classList.remove('pop'), 120); btn.innerHTML = (p.likes.includes(user) ? '❤️ ' : '👍 ') + `<span>${p.likes.length}</span>`; }
+      const container = postEl.querySelector('.liked-by-container'); const listSpan = postEl.querySelector('.liked-by-list');
+      if (container && listSpan) { if (p.likes.length > 0) { listSpan.innerHTML = p.likes.map(name => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()}</b>`).join(', '); container.style.display = 'block'; } else { container.style.display = 'none'; } }
     }
-
-    if(i === -1 && event) {
-       const u = document.createElement('div'); u.className='unicorn-pop'; u.textContent='🦄';
-       u.style.left=event.clientX+'px'; u.style.top=event.clientY+'px';
-       document.body.appendChild(u); setTimeout(()=>u.remove(), 1500);
-    }
-    
+    if(i === -1 && event) { const u = document.createElement('div'); u.className='unicorn-pop'; u.textContent='🦄'; u.style.left=event.clientX+'px'; u.style.top=event.clientY+'px'; document.body.appendChild(u); setTimeout(()=>u.remove(), 1500); }
     await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, rowIndex, username:user }) });
-    
   } else if (action === 'comment') {
-    const input = document.getElementById(`c-${rowIndex}`);
-    if(!input || !input.value) return;
-    const txt = input.value;
-    
-    const newCommentObj = { user, text: txt, time: new Date().toISOString() };
-    p.comments.push(newCommentObj);
-    input.value = ""; 
-    
-    if (postEl) {
-      const list = postEl.querySelector('.comments-list');
-      if (list) {
-        const div = document.createElement('div');
-        div.className = 'comment-box';
-        div.innerHTML = `<div style="display:flex; justify-content:space-between;"><b>${user}</b><span style="font-size:10px; color:#888;">just now</span></div><div>${highlightHashtags(txt)}</div>`;
-        list.appendChild(div);
-      }
-    }
-    
+    const input = document.getElementById(`c-${rowIndex}`); if(!input || !input.value) return; const txt = input.value;
+    const newCommentObj = { user, text: txt, time: new Date().toISOString() }; p.comments.push(newCommentObj); input.value = ""; 
+    if (postEl) { const list = postEl.querySelector('.comments-list'); if (list) { const div = document.createElement('div'); div.className = 'comment-box'; div.innerHTML = `<div style="display:flex; justify-content:space-between;"><b>${user}</b><span style="font-size:10px; color:#888;">just now</span></div><div>${highlightHashtags(txt)}</div>`; list.appendChild(div); } }
     await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, rowIndex, username:user, text: txt }) });
   }
 }
@@ -910,225 +792,51 @@ async function apiCall(action, rowIndex, event) {
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
-  const btn = event.target; 
-  const originalText = btn.innerText;
-  btn.innerText = "⏳ Preparing Card...";
-
-  const names = post.likes.length > 0 ? post.likes.join(', ') : '';
-  const hasPhoto = post.image && post.image.length > 10;
-  const targetImageUrl = hasPhoto ? post.image : "";
-
+  const btn = event.target; const originalText = btn.innerText; btn.innerText = "⏳ Preparing Card...";
+  const names = post.likes.length > 0 ? post.likes.join(', ') : ''; const hasPhoto = post.image && post.image.length > 10; const targetImageUrl = hasPhoto ? post.image : "";
   let textTextMsg = `🦄 Gooldbook Post by ${post.user}:\n\n"${post.message}"`;
 
   try {
     const safeBase64Image = await base64CacheProxy(targetImageUrl);
-
     const renderFrame = document.createElement('div');
-    renderFrame.style.cssText = `
-      position: fixed;
-      left: -9999px;
-      top: 0;
-      width: 400px;
-      background: #ffffff !important;
-      padding: 24px;
-      border-radius: 12px;
-      font-family: system-ui, -apple-system, sans-serif;
-      color: #1c1e21;
-      box-sizing: border-box;
-    `;
-
-    const allCommentsHTML = post.comments.slice(0, 3).map(c => `
-      <div style="background:#f0f2f5; padding:8px; border-radius:8px; margin-top:5px; font-size:13px; text-align: left;">
-        <b>${c.user}</b>: ${c.text}
-      </div>
-    `).join('');
+    renderFrame.style.cssText = `position: fixed; left: -9999px; top: 0; width: 400px; background: #ffffff !important; padding: 24px; border-radius: 12px; font-family: system-ui, -apple-system, sans-serif; color: #1c1e21; box-sizing: border-box;`;
+    const allCommentsHTML = post.comments.slice(0, 3).map(c => `<div style="background:#f0f2f5; padding:8px; border-radius:8px; margin-top:5px; font-size:13px; text-align: left;"><b>${c.user}</b>: ${c.text}</div>`).join('');
 
     renderFrame.innerHTML = `
       <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; text-align: left;">
         <div style="width:36px; height:36px; border-radius:50%; background:#3b5998; display:flex; align-items:center; justify-content:center; font-size:18px; color:white;">🦄</div>
-        <div>
-          <div style="font-weight: bold; color: #3b5998;">${post.user}</div>
-          <div style="font-size: 11px; color: #888;">theGooldbook 🦄</div>
-        </div>
+        <div><div style="font-weight: bold; color: #3b5998;">${post.user}</div><div style="font-size: 11px; color: #888;">theGooldbook 🦄</div></div>
       </div>
       <div style="font-size: 15px; margin-bottom: 15px; line-height: 1.4; text-align: left; color:#1c1e21;">${post.message}</div>
-      
       ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius: 8px; margin-bottom: 10px; display:block;">` : ''}
-      
       <div style="border-top: 2px solid #f0f2f5; padding-top: 12px; margin-top: 5px; text-align: left;">
-        <div style="display: flex; gap: 15px; font-size: 14px; font-weight: bold; color: #65676b; margin-bottom: 4px;">
-          <span>❤️ ${post.likes.length} Likes</span>
-          <span>💬 ${post.comments.length} Comments</span>
-        </div>
+        <div style="display: flex; gap: 15px; font-size: 14px; font-weight: bold; color: #65676b; margin-bottom: 4px;"><span>❤️ ${post.likes.length} Likes</span><span>💬 ${post.comments.length} Comments</span></div>
         ${names ? `<div style="font-size: 11px; color: #888; line-height: 1.3; margin-bottom:10px;">Liked by: <b>${names}</b></div>` : ''}
       </div>
       <div style="margin-top:10px;">${allCommentsHTML}</div>
-      <div style="margin-top:15px; border-top:1px dashed #ccc; padding-top:8px; font-size:10px; color:#aaa; text-align:center; font-weight:bold;">
-        SHARED VIA THEGOOLDBOOK 🦄
-      </div>
+      <div style="margin-top:15px; border-top:1px dashed #ccc; padding-top:8px; font-size:10px; color:#aaa; text-align:center; font-weight:bold;">SHARED VIA THEGOOLDBOOK 🦄</div>
     `;
 
     document.body.appendChild(renderFrame);
-
-    const canvas = await html2canvas(renderFrame, { 
-      useCORS: true,
-      allowTaint: false,
-      scale: 2, 
-      backgroundColor: "#ffffff",
-      logging: false,
-      width: 400
-    });
-    
+    const canvas = await html2canvas(renderFrame, { useCORS: true, allowTaint: false, scale: 2, backgroundColor: "#ffffff", logging: false, width: 400 });
     document.body.removeChild(renderFrame);
     
     const imageBlob = await new Promise(r => canvas.toBlob(r, 'image/png'));
     const sharedFile = new File([imageBlob], `Gooldbook_Card_${rowIndex}.png`, { type: 'image/png' });
 
     if (navigator.canShare && navigator.canShare({ files: [sharedFile] })) {
-      await navigator.share({
-        files: [sharedFile],
-        title: 'TheGooldbook Post',
-        text: textTextMsg
-      });
-    } else {
-      throw new Error("Native file sharing unavailable via runtime environment properties.");
-    }
-
-  } catch(e) { 
-    console.error("iOS Sharing initialization halted:", e);
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: 'TheGooldbook Post',
-          text: textTextMsg + `\n\nLink: ${post.image || window.location.href}`
-        });
-      } else {
-        alert("Sharing properties rejected by security settings context.");
-      }
-    } catch(textErr) {
-      alert("Sharing initialization declined by system parameters.");
-    }
-  } finally { 
-    btn.innerText = originalText; 
-  }
-}
-
-function applyImageCropAndFilter() {
-  if (!activeCropperInstance) return;
-  
-  const croppedCanvas = activeCropperInstance.getCroppedCanvas({ width: 800, height: 800 });
-  
-  const outputCanvas = document.createElement('canvas');
-  outputCanvas.width = 800;
-  outputCanvas.height = 800;
-  const outContext = outputCanvas.getContext('2d');
-  
-  outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
-  
-  const imgData = outContext.getImageData(0, 0, 800, 800);
-  const pixels = imgData.data;
-  
-  for (let i = 0; i < pixels.length; i += 4) {
-    let r = pixels[i];
-    let g = pixels[i + 1];
-    let b = pixels[i + 2];
-    
-    const currentPixelIndex = i / 4;
-    const rowY = Math.floor(currentPixelIndex / 800);
-    let modificationAmount = 0;
-
-    if (chosenFilterStyleName === 'film1982') {
-      let tr = (r * 0.393) + (g * 0.769) + (b * 0.189);
-      let tg = (r * 0.349) + (g * 0.686) + (b * 0.168);
-      let tb = (r * 0.272) + (g * 0.534) + (b * 0.131);
-      
-      r = (tr * 0.55 + r * 0.45) * 1.1;
-      g = (tg * 0.55 + g * 0.45) * 1.1;
-      b = (tb * 0.55 + b * 0.45) * 1.1;
-      
-      modificationAmount = (Math.random() - 0.5) * 24;
-    } 
-    
-    else if (chosenFilterStyleName === 'cyberpunk') {
-      let rShift = r * 0.3 + g * 0.5 + b * 0.2;
-      r = Math.min(255, ((rShift - 128) * 1.3) + 128 + 30);
-      g = Math.min(255, ((g - 128) * 1.5) + 128 - 20);
-      b = Math.min(255, ((b - 128) * 1.8) + 128 + 40);
-    } 
-    
-    else if (chosenFilterStyleName === 'vhs90s') {
-      r = ((r - 128) * 1.2) + 128;
-      g = ((g - 128) * 1.2) + 128;
-      b = ((b - 128) * 1.2) + 128;
-      
-      const isScanlineRow = rowY % 4 === 0; 
-      const scanlineDrop = isScanlineRow ? -15 : 0;
-      const subtleNoise = (Math.random() - 0.5) * 8;
-      modificationAmount = scanlineDrop + subtleNoise;
-    } 
-    
-    else if (chosenFilterStyleName === 'technopunk') {
-      let luminance = (r * 0.299) + (g * 0.587) + (b * 0.114);
-      
-      let gray = luminance < 128 ? (luminance * 0.4) : (luminance * 1.6);
-      gray = Math.min(255, Math.max(0, gray));
-
-      let colorIntensity = Math.max(r, g, b) - Math.min(r, g, b);
-
-      if (colorIntensity > 20 || luminance > 190) {
-        if (r > g && r > b) {
-          r = 255;
-          g = 0;
-          b = 140;
-        } else {
-          r = 0;
-          g = 230;
-          b = 255;
-        }
-      } else {
-        r = gray;
-        g = gray;
-        b = gray;
-      }
-
-      modificationAmount = (Math.random() - 0.5) * 35;
-    }
-
-    pixels[i]     = Math.min(255, Math.max(0, r + modificationAmount));     
-    pixels[i + 1] = Math.min(255, Math.max(0, g + modificationAmount)); 
-    pixels[i + 2] = Math.min(255, Math.max(0, b + modificationAmount)); 
-  }
-  
-  outContext.putImageData(imgData, 0, 0);
-  
-  processedBase64Image = outputCanvas.toDataURL('image/jpeg', 0.85);
-  
-  document.getElementById('cropModal').style.display = 'none';
-  if(activeCropperInstance) activeCropperInstance.destroy();
-  activeCropperInstance = null;
+      await navigator.share({ files: [sharedFile], title: 'TheGooldbook Post', text: textTextMsg });
+    } else { throw new Error("Native sharing unavailable."); }
+  } catch(e) {
+    try { if (navigator.share) { await navigator.share({ title: 'TheGooldbook Post', text: textTextMsg + `\n\nLink: ${post.image || window.location.href}` }); } } catch(txtErr) { alert("Sharing declined."); }
+  } finally { btn.innerText = originalText; }
 }
 
 function timeAgo(d) {
-  if (!d) return "just now";
-  const dateObj = new Date(d);
-  const diffMs = Date.now() - dateObj.getTime();
-  const seconds = Math.floor(diffMs / 1000);
-  if (seconds < 60) return "just now";
-
+  if (!d) return "just now"; const dateObj = new Date(d); const diffMs = Date.now() - dateObj.getTime(); const seconds = Math.floor(diffMs / 1000); if (seconds < 60) return "just now";
   const intervals = { yr: 31536000, mo: 2592000, d: 86400, h: 3600, m: 60 };
-  
-  if (seconds >= intervals.mo) {
-    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const dd = String(dateObj.getDate()).padStart(2, '0');
-    const yy = String(dateObj.getFullYear()).slice(-2);
-    return `${mm}/${dd}/${yy}`;
-  }
-
-  for (let key in intervals) {
-    const counter = Math.floor(seconds / intervals[key]);
-    if (counter > 0) return counter + key;
-  }
-  return "just now";
+  if (seconds >= intervals.mo) { return `${String(dateObj.getMonth() + 1).padStart(2, '0')}/${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getFullYear()).slice(-2)}`; }
+  for (let key in intervals) { const counter = Math.floor(seconds / intervals[key]); if (counter > 0) return counter + key; } return "just now";
 }
 
 function saveUser() { localStorage.setItem("gb_user", document.getElementById('user').value); loadFeed(); }
