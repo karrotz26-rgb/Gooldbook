@@ -411,7 +411,7 @@ async function pollForUpdates() {
 function acceptNewPosts() {
   if (incomingPostsCache) {
     allPosts = incomingPostsCache.posts || [];
-    allBios = incomingPostsCache.posts || {};
+    allBios = incomingPostsCache.bios || {};
     allAvatars = incomingPostsCache.avatars || {};
     localStorage.setItem("gb_cache", JSON.stringify(allPosts));
     lastPostCount = allPosts.length;
@@ -826,7 +826,7 @@ async function apiCall(action, rowIndex, event) {
   }
 }
 
-// 🔥 CLIPBOARD SOCIAL CARD ENGINE: Copies the image and post text details automatically
+// 🛡️ RE-ARCHITECTED AUTOMATIC CLIPBOARD COPY SHARING ENGINE
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
@@ -838,11 +838,11 @@ async function sharePost(rowIndex, event) {
   const hasPhoto = post.image && post.image.length > 10;
   const targetImageUrl = hasPhoto ? post.image : "";
 
-  // Compile clipboard body layout text parameters 
-  let textTextMsg = `🦄 Gooldbook Post by ${post.user}:\n\n"${post.message}"\n\nLink: ${postUrl = post.image || window.location.href}`;
+  // Compile standard plaintext string fallback including live layout URL strings
+  let textTextMsg = `🦄 Gooldbook Post by ${post.user}:\n\n"${post.message}"\n\nLink: ${post.image || window.location.href}`;
 
   try {
-    // 1. Process picture elements locally through cross-origin stream helpers
+    // 1. Convert image source to un-tainted local memory bytes via preloaded canvas proxy
     const safeBase64Image = await base64CacheProxy(targetImageUrl);
 
     // 2. Set up the design workspace element node to capture coordinates smoothly
@@ -908,7 +908,7 @@ async function sharePost(rowIndex, event) {
     
     document.body.removeChild(renderFrame);
     
-    // 4. STEP FOUR: Copy the binary PNG directly to the device clipboard context maps
+    // 4. Transform output data to binary PNG blobs and inject directly to clipboard items
     const imageBlob = await new Promise(r => canvas.toBlob(r, 'image/png'));
     
     await navigator.clipboard.write([
@@ -917,17 +917,17 @@ async function sharePost(rowIndex, event) {
       })
     ]);
     
-    // Success confirmation
-    alert("✨ Branded card image copied to your clipboard automatically! Just open any chat and click Paste.");
+    // Delivery alert toast notification
+    alert("✨ Branded card image copied to your clipboard automatically! Just open any chat window and tap Paste.");
 
   } catch(e) { 
-    console.error("Clipboard routing obstacle:", e);
-    // Hard fallback text delivery loop
+    console.error("Clipboard write blocked:", e);
+    // Silent plaintext clipboard fallback sequence
     try {
       await navigator.clipboard.writeText(textTextMsg);
-      alert("📋 Image blocked by your browser settings. Post text details copied instead!");
+      alert("📋 Image write dropped by device settings. Post text contents copied instead!");
     } catch(txtErr) {
-      alert("Clipboard access disabled. Check app site permissions.");
+      alert("System clipboard write access rejected.");
     }
   } finally { 
     btn.innerText = originalText; 
