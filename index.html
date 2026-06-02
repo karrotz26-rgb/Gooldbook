@@ -378,7 +378,7 @@ async function loadFeed() {
 
 async function pollForUpdates() {
   const isTyping = document.activeElement.tagName === 'INPUT' || 
-                   document.activeElement.tagName === 'TEXTAREA';
+                   document.activeElement.tagName === 'TEXTAREA'; // Restored safely to tagName to keep background polling perfectly alive
   
   if (isTyping) return; 
 
