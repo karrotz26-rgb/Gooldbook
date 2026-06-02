@@ -378,7 +378,7 @@ async function loadFeed() {
 
 async function pollForUpdates() {
   const isTyping = document.activeElement.tagName === 'INPUT' || 
-                   document.activeElement.toggleAttribute === 'TEXTAREA';
+                   document.activeElement.tagName === 'TEXTAREA';
   
   if (isTyping) return; 
 
@@ -451,8 +451,7 @@ function setFilter(type, val) {
 function getAvatarMarkup(user, sizeClass) {
   const ava = allAvatars[user];
   if (!ava || ava === "" || ava === "undefined") return `<div class="${sizeClass}">🦄</div>`;
-  // CRITICAL FIX 1: Add crossorigin flag to user profile icons too to prevent canvas taint
-  return `<img src="${ava}" crossorigin="anonymous" class="${sizeClass}" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=🦄';">`;
+  return `<img src="${ava}" class="${sizeClass}" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=🦄';">`;
 }
 
 async function uploadAvatar(user) {
@@ -579,10 +578,9 @@ function render() {
         if (existingImg && existingImg.getAttribute('src') === p.image) {
           mediaHTML = existingImg.closest('.img-container').outerHTML;
         } else {
-          // CRITICAL FIX 2: Added crossorigin="anonymous" directly to the primary live feed timeline layout stream 
           mediaHTML += `<div class="img-container">
             <div class="skeleton-loader"></div>
-            <img src="${p.image}" class="post-img" crossorigin="anonymous" loading="lazy" onload="onImageLoad(this)">
+            <img src="${p.image}" class="post-img" loading="lazy" onload="onImageLoad(this)">
           </div>`;
         }
       }
@@ -690,33 +688,48 @@ function performScroll(id) {
   else { postsToShow += 10; render(); setTimeout(() => performScroll(id), 100); }
 }
 
+// CRITICAL TIMING FIX: Ensures Google Drive completes permission configuration sweeps
 async function upload() {
   const user = document.getElementById('user').value.trim();
   const msg = document.getElementById('msg').value.trim();
   if(!user || !msg) return alert("Fill in name and message!");
-  document.getElementById('postBtn').innerText = "Posting...";
+  
+  const postBtn = document.getElementById('postBtn');
+  postBtn.innerText = "⏳ Uploading...";
+  postBtn.disabled = true;
   
   const imgPayload = (processedBase64Image && processedBase64Image.startsWith("data:image")) ? processedBase64Image : "";
   
-  await fetch(SCRIPT_URL, { 
-    method: 'POST', 
-    headers: {
-      'Content-Type': 'text/plain;charset=utf-8'
-    },
-    body: JSON.stringify({ 
-      action: 'post', 
-      username: user, 
-      message: msg, 
-      image: imgPayload 
-    }) 
-  });
-  
-  document.getElementById('msg').value = ""; 
-  document.getElementById('file').value = "";
-  processedBase64Image = ""; 
-  
-  loadFeed(); 
-  document.getElementById('postBtn').innerText = "Post Update";
+  try {
+    await fetch(SCRIPT_URL, { 
+      method: 'POST', 
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify({ 
+        action: 'post', 
+        username: user, 
+        message: msg, 
+        image: imgPayload 
+      }) 
+    });
+    
+    document.getElementById('msg').value = ""; 
+    document.getElementById('file').value = "";
+    processedBase64Image = ""; 
+    
+    // Gives Google Drive servers 2.5 seconds to build and verify file permissions
+    postBtn.innerText = "✨ Finalizing post...";
+    await new Promise(resolve => setTimeout(resolve, 2500));
+    
+    await loadFeed(); 
+  } catch(e) {
+    console.error("Upload failed:", e);
+    alert("Post creation failed. Please try again.");
+  } finally {
+    postBtn.innerText = "Post Update";
+    postBtn.disabled = false;
+  }
 }
 
 async function compressImage(file) {
@@ -797,7 +810,6 @@ async function apiCall(action, rowIndex, event) {
   }
 }
 
-// CRITICAL FIX 3: Fully updated and standalone share execution function
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
@@ -814,32 +826,31 @@ async function sharePost(rowIndex, event) {
       canvasTmp.height = liveTimelineImage.naturalHeight;
       const ctxTmp = canvasTmp.getContext('2d');
       ctxTmp.drawImage(liveTimelineImage, 0, 0);
-      safeBase64Image = canvasTmp.toDataURL('image/jpeg', 0.9);
+      safeBase64Image = canvasTmp.toDataURL('image/jpeg', 0.95);
     }
   } catch (imgErr) {
-    console.warn("Could not copy local image pixels directly:", imgErr);
+    console.warn("Direct layout pixel extraction dropped via CORS, drawing blank spacer instead.", imgErr);
   }
 
   const card = document.createElement('div');
   card.style.cssText = `
-    position: absolute; 
-    top: 0; 
-    left: 0; 
-    opacity: 0; 
-    pointer-events: none; 
-    z-index: -100;
-    width: 400px; 
-    background: white; 
-    padding: 20px; 
-    border-radius: 12px; 
-    font-family: system-ui, sans-serif; 
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 400px;
+    background: #ffffff !important;
+    padding: 20px;
+    border-radius: 12px;
+    font-family: system-ui, -apple-system, sans-serif;
     color: #1c1e21;
+    box-sizing: border-box;
+    z-index: -99999;
   `;
 
   const names = post.likes.length > 0 ? post.likes.join(', ') : '';
 
   const allCommentsHTML = post.comments.map(c => `
-    <div style="background:#f0f2f5; padding:8px; border-radius:8px; margin-top:5px; font-size:13px;">
+    <div style="background:#f0f2f5; padding:8px; border-radius:8px; margin-top:5px; font-size:13px; text-align: left;">
       <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
         <b>${c.user}</b>
       </div>
@@ -848,17 +859,17 @@ async function sharePost(rowIndex, event) {
   `).join('');
 
   card.innerHTML = `
-    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-      ${getAvatarMarkup(post.user, 'avatar-small')}
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; text-align: left;">
+      <div style="width:36px; height:36px; border-radius:50%; background:#eee; display:flex; align-items:center; justify-content:center; font-size:18px;">🦄</div>
       <div>
         <div style="font-weight: bold; color: #3b5998;">${post.user}</div>
         <div style="font-size: 11px; color: #888;">theGooldbook 🦄</div>
       </div>
     </div>
-    <div style="font-size: 16px; margin-bottom: 15px; line-height: 1.4;">${post.message}</div>
-    ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius: 8px; margin-bottom: 10px;">` : ''}
+    <div style="font-size: 16px; margin-bottom: 15px; line-height: 1.4; text-align: left; color:#1c1e21;">${post.message}</div>
+    ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius: 8px; margin-bottom: 10px; display:block;">` : ''}
     
-    <div style="border-top: 2px solid #f0f2f5; padding-top: 12px; margin-top: 5px;">
+    <div style="border-top: 2px solid #f0f2f5; padding-top: 12px; margin-top: 5px; text-align: left;">
       <div style="display: flex; gap: 15px; font-size: 14px; font-weight: bold; color: #65676b; margin-bottom: 4px;">
         <span>❤️ ${post.likes.length} Likes</span>
         <span>💬 ${post.comments.length} Comments</span>
@@ -866,18 +877,21 @@ async function sharePost(rowIndex, event) {
       ${names ? `<div style="font-size: 11px; color: #888; line-height: 1.3; margin-bottom:10px;">Liked by: <b>${names}</b></div>` : ''}
     </div>
     <div style="margin-top:10px; border-top:1px solid #eee; padding-top:10px;">
-       ${allCommentsHTML || '<div style="font-size:12px; color:#888; font-style:italic;">No comments yet.</div>'}
+       ${allCommentsHTML || '<div style="font-size:12px; color:#888; font-style:italic; text-align: left;">No comments yet.</div>'}
     </div>`;
 
   document.body.appendChild(card);
 
+  await new Promise(resolve => setTimeout(resolve, 250));
+
   try {
     const canvas = await html2canvas(card, { 
-      useCORS: true,         
-      allowTaint: true,       
+      useCORS: false,
+      allowTaint: true,
       scale: 2, 
       backgroundColor: "#ffffff",
-      logging: false 
+      logging: false,
+      width: 400
     });
     
     document.body.removeChild(card);
