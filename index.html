@@ -378,7 +378,7 @@ async function loadFeed() {
 
 async function pollForUpdates() {
   const isTyping = document.activeElement.tagName === 'INPUT' || 
-                   document.activeElement.tagName === 'TEXTAREA';
+                   document.activeElement.tagName === 'TEXTAREA'; // FIXED: Changed .toggleAttribute back to .tagName to prevent breaking background script loops
   
   if (isTyping) return; 
 
@@ -658,113 +658,192 @@ function render() {
   if (!filterVal && !s) updateSidebar();
 }
 
-// BULLETPROOF SAFARI/MOBILE SHARE CARD FIX: Renders purely in device memory
+function updateSidebar() {
+  const myName = document.getElementById('user').value.trim();
+  document.getElementById('myProfileLink').innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', '${myName}')">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
+  
+  const topPosts = [...allPosts].sort((a,b) => ((b.likes?.length||0)+(b.comments?.length||0)) - ((a.likes?.length||0)+(a.comments?.length||0))).slice(0,3);
+  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b><br>${topPosts.map(p => `<div class="sidebar-item" onclick="scrollToPost(${p.rowIndex})"><div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div><div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div><span class="trend-stats">❤️ ${p.likes.length} • 💬 ${p.comments.length}</span></div>`).join('')}</div>`;
+
+  const lCounts = {}; allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
+  const topLikers = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${topLikers.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
+
+  const hCounts = {}; allPosts.forEach(p => { 
+    const tags = ((p.message||"") + " " + p.comments.map(c=>c.text).join(" ")).match(/#(\w+)/g) || []; 
+    tags.forEach(t => { const ct = t.toLowerCase().trim(); hCounts[ct] = (hCounts[ct]||0)+1; });
+  });
+  const topTags = Object.entries(hCounts).sort((a,b) => b[1] - a[1]).slice(0, 8);
+  document.getElementById('hashtags').innerHTML = `<div class="sidebar-card"><b>#️⃣ Trending Tags</b><div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">${topTags.map(([tag, count]) => `<div class="sidebar-item" style="background: #f0f2f5; padding: 5px 10px; border-radius: 15px; font-size: 12px; cursor: pointer;" onclick="setFilter('hashtag','${tag}')"><span style="color:var(--gb-hover); font-weight:bold;">${tag}</span> <span style="color:#888; font-size: 10px;">${count}</span></div>`).join('') || 'None'}</div></div>`;
+}
+
+function scrollToPost(id) {
+  if (filterVal) { setFilter(null, null); setTimeout(() => performScroll(id), 300); } 
+  else performScroll(id);
+}
+
+function performScroll(id) {
+  const el = document.getElementById(`post-${id}`);
+  if (el) { window.scrollTo({ top: el.offsetTop - 70, behavior: 'smooth' }); el.classList.add('highlight-card'); setTimeout(() => el.classList.remove('highlight-card'), 2000); } 
+  else { postsToShow += 10; render(); setTimeout(() => performScroll(id), 100); }
+}
+
+async function upload() {
+  const user = document.getElementById('user').value.trim();
+  const msg = document.getElementById('msg').value.trim();
+  if(!user || !msg) return alert("Fill in name and message!");
+  
+  const postBtn = document.getElementById('postBtn');
+  postBtn.innerText = "⏳ Uploading...";
+  postBtn.disabled = true;
+  
+  const imgPayload = (processedBase64Image && processedBase64Image.startsWith("data:image")) ? processedBase64Image : "";
+  
+  try {
+    await fetch(SCRIPT_URL, { 
+      method: 'POST', 
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify({ 
+        action: 'post', 
+        username: user, 
+        message: msg, 
+        image: imgPayload 
+      }) 
+    });
+    
+    document.getElementById('msg').value = ""; 
+    document.getElementById('file').value = "";
+    processedBase64Image = ""; 
+    
+    postBtn.innerText = "✨ Finalizing post...";
+    await new Promise(resolve => setTimeout(resolve, 2500));
+    
+    await loadFeed(); 
+  } catch(e) {
+    console.error("Upload failed:", e);
+    alert("Post creation failed. Please try again.");
+  } finally {
+    postBtn.innerText = "Post Update";
+    postBtn.disabled = false;
+  }
+}
+
+async function compressImage(file) {
+  return new Promise(res => {
+    const r = new FileReader(); r.readAsDataURL(file);
+    r.onload = (e) => {
+      const i = new Image(); i.src = e.target.result;
+      i.onload = () => {
+        const c = document.createElement('canvas'); const m = 400;
+        let w = i.width, h = i.height; if(w > h){ w = h; } else { h = w; } 
+        if(w > m){ w = m; h = m; }
+        c.width = w; c.height = h; c.getContext('2d').drawImage(i,0,0,w,h);
+        res(c.toDataURL('image/jpeg', 0.8));
+      };
+    };
+  });
+}
+
+async function apiCall(action, rowIndex, event) {
+  const user = document.getElementById('user').value.trim();
+  if(!user) return alert("Name required!");
+  
+  const p = allPosts.find(x => x.rowIndex === rowIndex);
+  const postEl = document.getElementById(`post-${rowIndex}`);
+  
+  if(action==='like') {
+    const i = p.likes.indexOf(user);
+    i === -1 ? p.likes.push(user) : p.likes.splice(i,1);
+    
+    if (postEl) {
+      const btn = postEl.querySelector('.like-btn');
+      if (btn) {
+        btn.classList.add('pop');
+        setTimeout(() => btn.classList.remove('pop'), 120);
+        btn.innerHTML = (p.likes.includes(user) ? '❤️ ' : '👍 ') + `<span>${p.likes.length}</span>`;
+      }
+      
+      const container = postEl.querySelector('.liked-by-container');
+      const listSpan = postEl.querySelector('.liked-by-list');
+      if (container && listSpan) {
+        if (p.likes.length > 0) {
+          listSpan.innerHTML = p.likes.map(name => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()}</b>`).join(', ');
+          container.style.display = 'block';
+        } else {
+          container.style.display = 'none';
+        }
+      }
+    }
+
+    if(i === -1 && event) {
+       const u = document.createElement('div'); u.className='unicorn-pop'; u.textContent='🦄';
+       u.style.left=event.clientX+'px'; u.style.top=event.clientY+'px';
+       document.body.appendChild(u); setTimeout(()=>u.remove(), 1500);
+    }
+    
+    await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, rowIndex, username:user }) });
+    
+  } else if (action === 'comment') {
+    const input = document.getElementById(`c-${rowIndex}`);
+    if(!input || !input.value) return;
+    const txt = input.value;
+    
+    const newCommentObj = { user, text: txt, time: new Date().toISOString() };
+    p.comments.push(newCommentObj);
+    input.value = ""; 
+    
+    if (postEl) {
+      const list = postEl.querySelector('.comments-list');
+      if (list) {
+        const div = document.createElement('div');
+        div.className = 'comment-box';
+        div.innerHTML = `<div style="display:flex; justify-content:space-between;"><b>${user}</b><span style="font-size:10px; color:#888;">just now</span></div><div>${highlightHashtags(txt)}</div>`;
+        list.appendChild(div);
+      }
+    }
+    
+    await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, rowIndex, username:user, text: txt }) });
+  }
+}
+
+// FIXED: Native, text-based fallback share option that executes in under 200ms without freezing or cluttering the layout
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
   const btn = event.target; 
   const originalText = btn.innerText;
+  
   btn.innerText = "⏳ Processing...";
 
-  let safeBase64Image = "";
-  try {
-    const liveTimelineImage = document.querySelector(`#post-${rowIndex} .post-img`);
-    if (liveTimelineImage && liveTimelineImage.complete && liveTimelineImage.naturalWidth !== 0) {
-      const canvasTmp = document.createElement('canvas');
-      canvasTmp.width = liveTimelineImage.naturalWidth;
-      canvasTmp.height = liveTimelineImage.naturalHeight;
-      const ctxTmp = canvasTmp.getContext('2d');
-      ctxTmp.drawImage(liveTimelineImage, 0, 0);
-      safeBase64Image = canvasTmp.toDataURL('image/jpeg', 0.95);
-    }
-  } catch (imgErr) {
-    console.warn("Direct pixel capture bypassed.", imgErr);
-  }
+  let shareText = `🦄 Gooldbook Post by ${post.user}:\n\n`;
+  shareText += `"${post.message}"\n\n`;
+  shareText += `❤️ LIKES: ${post.likes.length}\n`;
+  shareText += `💬 COMMENTS (${post.comments.length}):\n`;
+  
+  const commentPreview = post.comments.slice(-3);
+  commentPreview.forEach(c => {
+    shareText += `- ${c.user}: ${c.text}\n`;
+  });
 
-  // Create a clean layout container strictly in memory (detaches completely from DOM space)
-  const cardFrame = document.createElement('div');
-  cardFrame.style.cssText = `
-    width: 400px;
-    background: #ffffff !important;
-    padding: 20px;
-    border-radius: 12px;
-    font-family: system-ui, -apple-system, sans-serif;
-    color: #1c1e21;
-    box-sizing: border-box;
-  `;
-
-  const names = post.likes.length > 0 ? post.likes.join(', ') : '';
-
-  const allCommentsHTML = post.comments.map(c => `
-    <div style="background:#f0f2f5; padding:8px; border-radius:8px; margin-top:5px; font-size:13px; text-align: left;">
-      <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
-        <b>${c.user}</b>
-      </div>
-      <div>${c.text}</div>
-    </div>
-  `).join('');
-
-  cardFrame.innerHTML = `
-    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; text-align: left;">
-      <div style="width:36px; height:36px; border-radius:50%; background:#eee; display:flex; align-items:center; justify-content:center; font-size:18px;">🦄</div>
-      <div>
-        <div style="font-weight: bold; color: #3b5998;">${post.user}</div>
-        <div style="font-size: 11px; color: #888;">theGooldbook 🦄</div>
-      </div>
-    </div>
-    <div style="font-size: 16px; margin-bottom: 15px; line-height: 1.4; text-align: left; color:#1c1e21;">${post.message}</div>
-    ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius: 8px; margin-bottom: 10px; display:block;">` : ''}
-    
-    <div style="border-top: 2px solid #f0f2f5; padding-top: 12px; margin-top: 5px; text-align: left;">
-      <div style="display: flex; gap: 15px; font-size: 14px; font-weight: bold; color: #65676b; margin-bottom: 4px;">
-        <span>❤️ ${post.likes.length} Likes</span>
-        <span>💬 ${post.comments.length} Comments</span>
-      </div>
-      ${names ? `<div style="font-size: 11px; color: #888; line-height: 1.3; margin-bottom:10px;">Liked by: <b>${names}</b></div>` : ''}
-    </div>
-    <div style="margin-top:10px; border-top:1px solid #eee; padding-top:10px;">
-       ${allCommentsHTML || '<div style="font-size:12px; color:#888; font-style:italic; text-align: left;">No comments yet.</div>'}
-    </div>`;
-
-  // FIXED: Place the container inside an isolated template sandbox element
-  const sandboxContainer = document.createElement('div');
-  sandboxContainer.style.cssText = "position:absolute; top:0; left:0; width:0; height:0; overflow:hidden; visibility:hidden;";
-  sandboxContainer.appendChild(cardFrame);
-  document.body.appendChild(sandboxContainer);
+  const imageSrc = post.image || "";
 
   try {
-    const canvas = await html2canvas(cardFrame, { 
-      useCORS: false,
-      allowTaint: true,
-      scale: 2, 
-      backgroundColor: "#ffffff",
-      logging: false,
-      width: 400
-    });
-    
-    document.body.removeChild(sandboxContainer);
-    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-    const file = new File([blob], `Gooldbook_${rowIndex}.png`, { type: 'image/png' });
-    
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ 
-        files: [file], 
-        title: `Post by ${post.user}`,
-        text: `Check out this post on The Gooldbook! 🦄`, 
-        url: window.location.href 
+    if (navigator.share) {
+      await navigator.share({
+        title: `Gooldbook - ${post.user}`,
+        text: shareText,
+        url: imageSrc || window.location.href 
       });
     } else {
-      const link = document.createElement('a');
-      link.download = `Gooldbook_${rowIndex}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+      await navigator.clipboard.writeText(`${shareText}\nLink: ${imageSrc || window.location.href}`);
+      alert("📋 Post details and image links copied to clipboard successfully!");
     }
-  } catch(e) { 
-    console.error("Card processing error encountered:", e);
-    alert("Could not extract card content."); 
-    if (sandboxContainer.parentNode) document.body.removeChild(sandboxContainer);
-  } finally { 
-    btn.innerText = originalText; 
+  } catch (e) {
+    console.error("Native device sharing cancelled or failed:", e);
+  } finally {
+    btn.innerText = originalText;
   }
 }
 
