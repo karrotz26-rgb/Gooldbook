@@ -200,7 +200,6 @@ let activeCropperInstance = null;
 let processedBase64Image = "";
 let chosenFilterStyleName = "normal";
 
-// Matrix maps applied natively during context processing runs
 const filterMatrixConfigurations = {
   normal: 'none',
   film1982: 'sepia(0.55) contrast(0.85) brightness(1.1) saturate(0.85) hue-rotate(-5deg)',
@@ -281,7 +280,6 @@ function applyImageCropAndFilter() {
   outContext.filter = filterMatrixConfigurations[chosenFilterStyleName] || 'none';
   outContext.drawImage(croppedCanvas, 0, 0);
   
-  // Custom texture modifiers for specialized presets (Grain & Scanlines)
   if (chosenFilterStyleName === 'film1982' || chosenFilterStyleName === 'vhs90s') {
     const imgData = outContext.getImageData(0, 0, 800, 800);
     const pixels = imgData.data;
@@ -292,11 +290,9 @@ function applyImageCropAndFilter() {
 
       let modificationAmount = 0;
 
-      // Heavy fading grain for old school photo print look
       if (chosenFilterStyleName === 'film1982') {
         modificationAmount = (Math.random() - 0.5) * 24; 
       } 
-      // Multi-line row drops simulating tracking scanlines + fine static noise
       else if (chosenFilterStyleName === 'vhs90s') {
         const isScanlineRow = rowY % 4 === 0; 
         const scanlineDrop = isScanlineRow ? -15 : 0;
@@ -799,12 +795,35 @@ async function apiCall(action, rowIndex, event) {
   }
 }
 
+// Inline Base64 image converter to bypass cross-origin browser rules
+async function fetchImageAsBase64(url) {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (err) {
+    console.error("CORS proxy conversion failed, falling back to direct link string", err);
+    return url; 
+  }
+}
+
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
   const btn = event.target; 
   const originalText = btn.innerText;
   btn.innerText = "⏳ Wait...";
+
+  let shareImageSource = "";
+  if (post.image && post.image.length > 10) {
+    // Convert to Base64 to give html2canvas full local viewing permissions
+    shareImageSource = await fetchImageAsBase64(post.image);
+  }
 
   const card = document.createElement('div');
   card.style.cssText = `position: fixed; left: -9999px; width: 400px; background: white; padding: 20px; border-radius: 12px; font-family: system-ui, sans-serif; color: #1c1e21;`;
@@ -830,7 +849,7 @@ async function sharePost(rowIndex, event) {
       </div>
     </div>
     <div style="font-size: 16px; margin-bottom: 15px; line-height: 1.4;">${post.message}</div>
-    ${post.image ? `<img src="${post.image}" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius: 8px; margin-bottom: 10px;">` : ''}
+    ${shareImageSource ? `<img src="${shareImageSource}" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius: 8px; margin-bottom: 10px;">` : ''}
     
     <div style="border-top: 2px solid #f0f2f5; padding-top: 12px; margin-top: 5px;">
       <div style="display: flex; gap: 15px; font-size: 14px; font-weight: bold; color: #65676b; margin-bottom: 4px;">
