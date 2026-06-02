@@ -308,7 +308,7 @@ function applyImageCropAndFilter() {
       modificationAmount = (Math.random() - 0.5) * 24;
     } 
     
-       else if (chosenFilterStyleName === 'technopunk') {
+           else if (chosenFilterStyleName === 'technopunk') {
       // 1. Calculate base luminance mapping
       let luminance = (r * 0.299) + (g * 0.587) + (b * 0.114);
       
@@ -337,6 +337,7 @@ function applyImageCropAndFilter() {
       // 3. Inject a heavy layer of digital matrix noise grain
       modificationAmount = (Math.random() - 0.5) * 35;
     }
+
  
     
     else if (chosenFilterStyleName === 'vhs90s') {
