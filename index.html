@@ -186,7 +186,7 @@
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwZ_Wx_ec91YH-eF_fHm51mcrRid_nYw57LhJ69tXE4dm4n_G5cKFwuDpVJIpXkss02/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzR2XHcV4OYJYXChx-oxydQwP3UdpGaygJ4PFHmD-7Fngm6wGGJhdTXQLqGpAw6rtfL/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let incomingPostsCache = null; 
 let allBios = {}, allAvatars = {};
@@ -451,7 +451,7 @@ function setFilter(type, val) {
 function getAvatarMarkup(user, sizeClass) {
   const ava = allAvatars[user];
   if (!ava || ava === "" || ava === "undefined") return `<div class="${sizeClass}">🦄</div>`;
-  return `<img src="${ava}" class="${sizeClass}" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=🦄';">`;
+  return `<img src="${ava}" crossorigin="anonymous" class="${sizeClass}" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=🦄';">`;
 }
 
 async function uploadAvatar(user) {
@@ -578,9 +578,10 @@ function render() {
         if (existingImg && existingImg.getAttribute('src') === p.image) {
           mediaHTML = existingImg.closest('.img-container').outerHTML;
         } else {
+          // FIXED: Added crossorigin parameter to avoid security canvas errors
           mediaHTML += `<div class="img-container">
             <div class="skeleton-loader"></div>
-            <img src="${p.image}" class="post-img" loading="lazy" onload="onImageLoad(this)">
+            <img src="${p.image}" class="post-img" crossorigin="anonymous" loading="lazy" onload="onImageLoad(this)">
           </div>`;
         }
       }
@@ -795,25 +796,7 @@ async function apiCall(action, rowIndex, event) {
   }
 }
 
-// Layout visibility extractor that copies active pixels directly from the screen
-function cloneRenderedTimelineImage(rowIndex) {
-  try {
-    const liveTimelineImage = document.querySelector(`#post-${rowIndex} .post-img`);
-    if (!liveTimelineImage || !liveTimelineImage.complete || liveTimelineImage.naturalWidth === 0) return "";
-    
-    const scratchCanvas = document.createElement('canvas');
-    scratchCanvas.width = liveTimelineImage.naturalWidth;
-    scratchCanvas.height = liveTimelineImage.naturalHeight;
-    
-    const ctx = scratchCanvas.getContext('2d');
-    ctx.drawImage(liveTimelineImage, 0, 0);
-    return scratchCanvas.toDataURL('image/jpeg', 0.9);
-  } catch (err) {
-    console.warn("Direct layout pixel extraction blocked, falling back to basic layout.", err);
-    return "";
-  }
-}
-
+// FIXED: Cleaned up share card rendering environment to guarantee html2canvas compatibility
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
@@ -821,11 +804,24 @@ async function sharePost(rowIndex, event) {
   const originalText = btn.innerText;
   btn.innerText = "⏳ Processing...";
 
-  // Clones the visible image from the timeline container to bypass CORS network blocks entirely
-  const safeBase64Image = cloneRenderedTimelineImage(rowIndex);
+  const liveTimelineImage = document.querySelector(`#post-${rowIndex} .post-img`);
+  const imageSrc = liveTimelineImage ? liveTimelineImage.getAttribute('src') : "";
 
   const card = document.createElement('div');
-  card.style.cssText = `position: fixed; left: -9999px; width: 400px; background: white; padding: 20px; border-radius: 12px; font-family: system-ui, sans-serif; color: #1c1e21;`;
+  card.style.cssText = `
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    opacity: 0; 
+    pointer-events: none; 
+    z-index: -100;
+    width: 400px; 
+    background: white; 
+    padding: 20px; 
+    border-radius: 12px; 
+    font-family: system-ui, sans-serif; 
+    color: #1c1e21;
+  `;
 
   const names = post.likes.length > 0 ? post.likes.join(', ') : '';
 
@@ -833,7 +829,6 @@ async function sharePost(rowIndex, event) {
     <div style="background:#f0f2f5; padding:8px; border-radius:8px; margin-top:5px; font-size:13px;">
       <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
         <b>${c.user}</b>
-        <span style="font-size:10px; color:#888;">${timeAgo(c.time)}</span>
       </div>
       <div>${c.text}</div>
     </div>
@@ -848,7 +843,7 @@ async function sharePost(rowIndex, event) {
       </div>
     </div>
     <div style="font-size: 16px; margin-bottom: 15px; line-height: 1.4;">${post.message}</div>
-    ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius: 8px; margin-bottom: 10px;">` : ''}
+    ${imageSrc ? `<img src="${imageSrc}" crossorigin="anonymous" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius: 8px; margin-bottom: 10px;">` : ''}
     
     <div style="border-top: 2px solid #f0f2f5; padding-top: 12px; margin-top: 5px;">
       <div style="display: flex; gap: 15px; font-size: 14px; font-weight: bold; color: #65676b; margin-bottom: 4px;">
@@ -865,17 +860,18 @@ async function sharePost(rowIndex, event) {
 
   try {
     const canvas = await html2canvas(card, { 
-      useCORS: false, 
-      allowTaint: true,
+      useCORS: true, 
+      allowTaint: false,
       scale: 2, 
       backgroundColor: "#ffffff",
       logging: false 
     });
+    
     document.body.removeChild(card);
     const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
     const file = new File([blob], `Gooldbook_${rowIndex}.png`, { type: 'image/png' });
     
-    if (navigator.share) {
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
       await navigator.share({ 
         files: [file], 
         title: `Post by ${post.user}`,
@@ -885,12 +881,13 @@ async function sharePost(rowIndex, event) {
     } else {
       const link = document.createElement('a');
       link.download = `Gooldbook_${rowIndex}.png`;
-      link.href = canvas.toDataURL();
+      link.href = canvas.toDataURL('image/png');
       link.click();
     }
   } catch(e) { 
-    console.error(e);
-    alert("Share card extraction encountered an error."); 
+    console.error("Card compilation encountered an error:", e);
+    alert("Could not generate share card."); 
+    if (card.parentNode) document.body.removeChild(card);
   } finally { 
     btn.innerText = originalText; 
   }
