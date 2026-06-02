@@ -104,8 +104,10 @@
     .filter-preview-box { width: 55px; height: 55px; border-radius: 6px; background: #333; margin-bottom: 4px; border: 2px solid transparent; background-size: cover; background-position: center; transition: border-color 0.2s; }
     .filter-option.active .filter-preview-box { border-color: #3498db; }
 
+    /* Live Synchronized Bounding Box Styles for the Cropping Screen Viewport */
     .f-normal .cropper-view-box img { filter: none; }
-    .f-film1982 .cropper-view-box img { filter: sepia(0.55) contrast(0.85) brightness(1.1) saturate(0.85) hue-rotate(-5deg); }
+    .f-film1982 .cropper-view-box img { filter: sepia(0.35) contrast(1.2) brightness(1.05) saturate(1.3) hue-rotate(-2deg); }
+    .f-cyberpunk .cropper-view-box img { filter: hue-rotate(140deg) saturate(1.8) contrast(1.3) brightness(0.9); }
     .f-vhs90s .cropper-view-box img { filter: contrast(1.1) saturate(1.3) brightness(1.05) blur(0.3px); }
     .f-technopunk .cropper-view-box img { filter: contrast(1.9) brightness(0.7) grayscale(1); }
     .f-aiportrait .cropper-view-box img { filter: saturate(1.4) contrast(1.25) brightness(1.05); }
@@ -127,7 +129,7 @@
       <div class="filter-preview-box" style="background-color: #555;"></div>Normal
     </div>
     <div class="filter-option" onclick="selectPostFilter('film1982', this)">
-      <div class="filter-preview-box" style="background-color: #555; filter: sepia(0.55) contrast(0.85) brightness(1.1) saturate(0.85) hue-rotate(-5deg);"></div>1982 Film 🎞️
+      <div class="filter-preview-box" style="background-color: #555; filter: sepia(0.35) contrast(1.2) brightness(1.05) saturate(1.3) hue-rotate(-2deg);"></div>1982 Film 🎞️
     </div>
     <div class="filter-option" onclick="selectPostFilter('cyberpunk', this)">
       <div class="filter-preview-box" style="background-color: #555; filter: hue-rotate(140deg) saturate(1.8) contrast(1.3) brightness(0.9);"></div>Cyberpunk 🤖
@@ -208,7 +210,7 @@ let selfieSegmentationModelInstance = null;
 
 const filterMatrixConfigurations = {
   normal: 'none',
-  film1982: 'sepia(0.55) contrast(0.85) brightness(1.1) saturate(0.85) hue-rotate(-5deg)',
+  film1982: 'none',
   cyberpunk: 'hue-rotate(140deg) saturate(1.8) contrast(1.3) brightness(0.9)',
   vhs90s: 'contrast(1.1) saturate(1.3) brightness(1.05)',
   technopunk: 'none',
@@ -730,7 +732,7 @@ async function applyImageCropAndFilter() {
         
         // 1. Render vibrant neon hue matrix into blurred background
         outContext.save();
-        outContext.filter = 'blur(16px) brightness(0.75) saturate(3) hue-rotate(135deg)';
+        outContext.filter = 'blur(16px) brightness(0.7) saturate(3) hue-rotate(135deg)';
         outContext.drawImage(results.image, 0, 0, 800, 800);
         outContext.restore();
         
@@ -756,6 +758,9 @@ async function applyImageCropAndFilter() {
     const imgData = outContext.getImageData(0, 0, 800, 800);
     const pixels = imgData.data;
     
+    // Generate static seed parameters for uniform light leak positioning across rows
+    const leakCenterY = Math.floor(Math.random() * 400) + 200;
+    
     for (let i = 0; i < pixels.length; i += 4) {
       let r = pixels[i];
       let g = pixels[i + 1];
@@ -767,13 +772,31 @@ async function applyImageCropAndFilter() {
       let modificationAmount = 0;
 
       if (chosenFilterStyleName === 'film1982') {
-        let tr = (r * 0.393) + (g * 0.769) + (b * 0.189);
-        let tg = (r * 0.349) + (g * 0.686) + (b * 0.168);
-        let tb = (r * 0.272) + (g * 0.534) + (b * 0.131);
-        r = (tr * 0.55 + r * 0.45) * 1.1;
-        g = (tg * 0.55 + g * 0.45) * 1.1;
-        b = (tb * 0.55 + b * 0.45) * 1.1;
-        modificationAmount = (Math.random() - 0.5) * 24;
+        // --- UPGRADED DISPOSABLE CAMERA ENGINE ---
+        // 1. High-saturation vintage warm sepia tint translation
+        let tr = (r * 0.42) + (g * 0.73) + (b * 0.22);
+        let tg = (r * 0.35) + (g * 0.64) + (b * 0.18);
+        let tb = (r * 0.26) + (g * 0.48) + (b * 0.12);
+        
+        // Blend warm sepia back with boosted standard visibility
+        r = (tr * 0.45 + r * 0.55) * 1.15;
+        g = (tg * 0.45 + g * 0.55) * 1.05;
+        b = (tb * 0.45 + b * 0.55) * 0.95;
+        
+        // 2. Coarse analog film grain variation 
+        modificationAmount = (Math.random() - 0.5) * 32;
+        
+        // 3. Simulated side plastic case light leak flare (glowing orange beam from left wall)
+        if (colX < 280) {
+          let leakIntensity = (1 - (colX / 280)) * 65;
+          // Smooth vertical dropoff distribution centering a realistic gradient hotspot
+          let verticalDistanceFactor = Math.abs(rowY - leakCenterY) / 400;
+          if (verticalDistanceFactor < 1) {
+            let localizedFalloff = Math.cos(verticalDistanceFactor * Math.PI / 2);
+            r += leakIntensity * localizedFalloff * 1.3;
+            g += leakIntensity * localizedFalloff * 0.5;
+          }
+        }
       } 
       else if (chosenFilterStyleName === 'cyberpunk') {
         let rShift = r * 0.3 + g * 0.5 + b * 0.2;
