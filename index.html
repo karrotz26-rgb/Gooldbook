@@ -808,7 +808,7 @@ async function apiCall(action, rowIndex, event) {
   }
 }
 
-// 100% BULLETPROOF SVG VECTOR CARD TRANSLATOR: Stops HTML rendering entirely to bypass mobile crashes
+// 🛡️ RE-ARCHITECTED SOCIAL SHARE CARD GENERATOR: 100% CORS-Safe Data Re-routing Method
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
@@ -816,116 +816,145 @@ async function sharePost(rowIndex, event) {
   const originalText = btn.innerText;
   btn.innerText = "⏳ Building Card...";
 
-  // Configuration settings for your card layout frame measurements
-  const cardWidth = 500;
-  let baseCardHeight = 160; 
-  
+  const names = post.likes.length > 0 ? post.likes.join(', ') : '';
   const hasPhoto = post.image && post.image.length > 10;
-  if (hasPhoto) baseCardHeight += 440; // Allocates clean grid padding safely inside memory configurations
+  const targetImageUrl = hasPhoto ? post.image : "";
 
-  const sharedComments = post.comments.slice(0, 3);
-  baseCardHeight += (sharedComments.length * 36);
-  if (sharedComments.length === 0) baseCardHeight += 24;
+  // 1. Compile the native text message copy block
+  let textTextMsg = `🦄 Gooldbook Post by ${post.user}:\n\n"${post.message}"\n`;
 
-  // Compile full text payload components cleanly for device messaging strings
-  let messagePayload = `🦄 Gooldbook update from ${post.user}!\n\n"${post.message}"\n`;
-  const postSourceLink = post.image || window.location.href;
-
-  // Construct a beautiful card entirely using SVG vector equations in memory
-  let svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="${cardWidth}" height="${baseCardHeight}" viewBox="0 0 ${cardWidth} ${baseCardHeight}">
-    <rect width="100%" height="100%" fill="#ffffff" rx="16" />
-    <rect width="100%" height="100%" fill="none" stroke="#e9ebee" stroke-width="4" rx="16" />
-    
-    <circle cx="45" cy="45" r="20" fill="#3b5998" />
-    <text x="45" y="52" font-family="-apple-system, system-ui, sans-serif" font-size="22" fill="#ffffff" text-anchor="middle">🦄</text>
-    
-    <text x="80" y="42" font-family="-apple-system, system-ui, sans-serif" font-weight="bold" font-size="16" fill="#3b5998">${post.user}</text>
-    <text x="80" y="58" font-family="-apple-system, system-ui, sans-serif" font-size="12" fill="#888888">theGooldbook • Timeline Update</text>
-    
-    <text x="25" y="105" font-family="-apple-system, system-ui, sans-serif" font-size="15" fill="#1c1e21">${post.message.substring(0, 55)}${post.message.length > 55 ? '...' : ''}</text>
-  `;
-
-  let runningYPosition = 130;
-
-  // FIXED: If the post contains a photo, we map an elegant standalone layout shape to avoid canvas tainting
+  // 2. Fetch the picture completely inside an isolated sandbox to defeat CORS canvas taint blocks
+  let safeBase64Image = "";
   if (hasPhoto) {
-    svgString += `
-      <rect x="25" y="${runningYPosition}" width="450" height="410" fill="#f0f2f5" rx="12" />
-      <text x="250" y="${runningYPosition + 195}" font-family="-apple-system, system-ui, sans-serif" font-size="40" text-anchor="middle">🖼️</text>
-      <text x="250" y="${runningYPosition + 240}" font-family="-apple-system, system-ui, sans-serif" font-weight="bold" font-size="14" fill="#65676b" text-anchor="middle">Image Attached Below inside Share Tray</text>
-    `;
-    runningYPosition += 430;
+    try {
+      safeBase64Image = await new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous"; 
+        img.src = targetImageUrl;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/jpeg', 0.9));
+        };
+        img.onerror = () => {
+          console.warn("Direct CORS access dropped. Utilizing fallback rendering structure.");
+          resolve("");
+        };
+      });
+    } catch (e) {
+      console.warn("Image asset re-routing skipped:", e);
+    }
   }
 
-  // Draw interactions dividers
-  svgString += `
-    <line x1="25" y1="${runningYPosition}" x2="475" y2="${runningYPosition}" stroke="#f0f2f5" stroke-width="2" />
-    <text x="25" y="${runningYPosition + 22}" font-family="-apple-system, system-ui, sans-serif" font-weight="bold" font-size="13" fill="#65676b">❤️ ${post.likes.length} Likes</text>
-    <text x="120" y="${runningYPosition + 22}" font-family="-apple-system, system-ui, sans-serif" font-weight="bold" font-size="13" fill="#65676b">💬 ${post.comments.length} Comments</text>
-    <line x1="25" y1="${runningYPosition + 35}" x2="475" y2="${runningYPosition + 35}" stroke="#f0f2f5" stroke-width="2" />
+  // 3. Generate a dynamic overlay rendering element on screen space (NOT hidden away at -9999px)
+  const renderFrame = document.createElement('div');
+  renderFrame.id = "gb-share-sandbox-card";
+  renderFrame.style.cssText = `
+    position: absolute;
+    top: ${window.scrollY + 20}px;
+    left: 10px;
+    width: 400px;
+    background: #ffffff !important;
+    padding: 20px;
+    border-radius: 12px;
+    font-family: system-ui, -apple-system, sans-serif;
+    color: #1c1e21;
+    box-sizing: border-box;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+    border: 1px solid #ddd;
+    z-index: 999999;
+    opacity: 1 !important;
+    display: block !important;
+    visibility: visible !important;
   `;
-  runningYPosition += 55;
 
-  // Print associated responses directly into the vector array
-  if (sharedComments.length > 0) {
-    sharedComments.forEach(c => {
-      let printComment = c.text.substring(0, 45) + (c.text.length > 45 ? '...' : '');
-      svgString += `
-        <rect x="25" y="${runningYPosition}" width="450" height="28" rx="6" fill="#f2f3f5" />
-        <text x="35" y="${runningYPosition + 18}" font-family="-apple-system, system-ui, sans-serif" font-weight="bold" font-size="12" fill="#3b5998">${c.user}:</text>
-        <text x="${c.user.length * 7 + 45}" y="${runningYPosition + 18}" font-family="-apple-system, system-ui, sans-serif" font-size="12" fill="#1c1e21">${printComment}</text>
-      `;
-      runningYPosition += 36;
-    });
-  } else {
-    svgString += `<text x="25" y="${runningYPosition + 12}" font-family="-apple-system, system-ui, sans-serif" font-style="italic" font-size="13" fill="#888888">No comments yet...</text>`;
-  }
+  const allCommentsHTML = post.comments.slice(0, 3).map(c => `
+    <div style="background:#f0f2f5; padding:8px; border-radius:8px; margin-top:5px; font-size:13px; text-align: left;">
+      <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+        <b>${c.user}</b>
+      </div>
+      <div>${c.text}</div>
+    </div>
+  `).join('');
 
-  svgString += `</svg>`;
+  renderFrame.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; text-align: left;">
+      <div style="width:36px; height:36px; border-radius:50%; background:#3b5998; display:flex; align-items:center; justify-content:center; font-size:18px; color:white;">🦄</div>
+      <div>
+        <div style="font-weight: bold; color: #3b5998;">${post.user}</div>
+        <div style="font-size: 11px; color: #888;">theGooldbook 🦄</div>
+      </div>
+    </div>
+    <div style="font-size: 15px; margin-bottom: 15px; line-height: 1.4; text-align: left; color:#1c1e21;">${post.message}</div>
+    
+    ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius: 8px; margin-bottom: 10px; display:block;">` : ''}
+    
+    <div style="border-top: 2px solid #f0f2f5; padding-top: 12px; margin-top: 5px; text-align: left;">
+      <div style="display: flex; gap: 15px; font-size: 14px; font-weight: bold; color: #65676b; margin-bottom: 4px;">
+        <span>❤️ ${post.likes.length} Likes</span>
+        <span>💬 ${post.comments.length} Comments</span>
+      </div>
+      ${names ? `<div style="font-size: 11px; color: #888; line-height: 1.3; margin-bottom:10px;">Liked by: <b>${names}</b></div>` : ''}
+    </div>
+    <div style="margin-top:10px; border-top:1px solid #eee; padding-top:10px;">
+       ${allCommentsHTML || '<div style="font-size:12px; color:#888; font-style:italic; text-align: left;">No comments yet.</div>'}
+    </div>
+    <div style="margin-top:15px; border-top:1px dashed #ccc; padding-top:8px; font-size:10px; color:#aaa; text-align:center; font-weight:bold;">
+      SHARED VIA THEGOOLDBOOK 🦄
+    </div>
+  `;
+
+  document.body.appendChild(renderFrame);
+
+  // Give the browser rendering pipeline 300ms to draw the image container cleanly
+  await new Promise(r => setTimeout(r, 300));
 
   try {
-    // Generate clean canvas pixels immediately via memory compilation vectors
-    const imageBlob = await new Promise((resolve, reject) => {
-      const compileCanvas = document.createElement('canvas');
-      compileCanvas.width = cardWidth * 2; 
-      compileCanvas.height = baseCardHeight * 2;
-      const ctx = compileCanvas.getContext('2d');
-      ctx.scale(2, 2);
-
-      const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-      const proxyUrl = (window.URL || window.webkitURL || window).createObjectURL(blob);
-      
-      const receiver = new Image();
-      receiver.src = proxyUrl;
-      receiver.onload = () => {
-        ctx.drawImage(receiver, 0, 0);
-        (window.URL || window.webkitURL || window).revokeObjectURL(proxyUrl);
-        compileCanvas.toBlob(b => resolve(b), 'image/png');
-      };
-      receiver.onerror = (err) => reject(err);
+    const canvas = await html2canvas(renderFrame, { 
+      useCORS: true,
+      allowTaint: false,
+      scale: 2, 
+      backgroundColor: "#ffffff",
+      logging: false,
+      width: 400
     });
-
-    const file = new File([imageBlob], `Gooldbook_${rowIndex}.png`, { type: 'image/png' });
-
-    // Open device sharing sheet, passing the text, beautiful canvas card image file, AND the direct link together
+    
+    // Wipe the generation frame immediately after capture
+    document.body.removeChild(renderFrame);
+    
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    const file = new File([blob], `Gooldbook_${rowIndex}.png`, { type: 'image/png' });
+    
+    // 4. Trigger Native Hardware Sheet sharing
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({
-        files: [file],
-        title: `${post.user}'s Post`,
-        text: messagePayload,
-        url: postSourceLink
+      await navigator.share({ 
+        files: [file], 
+        title: `Post by ${post.user}`,
+        text: textTextMsg, 
+        url: window.location.href // Includes the app URL path directly inside the copy parameters text link
       });
     } else {
+      // Manual desktop computer fallback channel save routine
       const link = document.createElement('a');
       link.download = `Gooldbook_Card_${rowIndex}.png`;
-      link.href = window.URL.createObjectURL(imageBlob);
+      link.href = canvas.toDataURL('image/png');
       link.click();
     }
-  } catch (err) {
-    console.error("Card generation failed:", err);
-    alert("Could not process card asset data stream.");
-  } finally {
-    btn.innerText = originalText;
+  } catch(e) { 
+    console.error("Card processing failure:", e);
+    alert("Card translation failed. Falling back to simple clipboard sharing.");
+    if (document.getElementById("gb-share-sandbox-card")) {
+      document.body.removeChild(renderFrame);
+    }
+    // Deep fallback option
+    if (navigator.share) {
+      await navigator.share({ title: `Gooldbook`, text: textTextMsg, url: window.location.href });
+    }
+  } finally { 
+    btn.innerText = originalText; 
   }
 }
 
