@@ -329,35 +329,46 @@ function applyImageCropAndFilter() {
       modificationAmount = scanlineDrop + subtleNoise;
     } 
     
-    else if (chosenFilterStyleName === 'technopunk') {
-      // Calculate a gritty, high-contrast grayscale base
+      else if (chosenFilterStyleName === 'technopunk') {
+      // 1. Calculate a gritty, high-contrast grayscale base
       let luminance = (r * 0.299) + (g * 0.587) + (b * 0.114);
       
-      // Push the contrast heavily (darks darker, brights brighter)
-      let gray = luminance < 128 ? (luminance * 0.7) : (luminance * 1.4);
+      // Crank the contrast heavily (darks dive, brights surge)
+      let gray = luminance < 128 ? (luminance * 0.6) : (luminance * 1.5);
       gray = Math.min(255, Math.max(0, gray));
 
-      // Identify highlight channels for neon accents
-      if (luminance > 165 && (Math.abs(r - g) > 10 || g > 150)) {
-        r = 0;        
-        g = 255;      
-        b = 200;      
+      // 2. Multi-Channel Neon Highlight Accent Engine
+      // Check if the pixel has a distinct, strong color bias or high intensity
+      let colorIntensity = Math.max(r, g, b) - Math.min(r, g, b);
+
+      if (colorIntensity > 35 || luminance > 170) {
+        if (r > b && r > g) {
+          // 🔥 NEON PINK/MAGENTA ACCENT (For red/warm tones)
+          r = 255;
+          g = 0;
+          b = 180;
+        } else if (b > r) {
+          // 💎 ELECTRIC NEON CYAN/BLUE ACCENT (For blue/cool tones)
+          r = 0;
+          g = 230;
+          b = 255;
+        } else {
+          // ⚡ RADIOACTIVE NEON GREEN ACCENT (For bright midtones/yellows/greens)
+          r = 50;
+          g = 255;
+          b = 0;
+        }
       } else {
+        // Otherwise, compress it into the gritty street-style black and white mix
         r = gray;
         g = gray;
         b = gray;
       }
 
-      // Add cybernetic digital noise grain
+      // 3. Inject a heavy layer of digital matrix noise grain
       modificationAmount = (Math.random() - 0.5) * 35;
     }
-
-    // Apply adjustments and clamp color values between 0 and 255
-    pixels[i]     = Math.min(255, Math.max(0, r + modificationAmount));     
-    pixels[i + 1] = Math.min(255, Math.max(0, g + modificationAmount)); 
-    pixels[i + 2] = Math.min(255, Math.max(0, b + modificationAmount)); 
-  }
-  
+ 
   // 3. Bake modified data back into destination canvas
   outContext.putImageData(imgData, 0, 0);
   
