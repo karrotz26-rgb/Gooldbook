@@ -836,25 +836,26 @@ async function apiCall(action, rowIndex, event) {
   }
 }
 
-// 🛡️ RE-ARCHITECTED AUTOMATIC CLIPBOARD COPY SHARING ENGINE
+// 🦄 RE-ARCHITECTED NATIVE IOS SHARE SHEET ENGINE
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
   const btn = event.target; 
   const originalText = btn.innerText;
-  btn.innerText = "⏳ Copying Card...";
+  btn.innerText = "⏳ Preparing Card...";
 
   const names = post.likes.length > 0 ? post.likes.join(', ') : '';
   const hasPhoto = post.image && post.image.length > 10;
   const targetImageUrl = hasPhoto ? post.image : "";
 
-  let textTextMsg = `🦄 Gooldbook Post by ${post.user}:\n\n"${post.message}"\n\nLink: ${post.image || window.location.href}`;
+  // Plain text baseline backup string formatting
+  let textTextMsg = `🦄 Gooldbook Post by ${post.user}:\n\n"${post.message}"`;
 
   try {
-    // 1. Convert image safely. If CORS proxy is blocked, it defaults gracefully to empty string
+    // 1. Process base64 proxies for the target assets cleanly
     const safeBase64Image = await base64CacheProxy(targetImageUrl);
 
-    // 2. Set up the design workspace element outside the user view port safely
+    // 2. Set up the design workspace container outside visible layouts
     const renderFrame = document.createElement('div');
     renderFrame.style.cssText = `
       position: fixed;
@@ -885,7 +886,7 @@ async function sharePost(rowIndex, event) {
       </div>
       <div style="font-size: 15px; margin-bottom: 15px; line-height: 1.4; text-align: left; color:#1c1e21;">${post.message}</div>
       
-      ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius: 8px; margin-bottom: 10px; display:block;">` : (hasPhoto ? `<p style="font-size:11px; color:#888;">🖼️ view image online: ${targetImageUrl}</p>` : '')}
+      ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius: 8px; margin-bottom: 10px; display:block;">` : ''}
       
       <div style="border-top: 2px solid #f0f2f5; padding-top: 12px; margin-top: 5px; text-align: left;">
         <div style="display: flex; gap: 15px; font-size: 14px; font-weight: bold; color: #65676b; margin-bottom: 4px;">
@@ -902,7 +903,7 @@ async function sharePost(rowIndex, event) {
 
     document.body.appendChild(renderFrame);
 
-    // 3. Render container layout properties to image canvas block explicitly bypassing cross-origin tainting crashes
+    // 3. Compile design data layouts into native canvas elements
     const canvas = await html2canvas(renderFrame, { 
       useCORS: true,
       allowTaint: false,
@@ -914,25 +915,37 @@ async function sharePost(rowIndex, event) {
     
     document.body.removeChild(renderFrame);
     
-    // 4. Transform output data to binary PNG blobs and copy directly to the system clipboard
+    // 4. Output canvas graphics map layout objects directly to File Blobs
     const imageBlob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-    
-    await navigator.clipboard.write([
-      new ClipboardItem({
-        [imageBlob.type]: imageBlob
-      })
-    ]);
-    
-    alert("✨ Branded card image copied to your clipboard automatically! Just open any chat window and tap Paste.");
+    const sharedFile = new File([imageBlob], `Gooldbook_Card_${rowIndex}.png`, { type: 'image/png' });
+
+    // 5. Intercept capability requirements and invoke the native iOS Sharing Sheets
+    if (navigator.canShare && navigator.canShare({ files: [sharedFile] })) {
+      await navigator.share({
+        files: [sharedFile],
+        title: 'TheGooldbook Post',
+        text: textTextMsg
+      });
+    } else {
+      // Fallback if the specific iOS wrapper lacks structural file parsing properties
+      throw new Error("Native file sharing unavailable via runtime environment properties.");
+    }
 
   } catch(e) { 
-    console.error("Clipboard write blocked:", e);
-    // Plaintext clipboard fallback sequence if browser rejects programmatic image injections
+    console.error("iOS Sharing initialization halted:", e);
+    
+    // Fall back to native text string messaging if things break
     try {
-      await navigator.clipboard.writeText(textTextMsg);
-      alert("📋 Image write dropped by device settings. Post text contents copied instead!");
-    } catch(txtErr) {
-      alert("System clipboard write access rejected.");
+      if (navigator.share) {
+        await navigator.share({
+          title: 'TheGooldbook Post',
+          text: textTextMsg + `\n\nLink: ${post.image || window.location.href}`
+        });
+      } else {
+        alert("Sharing properties rejected by security settings context.");
+      }
+    } catch(textErr) {
+      alert("Sharing initialization declined by system parameters.");
     }
   } finally { 
     btn.innerText = originalText; 
