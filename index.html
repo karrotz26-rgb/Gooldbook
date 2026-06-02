@@ -378,7 +378,7 @@ async function loadFeed() {
 
 async function pollForUpdates() {
   const isTyping = document.activeElement.tagName === 'INPUT' || 
-                   document.activeElement.tagName === 'TEXTAREA'; // Restored safely to tagName to keep background polling perfectly alive
+                   document.activeElement.tagName === 'TEXTAREA';
   
   if (isTyping) return; 
 
@@ -808,22 +808,36 @@ async function apiCall(action, rowIndex, event) {
   }
 }
 
-// 🛡️ RE-ARCHITECTED SOCIAL SHARE CARD GENERATOR: 100% CORS-Safe Data Re-routing Method
+// 🔥 CRITICAL RE-ENGINEERING: Instant Activation Share System (Guarantees Native Menu Popup)
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
   const btn = event.target; 
   const originalText = btn.innerText;
-  btn.innerText = "⏳ Building Card...";
+  
+  // Create share payloads immediately before starting asynchronous tasks
+  let textTextMsg = `🦄 Gooldbook Post by ${post.user}:\n\n"${post.message}"\n`;
+  const postUrl = post.image || window.location.href;
 
+  // 1. FIRST STEP: Open the browser's share sheet instantly using text parameters to secure user activation approval
+  let activeSharePromise = null;
+  if (navigator.share) {
+    btn.innerText = "⏳ Processing...";
+    // We pass the baseline parameters right away so mobile browsers don't think it's a security violation
+    activeSharePromise = navigator.share({
+      title: `Gooldbook - ${post.user}`,
+      text: textTextMsg,
+      url: window.location.href // Fallback base layout URL
+    }).catch(e => {
+      console.log("Initial menu layer bypassed or replaced.");
+    });
+  }
+
+  // 2. BACKGROUND STEP: Silently generate your card asset file layout on desktop fallback paths
   const names = post.likes.length > 0 ? post.likes.join(', ') : '';
   const hasPhoto = post.image && post.image.length > 10;
   const targetImageUrl = hasPhoto ? post.image : "";
 
-  // 1. Compile the native text message copy block
-  let textTextMsg = `🦄 Gooldbook Post by ${post.user}:\n\n"${post.message}"\n`;
-
-  // 2. Fetch the picture completely inside an isolated sandbox to defeat CORS canvas taint blocks
   let safeBase64Image = "";
   if (hasPhoto) {
     try {
@@ -839,120 +853,68 @@ async function sharePost(rowIndex, event) {
           ctx.drawImage(img, 0, 0);
           resolve(canvas.toDataURL('image/jpeg', 0.9));
         };
-        img.onerror = () => {
-          console.warn("Direct CORS access dropped. Utilizing fallback rendering structure.");
-          resolve("");
-        };
+        img.onerror = () => resolve("");
       });
-    } catch (e) {
-      console.warn("Image asset re-routing skipped:", e);
-    }
+    } catch (e) {}
   }
 
-  // 3. Generate a dynamic overlay rendering element on screen space (NOT hidden away at -9999px)
+  // Create physical visualization container structure dynamically
   const renderFrame = document.createElement('div');
-  renderFrame.id = "gb-share-sandbox-card";
-  renderFrame.style.cssText = `
-    position: absolute;
-    top: ${window.scrollY + 20}px;
-    left: 10px;
-    width: 400px;
-    background: #ffffff !important;
-    padding: 20px;
-    border-radius: 12px;
-    font-family: system-ui, -apple-system, sans-serif;
-    color: #1c1e21;
-    box-sizing: border-box;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.15);
-    border: 1px solid #ddd;
-    z-index: 999999;
-    opacity: 1 !important;
-    display: block !important;
-    visibility: visible !important;
-  `;
+  renderFrame.style.cssText = "position:absolute; top:0; left:0; width:400px; background:#fff; padding:20px; border-radius:12px; font-family:sans-serif; color:#1c1e21; box-sizing:border-box; z-index:-99999; visibility:hidden; overflow:hidden; height:0;";
 
   const allCommentsHTML = post.comments.slice(0, 3).map(c => `
     <div style="background:#f0f2f5; padding:8px; border-radius:8px; margin-top:5px; font-size:13px; text-align: left;">
-      <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
-        <b>${c.user}</b>
-      </div>
-      <div>${c.text}</div>
+      <b>${c.user}</b>: ${c.text}
     </div>
   `).join('');
 
   renderFrame.innerHTML = `
-    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; text-align: left;">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:15px;">
       <div style="width:36px; height:36px; border-radius:50%; background:#3b5998; display:flex; align-items:center; justify-content:center; font-size:18px; color:white;">🦄</div>
-      <div>
-        <div style="font-weight: bold; color: #3b5998;">${post.user}</div>
-        <div style="font-size: 11px; color: #888;">theGooldbook 🦄</div>
-      </div>
+      <div><b>${post.user}</b><div style="font-size:11px; color:#888;">theGooldbook</div></div>
     </div>
-    <div style="font-size: 15px; margin-bottom: 15px; line-height: 1.4; text-align: left; color:#1c1e21;">${post.message}</div>
-    
-    ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius: 8px; margin-bottom: 10px; display:block;">` : ''}
-    
-    <div style="border-top: 2px solid #f0f2f5; padding-top: 12px; margin-top: 5px; text-align: left;">
-      <div style="display: flex; gap: 15px; font-size: 14px; font-weight: bold; color: #65676b; margin-bottom: 4px;">
-        <span>❤️ ${post.likes.length} Likes</span>
-        <span>💬 ${post.comments.length} Comments</span>
-      </div>
-      ${names ? `<div style="font-size: 11px; color: #888; line-height: 1.3; margin-bottom:10px;">Liked by: <b>${names}</b></div>` : ''}
+    <div style="font-size:15px; margin-bottom:15px; text-align:left;">${post.message}</div>
+    ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:8px; margin-bottom:10px;">` : ''}
+    <div style="border-top:2px solid #f0f2f5; padding-top:12px; font-size:14px; font-weight:bold; color:#65676b;">
+      ❤️ ${post.likes.length} Likes • 💬 ${post.comments.length} Comments
     </div>
-    <div style="margin-top:10px; border-top:1px solid #eee; padding-top:10px;">
-       ${allCommentsHTML || '<div style="font-size:12px; color:#888; font-style:italic; text-align: left;">No comments yet.</div>'}
-    </div>
-    <div style="margin-top:15px; border-top:1px dashed #ccc; padding-top:8px; font-size:10px; color:#aaa; text-align:center; font-weight:bold;">
-      SHARED VIA THEGOOLDBOOK 🦄
-    </div>
+    <div style="margin-top:10px;">${allCommentsHTML}</div>
   `;
 
   document.body.appendChild(renderFrame);
 
-  // Give the browser rendering pipeline 300ms to draw the image container cleanly
-  await new Promise(r => setTimeout(r, 300));
-
   try {
     const canvas = await html2canvas(renderFrame, { 
-      useCORS: true,
-      allowTaint: false,
-      scale: 2, 
-      backgroundColor: "#ffffff",
-      logging: false,
-      width: 400
+      useCORS: true, allowTaint: false, scale: 2, backgroundColor: "#ffffff", logging: false, width: 400
     });
     
-    // Wipe the generation frame immediately after capture
     document.body.removeChild(renderFrame);
-    
-    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-    const file = new File([blob], `Gooldbook_${rowIndex}.png`, { type: 'image/png' });
-    
-    // 4. Trigger Native Hardware Sheet sharing
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ 
-        files: [file], 
-        title: `Post by ${post.user}`,
-        text: textTextMsg, 
-        url: window.location.href // Includes the app URL path directly inside the copy parameters text link
-      });
-    } else {
-      // Manual desktop computer fallback channel save routine
+
+    // If we are on laptop/desktop, trigger the file download instantly
+    if (!navigator.share) {
       const link = document.createElement('a');
-      link.download = `Gooldbook_Card_${rowIndex}.png`;
+      link.download = `Gooldbook_${rowIndex}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
+      btn.innerText = originalText;
+      return;
+    }
+
+    // 3. MOBILE SYSTEM RESOLUTION: If it's a mobile phone, prompt a secondary rich package share option containing the real PNG file
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    const file = new File([blob], `Gooldbook_${rowIndex}.png`, { type: 'image/png' });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      // Fires the deep-layer file transfer menu smoothly
+      await navigator.share({ 
+        files: [file], 
+        title: `${post.user}'s Post`,
+        text: textTextMsg, 
+        url: postUrl
+      });
     }
   } catch(e) { 
-    console.error("Card processing failure:", e);
-    alert("Card translation failed. Falling back to simple clipboard sharing.");
-    if (document.getElementById("gb-share-sandbox-card")) {
-      document.body.removeChild(renderFrame);
-    }
-    // Deep fallback option
-    if (navigator.share) {
-      await navigator.share({ title: `Gooldbook`, text: textTextMsg, url: window.location.href });
-    }
+    console.error("Card fallback triggered:", e);
   } finally { 
     btn.innerText = originalText; 
   }
