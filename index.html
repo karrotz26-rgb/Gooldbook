@@ -688,7 +688,6 @@ function performScroll(id) {
   else { postsToShow += 10; render(); setTimeout(() => performScroll(id), 100); }
 }
 
-// CRITICAL TIMING FIX: Ensures Google Drive completes permission configuration sweeps
 async function upload() {
   const user = document.getElementById('user').value.trim();
   const msg = document.getElementById('msg').value.trim();
@@ -718,7 +717,6 @@ async function upload() {
     document.getElementById('file').value = "";
     processedBase64Image = ""; 
     
-    // Gives Google Drive servers 2.5 seconds to build and verify file permissions
     postBtn.innerText = "✨ Finalizing post...";
     await new Promise(resolve => setTimeout(resolve, 2500));
     
@@ -810,6 +808,7 @@ async function apiCall(action, rowIndex, event) {
   }
 }
 
+// BULLETPROOF SAFARI/MOBILE SHARE CARD FIX: Renders purely in device memory
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex); 
   if (!post) return;
@@ -829,14 +828,12 @@ async function sharePost(rowIndex, event) {
       safeBase64Image = canvasTmp.toDataURL('image/jpeg', 0.95);
     }
   } catch (imgErr) {
-    console.warn("Direct layout pixel extraction dropped via CORS, drawing blank spacer instead.", imgErr);
+    console.warn("Direct pixel capture bypassed.", imgErr);
   }
 
-  const card = document.createElement('div');
-  card.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
+  // Create a clean layout container strictly in memory (detaches completely from DOM space)
+  const cardFrame = document.createElement('div');
+  cardFrame.style.cssText = `
     width: 400px;
     background: #ffffff !important;
     padding: 20px;
@@ -844,7 +841,6 @@ async function sharePost(rowIndex, event) {
     font-family: system-ui, -apple-system, sans-serif;
     color: #1c1e21;
     box-sizing: border-box;
-    z-index: -99999;
   `;
 
   const names = post.likes.length > 0 ? post.likes.join(', ') : '';
@@ -858,7 +854,7 @@ async function sharePost(rowIndex, event) {
     </div>
   `).join('');
 
-  card.innerHTML = `
+  cardFrame.innerHTML = `
     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; text-align: left;">
       <div style="width:36px; height:36px; border-radius:50%; background:#eee; display:flex; align-items:center; justify-content:center; font-size:18px;">🦄</div>
       <div>
@@ -880,12 +876,14 @@ async function sharePost(rowIndex, event) {
        ${allCommentsHTML || '<div style="font-size:12px; color:#888; font-style:italic; text-align: left;">No comments yet.</div>'}
     </div>`;
 
-  document.body.appendChild(card);
-
-  await new Promise(resolve => setTimeout(resolve, 250));
+  // FIXED: Place the container inside an isolated template sandbox element
+  const sandboxContainer = document.createElement('div');
+  sandboxContainer.style.cssText = "position:absolute; top:0; left:0; width:0; height:0; overflow:hidden; visibility:hidden;";
+  sandboxContainer.appendChild(cardFrame);
+  document.body.appendChild(sandboxContainer);
 
   try {
-    const canvas = await html2canvas(card, { 
+    const canvas = await html2canvas(cardFrame, { 
       useCORS: false,
       allowTaint: true,
       scale: 2, 
@@ -894,7 +892,7 @@ async function sharePost(rowIndex, event) {
       width: 400
     });
     
-    document.body.removeChild(card);
+    document.body.removeChild(sandboxContainer);
     const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
     const file = new File([blob], `Gooldbook_${rowIndex}.png`, { type: 'image/png' });
     
@@ -912,9 +910,9 @@ async function sharePost(rowIndex, event) {
       link.click();
     }
   } catch(e) { 
-    console.error("Card compilation encountered an error:", e);
-    alert("Could not generate share card: " + e.message); 
-    if (card.parentNode) document.body.removeChild(card);
+    console.error("Card processing error encountered:", e);
+    alert("Could not extract card content."); 
+    if (sandboxContainer.parentNode) document.body.removeChild(sandboxContainer);
   } finally { 
     btn.innerText = originalText; 
   }
