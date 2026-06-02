@@ -375,20 +375,41 @@ async function applyImageCropAndFilter() {
         modificationAmount = scanlineDrop + subtleNoise;
       } 
       else if (chosenFilterStyleName === 'technopunk') {
+        // 1. Calculate a crisp grayscale base value
         let luminance = (r * 0.299) + (g * 0.587) + (b * 0.114);
-        let gray = luminance < 128 ? (luminance * 0.4) : (luminance * 1.6);
+        
+        // Heavy street-photography contrast adjustment
+        let gray = luminance < 128 ? (luminance * 0.5) : (luminance * 1.6);
         gray = Math.min(255, Math.max(0, gray));
+
+        // 2. Multi-Channel Neon Highlight Accent Engine
         let colorIntensity = Math.max(r, g, b) - Math.min(r, g, b);
 
-        if (colorIntensity > 20 || luminance > 190) {
-          if (r > g && r > b) {
-            r = 255; g = 0; b = 140;
+        // 🔥 FORCED HIGHLIGHT SHIFT: Forces color targets to blaze out across every image context
+        if (colorIntensity > 35 || luminance > 170) {
+          if (r > b && r > g) {
+            // Warm tones transform directly to vibrant Hot Neon Pink
+            r = 255;
+            g = 0;
+            b = 180;
+          } else if (b > r) {
+            // Cool tones drop directly to Cyber Neon Cyan
+            r = 0;
+            g = 230;
+            b = 255;
           } else {
-            r = 0; g = 230; b = 255;
+            // Mid-bright frames become Radioactive Neon Green
+            r = 50;
+            g = 255;
+            b = 0;
           }
         } else {
-          r = gray; g = gray; b = gray;
+          r = gray;
+          g = gray;
+          b = gray;
         }
+
+        // 3. Inject matrix grid background static grain noise
         modificationAmount = (Math.random() - 0.5) * 35;
       }
 
@@ -706,7 +727,7 @@ function render() {
       let toggleLabelHTML = "";
       if(totalCommentsCount > 2) { toggleLabelHTML = `<div id="toggle-label-${p.rowIndex}" style="color:var(--gb-blue); font-size:12px; font-weight:bold; margin-top:8px; cursor:pointer;" onclick="toggleCommentsVisibility(${p.rowIndex})">💬 View all ${totalCommentsCount} comments</div>`; }
 
-      return `<div class="card" id="post-${p.rowIndex}"><div class="user-header">${getAvatarMarkup(p.user, 'avatar-small')}<div class="user-info"><div style="display:flex; align-items:center;"><span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span>${likeBadge}</div><span class="time-stamp">${timeAgo(p.timestamp)}</span></div></div><p style="margin:10px 0;">${highlightHashtags(p.message)}</p>${mediaHTML}<div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;"><div style="display:flex; gap:10px; align-items:center;"><button class="like-btn btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} <span>${p.likes.length}</span></button><button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button></div><div class="liked-by-container" style="font-size:11px; color:#65676b; margin-left:5px; line-height:1.4; display: ${p.likes.length > 0 ? 'block' : 'none'};">Liked by: <span class="liked-by-list">${likeNames}</span></div></div><div class="comment-section" style="margin-top:10px;"><div class="comments-list">${initialComments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">${timeAgo(c.time)}</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}${toggleLabelHTML}<div id="comments-tray-${p.rowIndex}" style="display:none;">${hiddenComments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">${timeAgo(c.time)}</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}</div></div><div style="margin-top:10px"><input id="c-${p.rowIndex}" placeholder="Reply..." style="margin-bottom:0; font-size:13px!important;"><button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button></div></div></div>`;
+      return `<div class="card" id="post-${p.rowIndex}"><div class="user-header">${getAvatarMarkup(p.user, 'avatar-small')}<div class="user-info"><div style="display:flex; align-items:center;"><span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span>${likeBadge}</div><span class="time-stamp">${timeAgo(p.timestamp)}</span></div></div><p style="margin:10px 0;">${highlightHashtags(p.message)}</p>${mediaHTML}<div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;"><div style="display:flex; gap:10px; align-items:center;"><button class="like-btn btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} <span>${p.likes.length}</span></button><button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button></div><div class="liked-by-container" style="font-size:11px; color:#65676b; margin-left:5px; line-height:1.4; display: ${p.likes.length > 0 ? 'block' : 'none'};">Liked by: <span class="liked-by-list">${likeNames}</span></div></div><div class="comment-section" style="margin-top:10px;"><div class="comments-list">${initialComments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">timeAgo(c.time)</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}${toggleLabelHTML}<div id="comments-tray-${p.rowIndex}" style="display:none;">${hiddenComments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">timeAgo(c.time)</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}</div></div><div style="margin-top:10px"><input id="c-${p.rowIndex}" placeholder="Reply..." style="margin-bottom:0; font-size:13px!important;"><button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button></div></div></div>`;
     } catch (err) { console.error("Error rendering post:", err); return `<div class="card">Error loading this post.</div>`; }
   }).join('');
 
