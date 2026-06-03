@@ -593,7 +593,6 @@ function render() {
 
   feedEl.innerHTML = feedHTML || '<div class="card">No posts found.</div>';
   
-  // FIX: Dynamically show/hide the button depending on whether more hidden filtered items exist
   if (postsToShow < totalInFilter) {
     document.getElementById('loadMore').style.display = 'block';
   } else {
@@ -899,7 +898,7 @@ function updateAndRenderStreak() {
   const streakCard = document.getElementById('streakCard');
   
   if (!user) {
-    if(streakCard) streakCard.style.display = 'none';
+    if (streakCard) streakCard.style.display = 'none';
     return;
   }
   
@@ -910,15 +909,12 @@ function updateAndRenderStreak() {
   const lastActiveDateStr = localStorage.getItem(lastDateKey);
   const todayStr = new Date().toDateString(); 
   
-  if (lastActiveDateStr === todayStr && currentStreak > 0) {
-  // FIX: This now displays your active day count alongside the success message!
-  statusEl.innerText = `Streak active: ${currentStreak} Day${currentStreak > 1 ? 's' : ''}! Today is safe! 🎉`;
-  statusEl.style.color = "#2ecc71";
-} else {
-  statusEl.innerText = "Post, like, or reply to grow your streak!";
-  statusEl.style.color = "#e67e22";
-}
-
+  if (lastActiveDateStr) {
+    const lastDate = new Date(lastActiveDateStr);
+    const today = new Date(todayStr);
+    const diffTime = today - lastDate;
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
     if (diffDays > 1) {
       currentStreak = 0; 
       localStorage.setItem(streakKey, "0");
@@ -926,13 +922,13 @@ function updateAndRenderStreak() {
   }
   
   const targetCountEl = document.getElementById('streakCount');
-  if(targetCountEl) targetCountEl.innerText = currentStreak;
-  if(streakCard) streakCard.style.display = 'flex';
+  if (targetCountEl) targetCountEl.innerText = currentStreak;
+  if (streakCard) streakCard.style.display = 'flex';
   
   const statusEl = document.getElementById('streakStatus');
-  if(statusEl) {
+  if (statusEl) {
     if (lastActiveDateStr === todayStr && currentStreak > 0) {
-      statusEl.innerText = "Today's streak safe! 🎉";
+      statusEl.innerText = `Streak active: ${currentStreak} Day${currentStreak > 1 ? 's' : ''}! Today is safe! 🎉`;
       statusEl.style.color = "#2ecc71";
     } else {
       statusEl.innerText = "Post, like, or reply to grow your streak!";
