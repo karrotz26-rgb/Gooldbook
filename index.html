@@ -177,6 +177,7 @@
     </div>
 
     <div class="sidebar-card"><b>🔍 Search Feed</b><input id="searchBar" placeholder="Filter posts..." oninput="render()"></div>
+    <div id="streakLeaderboard"></div>
     <div id="leaderboard"></div>
     <div id="hashtags"></div>
     <div id="trending"></div>
@@ -199,10 +200,11 @@
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz8rUmKEEbz18NPItXFL3D-i-aZ6iI4qIngUcrZJuQXmNlGf9uyD069cE76vVFEr56g/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwC3Y-KDgg_ZLRarL7y8BDxGCTvRpsbro8ujaLPPo2H8KnxNTtXKIrvO2hp2Ts_dvNp/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let incomingPostsCache = null; 
 let allBios = {}, allAvatars = {};
+let allStreaks = []; 
 let postsToShow = 10;
 let filterType = null, filterVal = null;
 let lastPostCount = allPosts.length;
@@ -347,6 +349,7 @@ async function loadFeed() {
     allPosts = data.posts || [];
     allBios = data.bios || {};
     allAvatars = data.avatars || {};
+    allStreaks = data.streaks || []; 
     localStorage.setItem("gb_cache", JSON.stringify(allPosts));
     lastPostCount = allPosts.length;
     incomingPostsCache = null;
@@ -381,6 +384,7 @@ async function pollForUpdates() {
       allPosts = newPosts;
       allBios = data.bios || {};
       allAvatars = data.avatars || {};
+      allStreaks = data.streaks || [];
       lastPostCount = newPosts.length;
       render();
     }
@@ -392,6 +396,7 @@ function acceptNewPosts() {
     allPosts = incomingPostsCache.posts || [];
     allBios = incomingPostsCache.bios || {};
     allAvatars = incomingPostsCache.avatars || {};
+    allStreaks = incomingPostsCache.streaks || [];
     localStorage.setItem("gb_cache", JSON.stringify(allPosts));
     lastPostCount = allPosts.length;
     incomingPostsCache = null;
@@ -602,11 +607,18 @@ function render() {
 function updateSidebar() {
   const myName = document.getElementById('user').value.trim();
   document.getElementById('myProfileLink').innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', '${myName}')">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
+  
   const topPosts = [...allPosts].sort((a,b) => ((b.likes?.length||0)+(b.comments?.length||0)) - ((a.likes?.length||0)+(a.comments?.length||0))).slice(0,3);
   document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b><br>${topPosts.map(p => `<div class="sidebar-item" onclick="scrollToPost(${p.rowIndex})"><div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div><div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div><span class="trend-stats">❤️ ${p.likes.length} • 💬 ${p.comments.length}</span></div>`).join('')}</div>`;
+  
   const lCounts = {}; allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
   const topLikers = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
   document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${topLikers.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
+  
+  // LEADERBOARD DRAW COMPONENT
+  const sortedStreaks = [...allStreaks].sort((a, b) => b.streak - a.streak).slice(0, 3);
+  document.getElementById('streakLeaderboard').innerHTML = `<div class="sidebar-card"><b style="color: #d35400;">👑 Top Streaks</b><br>${sortedStreaks.map((s, i) => `<div class="sidebar-item" onclick="setFilter('author','${s.user}')">${i===0?'👑':i===1?'🔥':'✨'} ${s.user} — <b>${s.streak} Days</b></div>`).join('') || '<div style="color:#888; font-size:11px; padding:4px 0;">No active family streaks yet!</div>'}</div>`;
+
   const hCounts = {}; allPosts.forEach(p => { const tags = ((p.message||"") + " " + p.comments.map(c=>c.text).join(" ")).match(/#(\w+)/g) || []; tags.forEach(t => { const ct = t.toLowerCase().trim(); hCounts[ct] = (hCounts[ct]||0)+1; }); });
   const topTags = Object.entries(hCounts).sort((a,b) => b[1] - a[1]).slice(0, 8);
   document.getElementById('hashtags').innerHTML = `<div class="sidebar-card"><b>#️⃣ Trending Tags</b><div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">${topTags.map(([tag, count]) => `<div class="sidebar-item" style="background: #f0f2f5; padding: 5px 10px; border-radius: 15px; font-size: 12px; cursor: pointer;" onclick="setFilter('hashtag','${tag}')"><span style="color:var(--gb-hover); font-weight:bold;">${tag}</span> <span style="color:#888; font-size: 10px;">${count}</span></div>`).join('') || 'None'}</div></div>`;
@@ -622,10 +634,26 @@ async function upload() {
   const postBtn = document.getElementById('postBtn');
   postBtn.innerText = "⏳ Uploading...";
   postBtn.disabled = true;
+  
+  // Increments streak on local device memory right before packaging
+  triggerStreakIncrement();
+  const currentLocalStreak = localStorage.getItem(`gb_streak_${user}`) || "1";
+  
   const imgPayload = (processedBase64Image && processedBase64Image.startsWith("data:image")) ? processedBase64Image : "";
   try {
-    await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'post', username: user, message: msg, image: imgPayload }) });
-    triggerStreakIncrement();
+    // Bundles streak variable seamlessly into the existing update payload schema
+    await fetch(SCRIPT_URL, { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
+      body: JSON.stringify({ 
+        action: 'post', 
+        username: user, 
+        message: msg, 
+        image: imgPayload, 
+        streak: currentLocalStreak 
+      }) 
+    });
+    
     document.getElementById('msg').value = ""; document.getElementById('file').value = ""; processedBase64Image = ""; 
     postBtn.innerText = "✨ Finalizing post...";
     await new Promise(resolve => setTimeout(resolve, 2500));
@@ -870,7 +898,7 @@ function saveUser() {
   updateAndRenderStreak();
 }
 
-// STREAK TRACKING ARCHITECTURE FUNCTIONS
+// LOGIC MANAGEMENT ENGINE
 function updateAndRenderStreak() {
   const user = document.getElementById('user').value.trim();
   const streakCard = document.getElementById('streakCard');
