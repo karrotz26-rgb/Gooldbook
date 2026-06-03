@@ -200,7 +200,7 @@
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwC3Y-KDgg_ZLRarL7y8BDxGCTvRpsbro8ujaLPPo2H8KnxNTtXKIrvO2hp2Ts_dvNp/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwZ_Wx_ec91YH-eF_fHm51mcrRid_nYw57LhJ69tXE4dm4n_G5cKFwuDpVJIpXkss02/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let incomingPostsCache = null; 
 let allBios = {}, allAvatars = {};
@@ -615,7 +615,7 @@ function updateSidebar() {
   const topLikers = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
   document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${topLikers.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
   
-  // LEADERBOARD DRAW COMPONENT
+  // LEADERBOARD RENDER SYSTEM
   const sortedStreaks = [...allStreaks].sort((a, b) => b.streak - a.streak).slice(0, 3);
   document.getElementById('streakLeaderboard').innerHTML = `<div class="sidebar-card"><b style="color: #d35400;">👑 Top Streaks</b><br>${sortedStreaks.map((s, i) => `<div class="sidebar-item" onclick="setFilter('author','${s.user}')">${i===0?'👑':i===1?'🔥':'✨'} ${s.user} — <b>${s.streak} Days</b></div>`).join('') || '<div style="color:#888; font-size:11px; padding:4px 0;">No active family streaks yet!</div>'}</div>`;
 
@@ -635,13 +635,13 @@ async function upload() {
   postBtn.innerText = "⏳ Uploading...";
   postBtn.disabled = true;
   
-  // Increments streak on local device memory right before packaging
+  // Increments streak locally before compilation
   triggerStreakIncrement();
   const currentLocalStreak = localStorage.getItem(`gb_streak_${user}`) || "1";
   
   const imgPayload = (processedBase64Image && processedBase64Image.startsWith("data:image")) ? processedBase64Image : "";
   try {
-    // Bundles streak variable seamlessly into the existing update payload schema
+    // Bundles current streak directly inside existing post payload structure
     await fetch(SCRIPT_URL, { 
       method: 'POST', 
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
@@ -898,7 +898,7 @@ function saveUser() {
   updateAndRenderStreak();
 }
 
-// LOGIC MANAGEMENT ENGINE
+// STREAK & LOCALSTORAGE CALCULATION SYSTEM
 function updateAndRenderStreak() {
   const user = document.getElementById('user').value.trim();
   const streakCard = document.getElementById('streakCard');
