@@ -104,8 +104,6 @@
     .filter-preview-box { width: 55px; height: 55px; border-radius: 6px; background: #333; margin-bottom: 4px; border: 2px solid transparent; background-size: cover; background-position: center; transition: border-color 0.2s; }
     .filter-option.active .filter-preview-box { border-color: #3498db; }
 
-    /* Live Synchronized Bounding Box Styles for the Cropping Screen Viewport */
-  /* Live Synchronized Bounding Box Styles for the Cropping Screen Viewport */
 .f-normal, .f-normal .cropper-container, .f-normal .cropper-wrap-box { filter: none !important; }
 .f-film1982, .f-film1982 .cropper-container, .f-film1982 .cropper-wrap-box { filter: sepia(0.35) contrast(1.2) brightness(1.05) saturate(1.3) hue-rotate(-2deg) !important; }
 .f-cyberpunk, .f-cyberpunk .cropper-container, .f-cyberpunk .cropper-wrap-box { filter: hue-rotate(140deg) saturate(1.8) contrast(1.3) brightness(0.9) !important; }
@@ -169,6 +167,15 @@
 <div class="container">
   <div class="sidebar">
     <div id="myProfileLink"></div>
+    
+    <div class="sidebar-card" id="streakCard" style="display:none; align-items:center; gap:12px; font-size:14px;">
+      <span style="font-size:26px;">🔥</span>
+      <div>
+        <b>Daily Streak: <span id="streakCount">0</span> Days</b>
+        <div style="font-size:11px; color:#666; margin-top:2px;" id="streakStatus">Keep the streak alive!</div>
+      </div>
+    </div>
+
     <div class="sidebar-card"><b>🔍 Search Feed</b><input id="searchBar" placeholder="Filter posts..." oninput="render()"></div>
     <div id="leaderboard"></div>
     <div id="hashtags"></div>
@@ -206,7 +213,6 @@ let activeCropperInstance = null;
 let processedBase64Image = "";
 let chosenFilterStyleName = "normal";
 
-// Core Neural Instance Network Array
 let selfieSegmentationModelInstance = null;
 
 const filterMatrixConfigurations = {
@@ -222,6 +228,7 @@ window.onload = () => {
   document.getElementById('user').value = localStorage.getItem("gb_user") || "";
   if(allPosts.length > 0) { render(); }
   loadFeed(); 
+  updateAndRenderStreak();
   window.addEventListener('scroll', handleWindowScroll, { passive: true });
   window.onscroll = handleWindowScroll; 
   setInterval(pollForUpdates, 30000);
@@ -285,7 +292,6 @@ function closeCropModal() {
   if(activeCropperInstance) activeCropperInstance.destroy();
 }
 
-// REST OF CODE REMAINS FULLY UNCHANGED
 function toggleCommentsVisibility(rowIndex) {
   const tray = document.getElementById(`comments-tray-${rowIndex}`);
   const label = document.getElementById(`toggle-label-${rowIndex}`);
@@ -619,6 +625,7 @@ async function upload() {
   const imgPayload = (processedBase64Image && processedBase64Image.startsWith("data:image")) ? processedBase64Image : "";
   try {
     await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'post', username: user, message: msg, image: imgPayload }) });
+    triggerStreakIncrement();
     document.getElementById('msg').value = ""; document.getElementById('file').value = ""; processedBase64Image = ""; 
     postBtn.innerText = "✨ Finalizing post...";
     await new Promise(resolve => setTimeout(resolve, 2500));
@@ -644,6 +651,9 @@ async function compressImage(file) {
 async function apiCall(action, rowIndex, event) {
   const user = document.getElementById('user').value.trim();
   if(!user) return alert("Name required!");
+  
+  triggerStreakIncrement();
+  
   const p = allPosts.find(x => x.rowIndex === rowIndex);
   const postEl = document.getElementById(`post-${rowIndex}`);
   
@@ -854,7 +864,85 @@ function timeAgo(d) {
   return "just now";
 }
 
-function saveUser() { localStorage.setItem("gb_user", document.getElementById('user').value); loadFeed(); }
+function saveUser() { 
+  localStorage.setItem("gb_user", document.getElementById('user').value); 
+  loadFeed(); 
+  updateAndRenderStreak();
+}
+
+// STREAK TRACKING ARCHITECTURE FUNCTIONS
+function updateAndRenderStreak() {
+  const user = document.getElementById('user').value.trim();
+  const streakCard = document.getElementById('streakCard');
+  
+  if (!user) {
+    streakCard.style.display = 'none';
+    return;
+  }
+  
+  const streakKey = `gb_streak_${user}`;
+  const lastDateKey = `gb_streak_date_${user}`;
+  
+  let currentStreak = parseInt(localStorage.getItem(streakKey) || "0");
+  const lastActiveDateStr = localStorage.getItem(lastDateKey);
+  const todayStr = new Date().toDateString(); 
+  
+  if (lastActiveDateStr) {
+    const lastDate = new Date(lastActiveDateStr);
+    const today = new Date(todayStr);
+    const diffTime = today - lastDate;
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays > 1) {
+      currentStreak = 0; 
+      localStorage.setItem(streakKey, "0");
+    }
+  }
+  
+  document.getElementById('streakCount').innerText = currentStreak;
+  streakCard.style.display = 'flex';
+  
+  const statusEl = document.getElementById('streakStatus');
+  if (lastActiveDateStr === todayStr && currentStreak > 0) {
+    statusEl.innerText = "Today's streak safe! 🎉";
+    statusEl.style.color = "#2ecc71";
+  } else {
+    statusEl.innerText = "Post, like, or reply to grow your streak!";
+    statusEl.style.color = "#e67e22";
+  }
+}
+
+function triggerStreakIncrement() {
+  const user = document.getElementById('user').value.trim();
+  if (!user) return;
+  
+  const streakKey = `gb_streak_${user}`;
+  const lastDateKey = `gb_streak_date_${user}`;
+  
+  let currentStreak = parseInt(localStorage.getItem(streakKey) || "0");
+  const lastActiveDateStr = localStorage.getItem(lastDateKey);
+  const todayStr = new Date().toDateString();
+  
+  if (lastActiveDateStr !== todayStr) {
+    if (lastActiveDateStr) {
+      const lastDate = new Date(lastActiveDateStr);
+      const today = new Date(todayStr);
+      const diffDays = Math.floor((today - lastDate) / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 1) {
+        currentStreak += 1;
+      } else {
+        currentStreak = 1;
+      }
+    } else {
+      currentStreak = 1;
+    }
+    
+    localStorage.setItem(streakKey, currentStreak);
+    localStorage.setItem(lastDateKey, todayStr);
+    updateAndRenderStreak();
+  }
+}
 </script>
 </body>
 </html>
