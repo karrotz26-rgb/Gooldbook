@@ -279,6 +279,7 @@ function selectPostFilter(filterType, triggerElement) {
   container.className = "crop-workspace f-" + filterType;
 }
 
+// REST OF CODE REMAINS FULLY UNCHANGED
 function closeCropModal() {
   document.getElementById('cropModal').style.display = 'none';
   document.getElementById('file').value = "";
@@ -613,8 +614,32 @@ function updateSidebar() {
   const topLikers = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
   document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${topLikers.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
   
+  // LEADERBOARD DRAW COMPONENT - INJECTS PERSONAL STREAK PANEL
+  let personalStreakHTML = "";
+  if (myName) {
+    const localStreak = localStorage.getItem(`gb_streak_${myName}`) || "0";
+    const lastDateKey = `gb_streak_date_${myName}`;
+    const lastActiveDateStr = localStorage.getItem(lastDateKey);
+    const todayStr = new Date().toDateString();
+    
+    const statusDot = (lastActiveDateStr === todayStr && parseInt(localStreak) > 0) ? "🟢 Safe" : "🟠 Action Needed";
+    
+    personalStreakHTML = `
+      <div class="sidebar-item" style="background: #fffaf0; border: 1px dashed #e67e22; border-radius: 4px; padding: 6px; margin-bottom: 8px;" onclick="setFilter('author','${myName}')">
+        👤 <b>You</b> — <span style="color: #d35400; font-weight: bold;">${localStreak} Day${localStreak != 1 ? 's' : ''}</span> 
+        <span style="font-size: 10px; float: right; background: #eee; padding: 1px 4px; border-radius: 3px;">${statusDot}</span>
+      </div>
+    `;
+  }
+
   const sortedStreaks = [...allStreaks].sort((a, b) => b.streak - a.streak).slice(0, 3);
-  document.getElementById('streakLeaderboard').innerHTML = `<div class="sidebar-card"><b style="color: #d35400;">👑 Top Streaks</b><br>${sortedStreaks.map((s, i) => `<div class="sidebar-item" onclick="setFilter('author','${s.user}')">${i===0?'👑':i===1?'🔥':'✨'} ${s.user} — <b>${s.streak} Days</b></div>`).join('') || '<div style="color:#888; font-size:11px; padding:4px 0;">No active family streaks yet!</div>'}</div>`;
+  document.getElementById('streakLeaderboard').innerHTML = `
+    <div class="sidebar-card">
+      <b style="color: #d35400;">👑 Top Streaks</b><br>
+      ${personalStreakHTML}
+      ${sortedStreaks.map((s, i) => `<div class="sidebar-item" onclick="setFilter('author','${s.user}')">${i===0?'👑':i===1?'🔥':'✨'} ${s.user} — <b>${s.streak} Days</b></div>`).join('') || '<div style="color:#888; font-size:11px; padding:4px 0;">No active family streaks yet!</div>'}
+    </div>
+  `;
 
   const hCounts = {}; allPosts.forEach(p => { const tags = ((p.message||"") + " " + p.comments.map(c=>c.text).join(" ")).match(/#(\w+)/g) || []; tags.forEach(t => { const ct = t.toLowerCase().trim(); hCounts[ct] = (hCounts[ct]||0)+1; }); });
   const topTags = Object.entries(hCounts).sort((a,b) => b[1] - a[1]).slice(0, 8);
@@ -676,6 +701,7 @@ async function apiCall(action, rowIndex, event) {
   if(!user) return alert("Name required!");
   
   triggerStreakIncrement();
+  const currentLocalStreak = localStorage.getItem(`gb_streak_${user}`) || "1";
   
   const p = allPosts.find(x => x.rowIndex === rowIndex);
   const postEl = document.getElementById(`post-${rowIndex}`);
@@ -690,12 +716,24 @@ async function apiCall(action, rowIndex, event) {
       if (container && listSpan) { if (p.likes.length > 0) { listSpan.innerHTML = p.likes.map(name => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()}</b>`).join(', '); container.style.display = 'block'; } else { container.style.display = 'none'; } }
     }
     if(i === -1 && event) { const u = document.createElement('div'); u.className='unicorn-pop'; u.textContent='🦄'; u.style.left=event.clientX+'px'; u.style.top=event.clientY+'px'; document.body.appendChild(u); setTimeout(()=>u.remove(), 1500); }
-    await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, rowIndex, username:user }) });
+    
+    // PACKAGES STREAK VALUE ON LIKE EXECUTIONS
+    await fetch(SCRIPT_URL, { 
+      method: 'POST', 
+      mode: 'no-cors', 
+      body: JSON.stringify({ action, rowIndex, username: user, streak: currentLocalStreak }) 
+    });
   } else if (action === 'comment') {
     const input = document.getElementById(`c-${rowIndex}`); if(!input || !input.value) return; const txt = input.value;
     const newCommentObj = { user, text: txt, time: new Date().toISOString() }; p.comments.push(newCommentObj); input.value = ""; 
     if (postEl) { const list = postEl.querySelector('.comments-list'); if (list) { const div = document.createElement('div'); div.className = 'comment-box'; div.innerHTML = `<div style="display:flex; justify-content:space-between;"><b>${user}</b><span style="font-size:10px; color:#888;">just now</span></div><div>${highlightHashtags(txt)}</div>`; list.appendChild(div); } }
-    await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action, rowIndex, username:user, text: txt }) });
+    
+    // PACKAGES STREAK VALUE ON COMMENT EXECUTIONS
+    await fetch(SCRIPT_URL, { 
+      method: 'POST', 
+      mode: 'no-cors', 
+      body: JSON.stringify({ action, rowIndex, username: user, text: txt, streak: currentLocalStreak }) 
+    });
   }
 }
 
@@ -751,7 +789,6 @@ async function applyImageCropAndFilter() {
   saveBtn.disabled = true;
 
   const croppedCanvas = activeCropperInstance.getCroppedCanvas({ width: 800, height: 800 });
-  
   const outputCanvas = document.createElement('canvas');
   outputCanvas.width = 800;
   outputCanvas.height = 800;
@@ -895,23 +932,17 @@ function saveUser() {
 
 function updateAndRenderStreak() {
   const user = document.getElementById('user').value.trim();
-  const streakCard = document.getElementById('streakCard');
-  
-  if (!user) {
-    if (streakCard) streakCard.style.display = 'none';
-    return;
-  }
+  if (!user) return;
   
   const streakKey = `gb_streak_${user}`;
   const lastDateKey = `gb_streak_date_${user}`;
   
   let currentStreak = parseInt(localStorage.getItem(streakKey) || "0");
   const lastActiveDateStr = localStorage.getItem(lastDateKey);
-  const todayStr = new Date().toDateString(); 
   
   if (lastActiveDateStr) {
     const lastDate = new Date(lastActiveDateStr);
-    const today = new Date(todayStr);
+    const today = new Date(new Date().toDateString());
     const diffTime = today - lastDate;
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
     
@@ -921,20 +952,7 @@ function updateAndRenderStreak() {
     }
   }
   
-  const targetCountEl = document.getElementById('streakCount');
-  if (targetCountEl) targetCountEl.innerText = currentStreak;
-  if (streakCard) streakCard.style.display = 'flex';
-  
-  const statusEl = document.getElementById('streakStatus');
-  if (statusEl) {
-    if (lastActiveDateStr === todayStr && currentStreak > 0) {
-      statusEl.innerText = `Streak active: ${currentStreak} Day${currentStreak > 1 ? 's' : ''}! Today is safe! 🎉`;
-      statusEl.style.color = "#2ecc71";
-    } else {
-      statusEl.innerText = "Post, like, or reply to grow your streak!";
-      statusEl.style.color = "#e67e22";
-    }
-  }
+  updateSidebar();
 }
 
 function triggerStreakIncrement() {
