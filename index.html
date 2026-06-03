@@ -614,16 +614,19 @@ function updateSidebar() {
   const topLikers = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
   document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${topLikers.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
   
-  // LEADERBOARD DRAW COMPONENT - INJECTS PERSONAL STREAK PANEL
+   // LEADERBOARD DRAW COMPONENT - INJECTS CLEAN PERSONAL STREAK PANEL
   let personalStreakHTML = "";
   if (myName) {
     const localStreak = localStorage.getItem(`gb_streak_${myName}`) || "0";
-    const lastDateKey = `gb_streak_date_${myName}`;
-    const lastActiveDateStr = localStorage.getItem(lastDateKey);
-    const todayStr = new Date().toDateString();
     
-    const statusDot = (lastActiveDateStr === todayStr && parseInt(localStreak) > 0) ? "🟢 Safe" : "🟠 Action Needed";
-    
+    // FIX: Removed the statusDot calculation and tag completely for a cleaner look
+    personalStreakHTML = `
+      <div class="sidebar-item" style="background: #fffaf0; border: 1px dashed #e67e22; border-radius: 4px; padding: 6px; margin-bottom: 8px;" onclick="setFilter('author','${myName}')">
+        👤 <b>You</b> — <span style="color: #d35400; font-weight: bold;">${localStreak} Day${localStreak != 1 ? 's' : ''}</span>
+      </div>
+    `;
+  }
+   
     personalStreakHTML = `
       <div class="sidebar-item" style="background: #fffaf0; border: 1px dashed #e67e22; border-radius: 4px; padding: 6px; margin-bottom: 8px;" onclick="setFilter('author','${myName}')">
         👤 <b>You</b> — <span style="color: #d35400; font-weight: bold;">${localStreak} Day${localStreak != 1 ? 's' : ''}</span> 
