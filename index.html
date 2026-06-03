@@ -286,7 +286,6 @@ function closeCropModal() {
   if(activeCropperInstance) activeCropperInstance.destroy();
 }
 
-// REST OF CODE REMAINS FULLY UNCHANGED
 function toggleCommentsVisibility(rowIndex) {
   const tray = document.getElementById(`comments-tray-${rowIndex}`);
   const label = document.getElementById(`toggle-label-${rowIndex}`);
@@ -593,7 +592,14 @@ function render() {
   }).join('');
 
   feedEl.innerHTML = feedHTML || '<div class="card">No posts found.</div>';
-  document.getElementById('loadMore').style.display = 'none';
+  
+  // FIX: Dynamically show/hide the button depending on whether more hidden filtered items exist
+  if (postsToShow < totalInFilter) {
+    document.getElementById('loadMore').style.display = 'block';
+  } else {
+    document.getElementById('loadMore').style.display = 'none';
+  }
+  
   if (!filterVal && !s) updateSidebar();
 }
 
@@ -608,7 +614,6 @@ function updateSidebar() {
   const topLikers = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
   document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${topLikers.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
   
-  // LEADERBOARD DRAW COMPONENT
   const sortedStreaks = [...allStreaks].sort((a, b) => b.streak - a.streak).slice(0, 3);
   document.getElementById('streakLeaderboard').innerHTML = `<div class="sidebar-card"><b style="color: #d35400;">👑 Top Streaks</b><br>${sortedStreaks.map((s, i) => `<div class="sidebar-item" onclick="setFilter('author','${s.user}')">${i===0?'👑':i===1?'🔥':'✨'} ${s.user} — <b>${s.streak} Days</b></div>`).join('') || '<div style="color:#888; font-size:11px; padding:4px 0;">No active family streaks yet!</div>'}</div>`;
 
@@ -628,13 +633,11 @@ async function upload() {
   postBtn.innerText = "⏳ Uploading...";
   postBtn.disabled = true;
   
-  // Triggers local calculation state directly prior to database assembly
   triggerStreakIncrement();
   const currentLocalStreak = localStorage.getItem(`gb_streak_${user}`) || "1";
   
   const imgPayload = (processedBase64Image && processedBase64Image.startsWith("data:image")) ? processedBase64Image : "";
   try {
-    // Injects 'streak' metric cleanly inside your pre-existing network call
     await fetch(SCRIPT_URL, { 
       method: 'POST', 
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
@@ -891,13 +894,12 @@ function saveUser() {
   updateAndRenderStreak();
 }
 
-// STREAK MANAGEMENT ALGORITHMS
 function updateAndRenderStreak() {
   const user = document.getElementById('user').value.trim();
   const streakCard = document.getElementById('streakCard');
   
   if (!user) {
-    streakCard.style.display = 'none';
+    if(streakCard) streakCard.style.display = 'none';
     return;
   }
   
@@ -920,16 +922,19 @@ function updateAndRenderStreak() {
     }
   }
   
-  document.getElementById('streakCount').innerText = currentStreak;
-  streakCard.style.display = 'flex';
+  const targetCountEl = document.getElementById('streakCount');
+  if(targetCountEl) targetCountEl.innerText = currentStreak;
+  if(streakCard) streakCard.style.display = 'flex';
   
   const statusEl = document.getElementById('streakStatus');
-  if (lastActiveDateStr === todayStr && currentStreak > 0) {
-    statusEl.innerText = "Today's streak safe! 🎉";
-    statusEl.style.color = "#2ecc71";
-  } else {
-    statusEl.innerText = "Post, like, or reply to grow your streak!";
-    statusEl.style.color = "#e67e22";
+  if(statusEl) {
+    if (lastActiveDateStr === todayStr && currentStreak > 0) {
+      statusEl.innerText = "Today's streak safe! 🎉";
+      statusEl.style.color = "#2ecc71";
+    } else {
+      statusEl.innerText = "Post, like, or reply to grow your streak!";
+      statusEl.style.color = "#e67e22";
+    }
   }
 }
 
