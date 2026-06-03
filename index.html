@@ -910,12 +910,15 @@ function updateAndRenderStreak() {
   const lastActiveDateStr = localStorage.getItem(lastDateKey);
   const todayStr = new Date().toDateString(); 
   
-  if (lastActiveDateStr) {
-    const lastDate = new Date(lastActiveDateStr);
-    const today = new Date(todayStr);
-    const diffTime = today - lastDate;
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    
+  if (lastActiveDateStr === todayStr && currentStreak > 0) {
+  // FIX: This now displays your active day count alongside the success message!
+  statusEl.innerText = `Streak active: ${currentStreak} Day${currentStreak > 1 ? 's' : ''}! Today is safe! 🎉`;
+  statusEl.style.color = "#2ecc71";
+} else {
+  statusEl.innerText = "Post, like, or reply to grow your streak!";
+  statusEl.style.color = "#e67e22";
+}
+
     if (diffDays > 1) {
       currentStreak = 0; 
       localStorage.setItem(streakKey, "0");
