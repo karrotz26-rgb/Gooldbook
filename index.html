@@ -246,6 +246,7 @@ window.onload = () => {
   updateAndRenderStreak();
   window.addEventListener('scroll', handleWindowScroll, { passive: true });
   setInterval(() => { if (!document.hidden) pollForUpdates(); }, 30000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) pollForUpdates(); });
   initializeSelfieSegmentationAI();
 };
 
