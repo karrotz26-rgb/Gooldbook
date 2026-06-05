@@ -179,7 +179,7 @@
   <div class="sidebar">
     <div id="myProfileLink"></div>
     
-    <div class="sidebar-card"><b>🔍 Search Feed</b><input id="searchBar" placeholder="Filter posts..." oninput="render()"></div>
+    <div class="sidebar-card"><b>🔍 Search Feed</b><input id="searchBar" placeholder="Filter posts..." oninput="debouncedRender()"></div>
     <div id="streakLeaderboard"></div>
     <div id="trending"></div>
     <div id="leaderboard"></div>
@@ -215,11 +215,20 @@ let lastPostCount = allPosts.length;
 let newPostCount = 0;
 let isInfiniteScrollLoading = false;
 let scrollTimeout;
+let searchDebounceTimer;
+let _isPollRunning = false;
+let _sidebarCacheRef = null;
+function debouncedRender() {
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(render, 300);
+}
 let activeCropperInstance = null;
 let processedBase64Image = "";
 let chosenFilterStyleName = "normal";
 
 let selfieSegmentationModelInstance = null;
+
+const HASHTAG_URL_REGEX = /(https?:\/\/[^\s]+)|#(\w+)/g;
 
 const filterMatrixConfigurations = {
   normal: 'none',
@@ -236,8 +245,7 @@ window.onload = () => {
   loadFeed(); 
   updateAndRenderStreak();
   window.addEventListener('scroll', handleWindowScroll, { passive: true });
-  window.onscroll = handleWindowScroll; 
-  setInterval(pollForUpdates, 30000);
+  setInterval(() => { if (!document.hidden) pollForUpdates(); }, 30000);
   initializeSelfieSegmentationAI();
 };
 
@@ -349,6 +357,7 @@ function handleWindowScroll() {
 async function loadFeed() {
   try {
     const res = await fetch(SCRIPT_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     allPosts = data.posts || [];
     allBios = data.bios || {};
@@ -363,16 +372,18 @@ async function loadFeed() {
 }
 
 async function pollForUpdates() {
-  const isTyping = document.activeElement.tagName === 'INPUT' || 
+  if (_isPollRunning) return;
+  _isPollRunning = true;
+  const isTyping = document.activeElement.tagName === 'INPUT' ||
                    document.activeElement.tagName === 'TEXTAREA';
-  
-  if (isTyping) return; 
+
+  if (isTyping) { _isPollRunning = false; return; }
 
   try {
     const res = await fetch(SCRIPT_URL);
     const data = await res.json();
     const newPosts = data.posts || [];
-    
+
     if (newPosts.length > lastPostCount) {
       const activeUser = document.getElementById('user').value.trim();
       if (newPosts[0] && newPosts[0].user !== activeUser) {
@@ -380,11 +391,15 @@ async function pollForUpdates() {
         incomingPostsCache = data;
         document.getElementById('refreshPill').classList.add('show');
         showNotif(`${newPosts[0].user} posted something new!`);
-        return; 
+        return;
       }
     }
-    
-    if (JSON.stringify(allPosts) !== JSON.stringify(newPosts)) {
+
+    const hasChanged = newPosts.length !== allPosts.length ||
+      (newPosts[0]?.rowIndex !== allPosts[0]?.rowIndex) ||
+      (newPosts[0]?.likes?.length !== allPosts[0]?.likes?.length) ||
+      (newPosts[0]?.comments?.length !== allPosts[0]?.comments?.length);
+    if (hasChanged) {
       allPosts = newPosts;
       allBios = data.bios || {};
       allAvatars = data.avatars || {};
@@ -393,6 +408,7 @@ async function pollForUpdates() {
       render();
     }
   } catch(e) { console.log("Poll failed, will try again..."); }
+  finally { _isPollRunning = false; }
 }
 
 function acceptNewPosts() {
@@ -485,7 +501,7 @@ async function uploadAvatar(user) {
       avatar: base64 
     }) 
   });
-  setTimeout(async () => { await loadFeed(); if(btn) btn.innerText = "Edit Bio"; render(); }, 4000); 
+  setTimeout(async () => { await loadFeed(); if(btn) btn.innerText = "Edit Bio"; render(); }, 1500); 
 }
 
 async function saveBio(user) {
@@ -502,14 +518,13 @@ async function saveBio(user) {
       avatar: allAvatars[user] || "" 
     }) 
   });
-  setTimeout(loadFeed, 2000);
+  setTimeout(loadFeed, 1000);
 }
 
-function highlightHashtags(t) { 
+function highlightHashtags(t) {
   if(!t) return "";
-  const regex = /(https?:\/\/[^\s]+)|#(\w+)/g;
-  
-  return t.replace(regex, (match, url, tag) => {
+  HASHTAG_URL_REGEX.lastIndex = 0;
+  return t.replace(HASHTAG_URL_REGEX, (match, url, tag) => {
     if (url) {
       try {
         const urlObj = new URL(url);
@@ -615,6 +630,8 @@ function render() {
 }
 
 function updateSidebar() {
+  if (_sidebarCacheRef === allPosts) return;
+  _sidebarCacheRef = allPosts;
   const myName = document.getElementById('user').value.trim();
   document.getElementById('myProfileLink').innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', '${myName}')">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
   
