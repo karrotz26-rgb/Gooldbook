@@ -123,6 +123,20 @@
 .f-aiportrait, .f-aiportrait .cropper-container, .f-aiportrait .cropper-wrap-box { filter: saturate(1.4) contrast(1.25) brightness(1.05) !important; }
 
     @media(max-width:700px){ .container { flex-direction:column; } .sidebar { width:100%; position:static; max-height: none; overflow-y: visible; } }
+    .carousel { position: relative; width: 100%; aspect-ratio: 1/1; background: #f8f9fa; margin-top: 10px; border-radius: 6px; overflow: hidden; border: 1px solid #f0f2f5; }
+    .carousel-slide { display: none; width: 100%; height: 100%; object-fit: cover; }
+    .carousel-slide.active { display: block; }
+    .car-btn { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.45); color: #fff; border: none; font-size: 22px; padding: 4px 11px; cursor: pointer; border-radius: 4px; z-index: 2; }
+    .car-prev { left: 6px; }
+    .car-next { right: 6px; }
+    .car-dots { position: absolute; bottom: 8px; width: 100%; text-align: center; z-index: 2; }
+    .car-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.6); margin: 0 3px; cursor: pointer; }
+    .car-dot.active { background: #fff; }
+    .img-thumb-wrap { position: relative; display: inline-block; }
+    .img-thumb { width: 70px; height: 70px; object-fit: cover; border-radius: 8px; display: block; }
+    .img-thumb-remove { position: absolute; top: -6px; right: -6px; background: #e74c3c; color: #fff; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 13px; cursor: pointer; line-height: 20px; padding: 0; text-align: center; }
+    #addAnotherPhotoBtn { background: none; border: 1px dashed #aaa; color: #555; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 13px; }
+    #addAnotherPhotoBtn:hover { background: #f0f2f5; }
   </style>
 </head>
 <body>
@@ -193,6 +207,8 @@
       <input id="user" placeholder="Your Name" onchange="saveUser()">
       <textarea id="msg" rows="2" placeholder="What's on your mind?"></textarea>
       <input type="file" id="file" accept="image/*" onchange="initiateCropper(event)">
+      <div id="imagePreviewStrip" style="display:none; flex-wrap:wrap; gap:8px; margin:8px 0;"></div>
+      <button id="addAnotherPhotoBtn" style="display:none;" onclick="document.getElementById('file').click()">+ Add another photo</button>
       <div style="display: flex; gap: 5px;">
         <button id="postBtn" class="btn" style="flex: 2;" onclick="upload()">Post Update</button>
         <button class="btn btn-alt" style="flex: 1;" onclick="loadFeed()">🔄</button>
@@ -204,7 +220,7 @@
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbymir3lMPFQQ63a9yAqZQEIs39SQ0myjv3GNTDiMVFXdN8R4J2oEubDzdF7Nh3pWD2Q/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzidSBQRHBXq3Ktsln-iBJxWeGTSa9ifVpE5p1eJT2LF23FVnjRLnt_BLY-Rkd-ES4F/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let incomingPostsCache = null; 
 let allBios = {}, allAvatars = {};
@@ -223,7 +239,7 @@ function debouncedRender() {
   searchDebounceTimer = setTimeout(render, 300);
 }
 let activeCropperInstance = null;
-let processedBase64Image = "";
+let processedBase64Images = [];
 let chosenFilterStyleName = "normal";
 
 let selfieSegmentationModelInstance = null;
@@ -303,7 +319,6 @@ function selectPostFilter(filterType, triggerElement) {
 function closeCropModal() {
   document.getElementById('cropModal').style.display = 'none';
   document.getElementById('file').value = "";
-  processedBase64Image = "";
   if(activeCropperInstance) activeCropperInstance.destroy();
 }
 
@@ -590,13 +605,21 @@ function render() {
   const feedHTML = filtered.slice(0, postsToShow).map((p, index) => {
     try {
       let mediaHTML = "";
-      if (p.image && p.image.length > 10) {
+      const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
+      if (imgs.length === 1) {
         const existingImg = document.querySelector(`#post-${p.rowIndex} .post-img`);
-        if (existingImg && existingImg.getAttribute('src') === p.image) {
+        if (existingImg && existingImg.getAttribute('src') === imgs[0]) {
           mediaHTML = existingImg.closest('.img-container').outerHTML;
         } else {
-          mediaHTML += `<div class="img-container"><div class="skeleton-loader"></div><img src="${p.image}" class="post-img" loading="lazy" onload="onImageLoad(this)"></div>`;
+          mediaHTML = `<div class="img-container"><div class="skeleton-loader"></div><img src="${imgs[0]}" class="post-img" loading="lazy" onload="onImageLoad(this)"></div>`;
         }
+      } else if (imgs.length > 1) {
+        mediaHTML = `<div class="carousel" id="carousel-${p.rowIndex}" data-idx="0">
+          ${imgs.map((src, i) => `<img src="${src}" class="post-img carousel-slide${i===0?' active':''}" loading="lazy">`).join('')}
+          <button class="car-btn car-prev" onclick="carouselMove(${p.rowIndex},-1)">&#8249;</button>
+          <button class="car-btn car-next" onclick="carouselMove(${p.rowIndex},1)">&#8250;</button>
+          <div class="car-dots">${imgs.map((_,i) => `<span class="car-dot${i===0?' active':''}" onclick="carouselGo(${p.rowIndex},${i})"></span>`).join('')}</div>
+        </div>`;
       }
 
       const ytMatch = (p.message || "").match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
@@ -660,6 +683,42 @@ function updateSidebar() {
 function scrollToPost(id) { if (filterVal) { setFilter(null, null); setTimeout(() => performScroll(id), 300); } else performScroll(id); }
 function performScroll(id) { const el = document.getElementById(`post-${id}`); if (el) { window.scrollTo({ top: el.offsetTop - 70, behavior: 'smooth' }); el.classList.add('highlight-card'); setTimeout(() => el.classList.remove('highlight-card'), 2000); } else { postsToShow += 10; render(); setTimeout(() => performScroll(id), 100); } }
 
+function updateImagePreviewStrip() {
+  const strip = document.getElementById('imagePreviewStrip');
+  const addBtn = document.getElementById('addAnotherPhotoBtn');
+  if (!strip) return;
+  strip.innerHTML = processedBase64Images.map((src, i) =>
+    `<div class="img-thumb-wrap">
+       <img src="${src}" class="img-thumb">
+       <button class="img-thumb-remove" onclick="removePostImage(${i})">×</button>
+     </div>`
+  ).join('');
+  strip.style.display = processedBase64Images.length ? 'flex' : 'none';
+  if (addBtn) addBtn.style.display = processedBase64Images.length > 0 && processedBase64Images.length < 4 ? 'inline-block' : 'none';
+}
+
+function removePostImage(index) {
+  processedBase64Images.splice(index, 1);
+  updateImagePreviewStrip();
+}
+
+function carouselMove(rowIndex, dir) {
+  const car = document.getElementById(`carousel-${rowIndex}`);
+  const slides = car.querySelectorAll('.carousel-slide');
+  const dots = car.querySelectorAll('.car-dot');
+  let idx = (parseInt(car.dataset.idx) + dir + slides.length) % slides.length;
+  car.dataset.idx = idx;
+  slides.forEach((s, i) => s.classList.toggle('active', i === idx));
+  dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+}
+
+function carouselGo(rowIndex, idx) {
+  const car = document.getElementById(`carousel-${rowIndex}`);
+  car.dataset.idx = idx;
+  car.querySelectorAll('.carousel-slide').forEach((s, i) => s.classList.toggle('active', i === idx));
+  car.querySelectorAll('.car-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
+}
+
 async function upload() {
   const user = document.getElementById('user').value.trim();
   const msg = document.getElementById('msg').value.trim();
@@ -671,21 +730,21 @@ async function upload() {
   triggerStreakIncrement();
   const currentLocalStreak = localStorage.getItem(`gb_streak_${user}`) || "1";
   
-  const imgPayload = (processedBase64Image && processedBase64Image.startsWith("data:image")) ? processedBase64Image : "";
   try {
-    await fetch(SCRIPT_URL, { 
-      method: 'POST', 
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
-      body: JSON.stringify({ 
-        action: 'post', 
-        username: user, 
-        message: msg, 
-        image: imgPayload, 
-        streak: currentLocalStreak 
-      }) 
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        action: 'post',
+        username: user,
+        message: msg,
+        images: processedBase64Images,
+        streak: currentLocalStreak
+      })
     });
-    
-    document.getElementById('msg').value = ""; document.getElementById('file').value = ""; processedBase64Image = ""; 
+
+    document.getElementById('msg').value = ""; document.getElementById('file').value = "";
+    processedBase64Images = []; updateImagePreviewStrip();
     postBtn.innerText = "✨ Finalizing post...";
     await new Promise(resolve => setTimeout(resolve, 2500));
     await loadFeed(); 
@@ -915,7 +974,10 @@ async function applyImageCropAndFilter() {
     outContext.putImageData(imgData, 0, 0);
   }
   
-  processedBase64Image = outputCanvas.toDataURL('image/jpeg', 0.85);
+  if (processedBase64Images.length < 4) {
+    processedBase64Images.push(outputCanvas.toDataURL('image/jpeg', 0.85));
+  }
+  updateImagePreviewStrip();
   saveBtn.innerText = originalBtnText;
   saveBtn.disabled = false;
   document.getElementById('cropModal').style.display = 'none';
