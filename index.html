@@ -605,7 +605,13 @@ function render() {
   const feedHTML = filtered.slice(0, postsToShow).map((p, index) => {
     try {
       let mediaHTML = "";
-      const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
+      const imgs = (() => {
+        if (Array.isArray(p.images) && p.images.length) return p.images;
+        const v = p.image || "";
+        if (!v) return [];
+        try { const parsed = JSON.parse(v); return Array.isArray(parsed) ? parsed : [v]; }
+        catch { return [v]; }
+      })();
       if (imgs.length === 1) {
         const existingImg = document.querySelector(`#post-${p.rowIndex} .post-img`);
         if (existingImg && existingImg.getAttribute('src') === imgs[0]) {
@@ -812,7 +818,13 @@ async function sharePost(rowIndex, event) {
   if (!post) return;
   const btn = event.target; const originalText = btn.innerText; btn.innerText = "⏳ Preparing Card...";
   const names = post.likes.length > 0 ? post.likes.join(', ') : '';
-  const imgs = Array.isArray(post.images) && post.images.length ? post.images : (post.image ? [post.image] : []);
+  const imgs = (() => {
+    if (Array.isArray(post.images) && post.images.length) return post.images;
+    const v = post.image || "";
+    if (!v) return [];
+    try { const parsed = JSON.parse(v); return Array.isArray(parsed) ? parsed : [v]; }
+    catch { return [v]; }
+  })();
   const carEl = document.getElementById(`carousel-${rowIndex}`);
   const activeIdx = carEl ? parseInt(carEl.dataset.idx || 0) : 0;
   const targetImageUrl = imgs[activeIdx] || "";
