@@ -615,7 +615,7 @@ function render() {
         }
       } else if (imgs.length > 1) {
         mediaHTML = `<div class="carousel" id="carousel-${p.rowIndex}" data-idx="0">
-          ${imgs.map((src, i) => `<img src="${src}" class="post-img carousel-slide${i===0?' active':''}" loading="lazy">`).join('')}
+          ${imgs.map((src, i) => `<img src="${src}" class="post-img carousel-slide${i===0?' active':''}" loading="lazy" onload="onImageLoad(this)">`).join('')}
           <button class="car-btn car-prev" onclick="carouselMove(${p.rowIndex},-1)">&#8249;</button>
           <button class="car-btn car-next" onclick="carouselMove(${p.rowIndex},1)">&#8250;</button>
           <div class="car-dots">${imgs.map((_,i) => `<span class="car-dot${i===0?' active':''}" onclick="carouselGo(${p.rowIndex},${i})"></span>`).join('')}</div>
