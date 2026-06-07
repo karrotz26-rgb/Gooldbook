@@ -889,9 +889,10 @@ async function apiCall(action, rowIndex, event) {
 }
 
 async function sharePost(rowIndex, event) {
-  const post = allPosts.find(p => p.rowIndex === rowIndex); 
+  const post = allPosts.find(p => p.rowIndex === rowIndex);
   if (!post) return;
-  const btn = event.target; const originalText = btn.innerText; btn.innerText = "⏳ Preparing Card...";
+  const btn = event.target; const originalText = btn.innerText; btn.innerText = "⏳ Preparing...";
+  const shareText = `🦄 Gooldbook Post by ${post.user}:\n\n"${post.message}"`;
   const names = post.likes.length > 0 ? post.likes.join(', ') : '';
   const imgs = (() => {
     if (Array.isArray(post.images) && post.images.length) return post.images;
@@ -903,42 +904,59 @@ async function sharePost(rowIndex, event) {
   const carEl = document.getElementById(`carousel-${rowIndex}`);
   const activeIdx = carEl ? parseInt(carEl.dataset.idx || 0) : 0;
   const targetImageUrl = imgs[activeIdx] || "";
-  let textTextMsg = `🦄 Gooldbook Post by ${post.user}:\n\n"${post.message}"`;
+
+  let canvas = null;
+  const renderFrame = document.createElement('div');
+  renderFrame.style.cssText = `position:fixed;left:-9999px;top:0;width:400px;background:#ffffff;padding:24px;border-radius:12px;font-family:system-ui,-apple-system,sans-serif;color:#1c1e21;box-sizing:border-box;`;
 
   try {
     const safeBase64Image = await base64CacheProxy(targetImageUrl);
-    const renderFrame = document.createElement('div');
-    renderFrame.style.cssText = `position: fixed; left: -9999px; top: 0; width: 400px; background: #ffffff !important; padding: 24px; border-radius: 12px; font-family: system-ui, -apple-system, sans-serif; color: #1c1e21; box-sizing: border-box;`;
-    const allCommentsHTML = post.comments.slice(0, 3).map(c => `<div style="background:#f0f2f5; padding:8px; border-radius:8px; margin-top:5px; font-size:13px; text-align: left;"><b>${c.user}</b>: ${c.text}</div>`).join('');
-
+    const allCommentsHTML = post.comments.slice(0, 3).map(c => `<div style="background:#f0f2f5;padding:8px;border-radius:8px;margin-top:5px;font-size:13px;text-align:left;"><b>${c.user}</b>: ${c.text}</div>`).join('');
     renderFrame.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; text-align: left;">
-        <div style="width:36px; height:36px; border-radius:50%; background:#3b5998; display:flex; align-items:center; justify-content:center; font-size:18px; color:white;">🦄</div>
-        <div><div style="font-weight: bold; color: #3b5998;">${post.user}</div><div style="font-size: 11px; color: #888;">theGooldbook 🦄</div></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:#3b5998;display:flex;align-items:center;justify-content:center;font-size:18px;color:white;">🦄</div>
+        <div><div style="font-weight:bold;color:#3b5998;">${post.user}</div><div style="font-size:11px;color:#888;">theGooldbook 🦄</div></div>
       </div>
-      <div style="font-size: 15px; margin-bottom: 15px; line-height: 1.4; text-align: left; color:#1c1e21;">${post.message}</div>
-      ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius: 8px; margin-bottom: 10px; display:block;">` : ''}
-      <div style="border-top: 2px solid #f0f2f5; padding-top: 12px; margin-top: 5px; text-align: left;">
-        <div style="display: flex; gap: 15px; font-size: 14px; font-weight: bold; color: #65676b; margin-bottom: 4px;"><span>❤️ ${post.likes.length} Likes</span><span>💬 ${post.comments.length} Comments</span></div>
-        ${names ? `<div style="font-size: 11px; color: #888; line-height: 1.3; margin-bottom:10px;">Liked by: <b>${names}</b></div>` : ''}
+      <div style="font-size:15px;margin-bottom:15px;line-height:1.4;color:#1c1e21;">${post.message}</div>
+      ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px;margin-bottom:10px;display:block;">` : ''}
+      <div style="border-top:2px solid #f0f2f5;padding-top:12px;margin-top:5px;">
+        <div style="display:flex;gap:15px;font-size:14px;font-weight:bold;color:#65676b;margin-bottom:4px;"><span>❤️ ${post.likes.length} Likes</span><span>💬 ${post.comments.length} Comments</span></div>
+        ${names ? `<div style="font-size:11px;color:#888;margin-bottom:10px;">Liked by: <b>${names}</b></div>` : ''}
       </div>
       <div style="margin-top:10px;">${allCommentsHTML}</div>
-      <div style="margin-top:15px; border-top:1px dashed #ccc; padding-top:8px; font-size:10px; color:#aaa; text-align:center; font-weight:bold;">SHARED VIA THEGOOLDBOOK 🦄</div>
-    `;
+      <div style="margin-top:15px;border-top:1px dashed #ccc;padding-top:8px;font-size:10px;color:#aaa;text-align:center;font-weight:bold;">SHARED VIA THEGOOLDBOOK 🦄</div>`;
 
     document.body.appendChild(renderFrame);
-    const canvas = await html2canvas(renderFrame, { useCORS: true, allowTaint: false, scale: 2, backgroundColor: "#ffffff", logging: false, width: 400 });
-    document.body.removeChild(renderFrame);
-    
+    canvas = await html2canvas(renderFrame, { useCORS: true, allowTaint: false, scale: 2, backgroundColor: "#ffffff", logging: false, width: 400 });
+    if (document.body.contains(renderFrame)) document.body.removeChild(renderFrame);
+
     const imageBlob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-    const sharedFile = new File([imageBlob], `Gooldbook_Card_${rowIndex}.png`, { type: 'image/png' });
+    const sharedFile = new File([imageBlob], `Gooldbook_${rowIndex}.png`, { type: 'image/png' });
 
     if (navigator.canShare && navigator.canShare({ files: [sharedFile] })) {
-      await navigator.share({ files: [sharedFile], title: 'TheGooldbook Post', text: textTextMsg });
-    } else { throw new Error("Native sharing unavailable."); }
+      await navigator.share({ files: [sharedFile], title: 'TheGooldbook Post', text: shareText });
+    } else if (navigator.share) {
+      await navigator.share({ title: 'TheGooldbook Post', text: shareText });
+    } else {
+      shareDownload(canvas, rowIndex);
+    }
   } catch(e) {
-    try { if (navigator.share) { await navigator.share({ title: 'TheGooldbook Post', text: textTextMsg + `\n\nLink: ${post.image || window.location.href}` }); } } catch(txtErr) { alert("Sharing declined."); }
+    if (document.body.contains(renderFrame)) document.body.removeChild(renderFrame);
+    if (e.name === 'AbortError') return;
+    if (canvas) {
+      shareDownload(canvas, rowIndex);
+    } else {
+      try { await navigator.clipboard.writeText(shareText); alert("Copied post text to clipboard!"); }
+      catch { alert("Sharing not available on this device."); }
+    }
   } finally { btn.innerText = originalText; }
+}
+
+function shareDownload(canvas, rowIndex) {
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = `Gooldbook_${rowIndex}.png`;
+  a.click();
 }
 
 async function applyImageCropAndFilter() {
