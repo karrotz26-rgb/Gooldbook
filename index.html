@@ -397,10 +397,11 @@ async function loadFeed() {
     allPosts = data.posts || [];
     allBios = data.bios || {};
     allAvatars = data.avatars || {};
-    allStreaks = data.streaks || []; 
+    allStreaks = data.streaks || [];
     localStorage.setItem("gb_cache", JSON.stringify(allPosts));
     lastPostCount = allPosts.length;
     incomingPostsCache = null;
+    syncStreakFromServer();
     document.getElementById('refreshPill').classList.remove('show');
     render();
   } catch(e) { console.error("Load failed", e); }
@@ -1110,6 +1111,22 @@ function saveUser() {
   localStorage.setItem("gb_user", document.getElementById('user').value); 
   loadFeed(); 
   updateAndRenderStreak();
+}
+
+function syncStreakFromServer() {
+  const user = document.getElementById('user').value.trim();
+  if (!user || !allStreaks.length) return;
+  const serverEntry = allStreaks.find(s => s.user === user);
+  if (!serverEntry || !serverEntry.streak || !serverEntry.lastUpdated) return;
+  const serverLastISO = normalizeToISO(serverEntry.lastUpdated);
+  if (!serverLastISO) return;
+  if (daysBetween(serverLastISO, getTodayISO()) > 1) return; // server streak expired
+  const localStreak = parseInt(localStorage.getItem(`gb_streak_${user}`) || "0");
+  const localLastISO = normalizeToISO(localStorage.getItem(`gb_streak_date_${user}`));
+  if (serverEntry.streak > localStreak || !localLastISO) {
+    localStorage.setItem(`gb_streak_${user}`, serverEntry.streak);
+    localStorage.setItem(`gb_streak_date_${user}`, serverLastISO);
+  }
 }
 
 function getTodayISO() {
