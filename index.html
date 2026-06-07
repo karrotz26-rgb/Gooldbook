@@ -1112,61 +1112,58 @@ function saveUser() {
   updateAndRenderStreak();
 }
 
+function getTodayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function normalizeToISO(dateStr) {
+  if (!dateStr) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  const d = new Date(dateStr);
+  if (isNaN(d)) return null;
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function daysBetween(isoA, isoB) {
+  const a = new Date(isoA + 'T00:00:00');
+  const b = new Date(isoB + 'T00:00:00');
+  return Math.round((b - a) / 86400000);
+}
+
 function updateAndRenderStreak() {
   const user = document.getElementById('user').value.trim();
   if (!user) return;
-  
   const streakKey = `gb_streak_${user}`;
   const lastDateKey = `gb_streak_date_${user}`;
-  
   let currentStreak = parseInt(localStorage.getItem(streakKey) || "0");
-  const lastActiveDateStr = localStorage.getItem(lastDateKey);
-  
-  if (lastActiveDateStr) {
-    const lastDate = new Date(lastActiveDateStr);
-    const today = new Date(new Date().toDateString());
-    const diffTime = today - lastDate;
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays > 1) {
-      currentStreak = 0; 
-      localStorage.setItem(streakKey, "0");
-    }
+  const lastISO = normalizeToISO(localStorage.getItem(lastDateKey));
+  if (lastISO && currentStreak > 0 && daysBetween(lastISO, getTodayISO()) > 1) {
+    currentStreak = 0;
+    localStorage.setItem(streakKey, "0");
+    localStorage.removeItem(lastDateKey);
   }
-  
   updateSidebar();
 }
 
 function triggerStreakIncrement() {
   const user = document.getElementById('user').value.trim();
   if (!user) return;
-  
   const streakKey = `gb_streak_${user}`;
   const lastDateKey = `gb_streak_date_${user}`;
-  
   let currentStreak = parseInt(localStorage.getItem(streakKey) || "0");
-  const lastActiveDateStr = localStorage.getItem(lastDateKey);
-  const todayStr = new Date().toDateString();
-  
-  if (lastActiveDateStr !== todayStr) {
-    if (lastActiveDateStr) {
-      const lastDate = new Date(lastActiveDateStr);
-      const today = new Date(todayStr);
-      const diffDays = Math.floor((today - lastDate) / (1000 * 60 * 60 * 24));
-      
-      if (diffDays === 1) {
-        currentStreak += 1;
-      } else {
-        currentStreak = 1;
-      }
-    } else {
-      currentStreak = 1;
-    }
-    
-    localStorage.setItem(streakKey, currentStreak);
-    localStorage.setItem(lastDateKey, todayStr);
-    updateAndRenderStreak();
+  const lastISO = normalizeToISO(localStorage.getItem(lastDateKey));
+  const todayISO = getTodayISO();
+  if (lastISO === todayISO) return;
+  if (lastISO) {
+    const diff = daysBetween(lastISO, todayISO);
+    currentStreak = diff === 1 ? currentStreak + 1 : 1;
+  } else {
+    currentStreak = currentStreak > 0 ? currentStreak + 1 : 1;
   }
+  localStorage.setItem(streakKey, currentStreak);
+  localStorage.setItem(lastDateKey, todayISO);
+  updateAndRenderStreak();
 }
 </script>
 </body>
