@@ -137,6 +137,14 @@
     .img-thumb-remove { position: absolute; top: -6px; right: -6px; background: #e74c3c; color: #fff; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 13px; cursor: pointer; line-height: 20px; padding: 0; text-align: center; }
     #addAnotherPhotoBtn { background: none; border: 1px dashed #aaa; color: #555; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 13px; }
     #addAnotherPhotoBtn:hover { background: #f0f2f5; }
+    .gif-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; overflow-y: auto; padding: 8px; flex: 1; min-height: 0; }
+    .gif-item { width: 100%; aspect-ratio: 1/1; object-fit: cover; cursor: pointer; border-radius: 4px; transition: opacity 0.15s, transform 0.15s; }
+    .gif-item:hover { opacity: 0.8; transform: scale(1.03); }
+    .reaction-bar { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+    .reaction-btn { background: #f0f2f5; border: 1.5px solid transparent; border-radius: 20px; padding: 4px 9px; font-size: 15px; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; transition: all 0.15s; line-height: 1.2; }
+    .reaction-btn:hover { background: #e4e6ea; border-color: #ccc; transform: scale(1.1); }
+    .reaction-btn.active { background: #e8f0fe; border-color: var(--gb-blue); }
+    .rxn-count { font-size: 11px; font-weight: bold; color: #444; }
   </style>
 </head>
 <body>
@@ -353,13 +361,13 @@ function handleWindowScroll() {
       );
       if (filterVal) {
         if (filterType === 'author') filtered = filtered.filter(p => p.user === filterVal);
-        if (filterType === 'likes') filtered = allPosts.filter(p => p.likes.includes(filterVal));
+        if (filterType === 'likes') filtered = allPosts.filter(p => Object.keys(normalizeLikes(p.likes)).includes(filterVal));
         if (filterType === 'hashtag') {
           const tag = filterVal.toLowerCase();
           filtered = filtered.filter(p => (p.message || "").toLowerCase().includes(tag));
         }
       }
-      
+
       if (postsToShow < filtered.length && !isInfiniteScrollLoading) {
         isInfiniteScrollLoading = true;
         postsToShow += 10;
@@ -592,7 +600,7 @@ function render() {
     } else {
         let label = filterType === 'likes' ? `Liked by ${filterVal}` : `Tagged ${filterVal}`;
         statusEl.innerHTML = `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>Showing: <b>${label}</b></span><button class="btn-alt" onclick="setFilter(null,null)">Clear</button></div>`;
-        if(filterType === 'likes') { filtered = allPosts.filter(p => p.likes.includes(filterVal)); }
+        if(filterType === 'likes') { filtered = allPosts.filter(p => Object.keys(normalizeLikes(p.likes)).includes(filterVal)); }
         if(filterType === 'hashtag') {
           const tag = filterVal.toLowerCase();
           filtered = filtered.filter(p => (p.message || "").toLowerCase().includes(tag) || p.comments.some(c => (c.text || "").toLowerCase().includes(tag)));
@@ -630,7 +638,10 @@ function render() {
       }
 
       const likeBadge = (filterType === 'likes') ? `<span style="color:#e74c3c; font-size:11px; font-weight:normal; background:#fff0f0; padding:2px 6px; border-radius:10px; margin-left:8px; border:1px solid #ffccd5;">❤️ ${index + 1} of ${totalInFilter}</span>` : '';
-      const likeNames = p.likes.length > 0 ? p.likes.map(name => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()}</b>`).join(', ') : '';
+      const reactions = normalizeLikes(p.likes);
+      const reactionCount = Object.keys(reactions).length;
+      const likeNames = reactionCount > 0 ? Object.entries(reactions).map(([name, em]) => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()} ${em}</b>`).join(', ') : '';
+      const reactionBarHTML = ['❤️','🤯','😡','🙄','😉'].map(em => { const cnt = Object.values(reactions).filter(e=>e===em).length; const isActive = reactions[u]===em; return `<button class="reaction-btn${isActive?' active':''}" data-emoji="${em}" onclick="apiCall('like',${p.rowIndex},event,'${em}')">${em}${cnt>0?` <span class='rxn-count'>${cnt}</span>`:''}</button>`; }).join('');
       const totalCommentsCount = p.comments.length;
       const initialComments = p.comments.slice(0, 2);
       const hiddenComments = p.comments.slice(2);
@@ -638,7 +649,7 @@ function render() {
       let toggleLabelHTML = "";
       if(totalCommentsCount > 2) { toggleLabelHTML = `<div id="toggle-label-${p.rowIndex}" style="color:var(--gb-blue); font-size:12px; font-weight:bold; margin-top:8px; cursor:pointer;" onclick="toggleCommentsVisibility(${p.rowIndex})">💬 View all ${totalCommentsCount} comments</div>`; }
 
-      return `<div class="card" id="post-${p.rowIndex}"><div class="user-header">${getAvatarMarkup(p.user, 'avatar-small')}<div class="user-info"><div style="display:flex; align-items:center;"><span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span>${likeBadge}</div><span class="time-stamp">${timeAgo(p.timestamp)}</span></div></div><p style="margin:10px 0;">${highlightHashtags(p.message)}</p>${mediaHTML}<div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;"><div style="display:flex; gap:10px; align-items:center;"><button class="like-btn btn-alt" onclick="apiCall('like', ${p.rowIndex}, event)">${p.likes.includes(u)?'❤️':'👍'} <span>${p.likes.length}</span></button><button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button></div><div class="liked-by-container" style="font-size:11px; color:#65676b; margin-left:5px; line-height:1.4; display: ${p.likes.length > 0 ? 'block' : 'none'};">Liked by: <span class="liked-by-list">${likeNames}</span></div></div><div class="comment-section" style="margin-top:10px;"><div class="comments-list">${initialComments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">${timeAgo(c.time)}</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}${toggleLabelHTML}<div id="comments-tray-${p.rowIndex}" style="display:none;">${hiddenComments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">Time unknown</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}</div></div><div style="margin-top:10px"><input id="c-${p.rowIndex}" placeholder="Reply..." style="margin-bottom:0; font-size:13px!important;"><button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button></div></div></div>`;
+      return `<div class="card" id="post-${p.rowIndex}"><div class="user-header">${getAvatarMarkup(p.user, 'avatar-small')}<div class="user-info"><div style="display:flex; align-items:center;"><span class="user-name" onclick="setFilter('author', '${p.user}')">${p.user}</span>${likeBadge}</div><span class="time-stamp">${timeAgo(p.timestamp)}</span></div></div><p style="margin:10px 0;">${highlightHashtags(p.message)}</p>${mediaHTML}<div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;"><div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;"><div class="reaction-bar">${reactionBarHTML}</div><button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button></div><div class="liked-by-container" style="font-size:11px; color:#65676b; margin-left:5px; line-height:1.4; display: ${reactionCount > 0 ? 'block' : 'none'};">Reacted: <span class="liked-by-list">${likeNames}</span></div></div><div class="comment-section" style="margin-top:10px;"><div class="comments-list">${initialComments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">${timeAgo(c.time)}</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}${toggleLabelHTML}<div id="comments-tray-${p.rowIndex}" style="display:none;">${hiddenComments.map(c => `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${c.user}</b><span style="font-size:10px; color:#888;">Time unknown</span></div><div>${highlightHashtags(c.text)}</div></div>`).join('')}</div></div><div style="margin-top:10px"><input id="c-${p.rowIndex}" placeholder="Reply..." style="margin-bottom:0; font-size:13px!important;"><button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button></div></div></div>`;
     } catch (err) { console.error("Error rendering post:", err); return `<div class="card">Error loading this post.</div>`; }
   }).join('');
 
@@ -659,10 +670,10 @@ function updateSidebar() {
   const myName = document.getElementById('user').value.trim();
   document.getElementById('myProfileLink').innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', '${myName}')">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
   
-  const topPosts = [...allPosts].sort((a,b) => ((b.likes?.length||0)+(b.comments?.length||0)) - ((a.likes?.length||0)+(a.comments?.length||0))).slice(0,3);
-  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b><br>${topPosts.map(p => `<div class="sidebar-item" onclick="scrollToPost(${p.rowIndex})"><div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div><div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div><span class="trend-stats">❤️ ${p.likes.length} • 💬 ${p.comments.length}</span></div>`).join('')}</div>`;
-  
-  const lCounts = {}; allPosts.forEach(p => p.likes.forEach(n => lCounts[n] = (lCounts[n]||0)+1));
+  const topPosts = [...allPosts].sort((a,b) => (Object.keys(normalizeLikes(b.likes)).length+(b.comments?.length||0)) - (Object.keys(normalizeLikes(a.likes)).length+(a.comments?.length||0))).slice(0,3);
+  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b><br>${topPosts.map(p => `<div class="sidebar-item" onclick="scrollToPost(${p.rowIndex})"><div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div><div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div><span class="trend-stats">❤️ ${Object.keys(normalizeLikes(p.likes)).length} • 💬 ${p.comments.length}</span></div>`).join('')}</div>`;
+
+  const lCounts = {}; allPosts.forEach(p => Object.keys(normalizeLikes(p.likes)).forEach(n => lCounts[n] = (lCounts[n]||0)+1));
   const topLikers = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
   document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${topLikers.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
   
@@ -766,32 +777,47 @@ async function compressImage(file) {
   });
 }
 
-async function apiCall(action, rowIndex, event) {
+function normalizeLikes(data) {
+  if (!data) return {};
+  if (Array.isArray(data)) { const o = {}; data.forEach(n => { if (n) o[String(n)] = '❤️'; }); return o; }
+  if (typeof data === 'object') return data;
+  return {};
+}
+
+async function apiCall(action, rowIndex, event, emoji) {
   const user = document.getElementById('user').value.trim();
   if(!user) return alert("Name required!");
-  
+
   triggerStreakIncrement();
   const currentLocalStreak = localStorage.getItem(`gb_streak_${user}`) || "1";
-  
+
   const p = allPosts.find(x => x.rowIndex === rowIndex);
   const postEl = document.getElementById(`post-${rowIndex}`);
-  
+
   if(action==='like') {
-    const i = p.likes.indexOf(user);
-    i === -1 ? p.likes.push(user) : p.likes.splice(i,1);
+    const em = emoji || '❤️';
+    const reactions = normalizeLikes(p.likes);
+    const wasReacted = reactions[user] === em;
+    if (wasReacted) { delete reactions[user]; } else { reactions[user] = em; }
+    p.likes = reactions;
     if (postEl) {
-      const btn = postEl.querySelector('.like-btn');
-      if (btn) { btn.classList.add('pop'); setTimeout(() => btn.classList.remove('pop'), 120); btn.innerHTML = (p.likes.includes(user) ? '❤️ ' : '👍 ') + `<span>${p.likes.length}</span>`; }
+      postEl.querySelectorAll('.reaction-btn').forEach(btn => {
+        const bEm = btn.dataset.emoji;
+        const cnt = Object.values(reactions).filter(e=>e===bEm).length;
+        btn.className = 'reaction-btn' + (reactions[user]===bEm ? ' active' : '');
+        btn.innerHTML = bEm + (cnt > 0 ? ` <span class='rxn-count'>${cnt}</span>` : '');
+        if (bEm === em && !wasReacted) { btn.classList.add('pop'); setTimeout(() => btn.classList.remove('pop'), 120); }
+      });
       const container = postEl.querySelector('.liked-by-container'); const listSpan = postEl.querySelector('.liked-by-list');
-      if (container && listSpan) { if (p.likes.length > 0) { listSpan.innerHTML = p.likes.map(name => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()}</b>`).join(', '); container.style.display = 'block'; } else { container.style.display = 'none'; } }
+      if (container && listSpan) { if (Object.keys(reactions).length > 0) { listSpan.innerHTML = Object.entries(reactions).map(([n, e]) => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${n.trim()}')">${n.trim()} ${e}</b>`).join(', '); container.style.display = 'block'; } else { container.style.display = 'none'; } }
     }
-    if(i === -1 && event) { const u = document.createElement('div'); u.className='unicorn-pop'; u.textContent='🦄'; u.style.left=event.clientX+'px'; u.style.top=event.clientY+'px'; document.body.appendChild(u); setTimeout(()=>u.remove(), 1500); }
-    
+    if (!wasReacted && event) { const u = document.createElement('div'); u.className='unicorn-pop'; u.textContent=em; u.style.left=event.clientX+'px'; u.style.top=event.clientY+'px'; document.body.appendChild(u); setTimeout(()=>u.remove(), 1500); }
+
     // PACKAGES STREAK VALUE ON LIKE EXECUTIONS
-    await fetch(SCRIPT_URL, { 
-      method: 'POST', 
-      mode: 'no-cors', 
-      body: JSON.stringify({ action, rowIndex, username: user, streak: currentLocalStreak }) 
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: JSON.stringify({ action, rowIndex, username: user, streak: currentLocalStreak, emoji: em })
     });
   } else if (action === 'comment') {
     const input = document.getElementById(`c-${rowIndex}`); if(!input || !input.value) return; const txt = input.value;
@@ -808,46 +834,77 @@ async function apiCall(action, rowIndex, event) {
 }
 
 async function sharePost(rowIndex, event) {
-  const post = allPosts.find(p => p.rowIndex === rowIndex); 
+  const post = allPosts.find(p => p.rowIndex === rowIndex);
   if (!post) return;
-  const btn = event.target; const originalText = btn.innerText; btn.innerText = "⏳ Preparing Card...";
-  const names = post.likes.length > 0 ? post.likes.join(', ') : ''; const hasPhoto = post.image && post.image.length > 10; const targetImageUrl = hasPhoto ? post.image : "";
-  let textTextMsg = `🦄 Gooldbook Post by ${post.user}:\n\n"${post.message}"`;
+  const btn = event.target; const originalText = btn.innerText; btn.innerText = "⏳ Preparing...";
+  const shareText = `🦄 Gooldbook Post by ${post.user}:\n\n"${post.message}"`;
+  const postReactions = normalizeLikes(post.likes);
+  const names = Object.keys(postReactions).length > 0 ? Object.entries(postReactions).map(([n,e]) => `${n} ${e}`).join(', ') : '';
+  const imgs = (() => {
+    if (Array.isArray(post.images) && post.images.length) return post.images;
+    const v = post.image || "";
+    if (!v) return [];
+    try { const parsed = JSON.parse(v); return Array.isArray(parsed) ? parsed : [v]; }
+    catch { return [v]; }
+  })();
+  const carEl = document.getElementById(`carousel-${rowIndex}`);
+  const activeIdx = carEl ? parseInt(carEl.dataset.idx || 0) : 0;
+  const targetImageUrl = imgs[activeIdx] || "";
+
+  let canvas = null;
+  const renderFrame = document.createElement('div');
+  renderFrame.style.cssText = `position:fixed;left:-9999px;top:0;width:400px;background:#ffffff;padding:24px;border-radius:12px;font-family:system-ui,-apple-system,sans-serif;color:#1c1e21;box-sizing:border-box;`;
 
   try {
     const safeBase64Image = await base64CacheProxy(targetImageUrl);
-    const renderFrame = document.createElement('div');
-    renderFrame.style.cssText = `position: fixed; left: -9999px; top: 0; width: 400px; background: #ffffff !important; padding: 24px; border-radius: 12px; font-family: system-ui, -apple-system, sans-serif; color: #1c1e21; box-sizing: border-box;`;
-    const allCommentsHTML = post.comments.slice(0, 3).map(c => `<div style="background:#f0f2f5; padding:8px; border-radius:8px; margin-top:5px; font-size:13px; text-align: left;"><b>${c.user}</b>: ${c.text}</div>`).join('');
-
+    const allCommentsHTML = post.comments.slice(0, 3).map(c => `<div style="background:#f0f2f5;padding:8px;border-radius:8px;margin-top:5px;font-size:13px;text-align:left;"><b>${c.user}</b>: ${c.text}</div>`).join('');
     renderFrame.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; text-align: left;">
-        <div style="width:36px; height:36px; border-radius:50%; background:#3b5998; display:flex; align-items:center; justify-content:center; font-size:18px; color:white;">🦄</div>
-        <div><div style="font-weight: bold; color: #3b5998;">${post.user}</div><div style="font-size: 11px; color: #888;">theGooldbook 🦄</div></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:#3b5998;display:flex;align-items:center;justify-content:center;font-size:18px;color:white;">🦄</div>
+        <div><div style="font-weight:bold;color:#3b5998;">${post.user}</div><div style="font-size:11px;color:#888;">theGooldbook 🦄</div></div>
       </div>
-      <div style="font-size: 15px; margin-bottom: 15px; line-height: 1.4; text-align: left; color:#1c1e21;">${post.message}</div>
-      ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%; aspect-ratio:1/1; object-fit:cover; border-radius: 8px; margin-bottom: 10px; display:block;">` : ''}
-      <div style="border-top: 2px solid #f0f2f5; padding-top: 12px; margin-top: 5px; text-align: left;">
-        <div style="display: flex; gap: 15px; font-size: 14px; font-weight: bold; color: #65676b; margin-bottom: 4px;"><span>❤️ ${post.likes.length} Likes</span><span>💬 ${post.comments.length} Comments</span></div>
-        ${names ? `<div style="font-size: 11px; color: #888; line-height: 1.3; margin-bottom:10px;">Liked by: <b>${names}</b></div>` : ''}
+      <div style="font-size:15px;margin-bottom:15px;line-height:1.4;color:#1c1e21;">${post.message}</div>
+      ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px;margin-bottom:10px;display:block;">` : ''}
+      <div style="border-top:2px solid #f0f2f5;padding-top:12px;margin-top:5px;">
+        <div style="display:flex;gap:15px;font-size:14px;font-weight:bold;color:#65676b;margin-bottom:4px;"><span>❤️ ${Object.keys(postReactions).length} Reactions</span><span>💬 ${post.comments.length} Comments</span></div>
+        ${names ? `<div style="font-size:11px;color:#888;margin-bottom:10px;">Reacted: <b>${names}</b></div>` : ''}
       </div>
       <div style="margin-top:10px;">${allCommentsHTML}</div>
-      <div style="margin-top:15px; border-top:1px dashed #ccc; padding-top:8px; font-size:10px; color:#aaa; text-align:center; font-weight:bold;">SHARED VIA THEGOOLDBOOK 🦄</div>
-    `;
+      <div style="margin-top:15px;border-top:1px dashed #ccc;padding-top:8px;font-size:10px;color:#aaa;text-align:center;font-weight:bold;">SHARED VIA THEGOOLDBOOK 🦄</div>`;
 
     document.body.appendChild(renderFrame);
-    const canvas = await html2canvas(renderFrame, { useCORS: true, allowTaint: false, scale: 2, backgroundColor: "#ffffff", logging: false, width: 400 });
-    document.body.removeChild(renderFrame);
-    
+    canvas = await html2canvas(renderFrame, { useCORS: true, allowTaint: false, scale: 2, backgroundColor: "#ffffff", logging: false, width: 400 });
+    if (document.body.contains(renderFrame)) document.body.removeChild(renderFrame);
+
     const imageBlob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-    const sharedFile = new File([imageBlob], `Gooldbook_Card_${rowIndex}.png`, { type: 'image/png' });
+    const sharedFile = new File([imageBlob], `Gooldbook_${rowIndex}.png`, { type: 'image/png' });
 
     if (navigator.canShare && navigator.canShare({ files: [sharedFile] })) {
-      await navigator.share({ files: [sharedFile], title: 'TheGooldbook Post', text: textTextMsg });
-    } else { throw new Error("Native sharing unavailable."); }
+      await navigator.share({ files: [sharedFile], title: 'TheGooldbook Post', text: shareText });
+    } else if (navigator.share) {
+      await navigator.share({ title: 'TheGooldbook Post', text: shareText });
+    } else {
+      shareDownload(canvas, rowIndex);
+    }
   } catch(e) {
-    try { if (navigator.share) { await navigator.share({ title: 'TheGooldbook Post', text: textTextMsg + `\n\nLink: ${post.image || window.location.href}` }); } } catch(txtErr) { alert("Sharing declined."); }
+    if (document.body.contains(renderFrame)) document.body.removeChild(renderFrame);
+    if (e.name === 'AbortError') return;
+    if (canvas) {
+      shareDownload(canvas, rowIndex);
+    } else {
+      try { await navigator.clipboard.writeText(shareText); alert("Copied post text to clipboard!"); }
+      catch { alert("Sharing not available on this device."); }
+    }
   } finally { btn.innerText = originalText; }
+}
+
+function shareDownload(canvas, rowIndex) {
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = `Gooldbook_${rowIndex}.png`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 async function applyImageCropAndFilter() {
