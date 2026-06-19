@@ -667,7 +667,7 @@ function render() {
       const reactions = normalizeLikes(p.likes);
       const reactionCount = Object.keys(reactions).length;
       const likeNames = reactionCount > 0 ? Object.entries(reactions).map(([name, em]) => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()} ${em}</b>`).join(', ') : '';
-      const reactionBarHTML = ['❤️','🤯','😡','🙄','😉'].map(em => { const cnt = Object.values(reactions).filter(e=>e===em).length; const isActive = reactions[u]===em; return `<button class="reaction-btn${isActive?' active':''}" data-emoji="${em}" onclick="apiCall('like',${p.rowIndex},event,'${em}')">${em}${cnt>0?` <span class='rxn-count'>${cnt}</span>`:''}</button>`; }).join('');
+      const reactionBarHTML = ['❤️','🤯','🙄','😉'].map(em => { const cnt = Object.values(reactions).filter(e=>e===em).length; const isActive = reactions[u]===em; return `<button class="reaction-btn${isActive?' active':''}" data-emoji="${em}" onclick="apiCall('like',${p.rowIndex},event,'${em}')">${em}${cnt>0?` <span class='rxn-count'>${cnt}</span>`:''}</button>`; }).join('');
       const totalCommentsCount = p.comments.length;
       const initialComments = p.comments.slice(0, 2);
       const hiddenComments = p.comments.slice(2);
