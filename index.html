@@ -1141,18 +1141,20 @@ function saveUser() {
 
 function syncStreakFromServer() {
   const user = document.getElementById('user').value.trim();
-  if (!user || !allStreaks.length) return;
+  if (!user || !allStreaks.length) { triggerStreakIncrement(); return; }
   const serverEntry = allStreaks.find(s => s.user === user);
-  if (!serverEntry || !serverEntry.streak || !serverEntry.lastUpdated) return;
-  const serverLastISO = normalizeToISO(serverEntry.lastUpdated);
-  if (!serverLastISO) return;
-  if (daysBetween(serverLastISO, getTodayISO()) > 1) return; // server streak expired
-  const localStreak = parseInt(localStorage.getItem(`gb_streak_${user}`) || "0");
-  const localLastISO = normalizeToISO(localStorage.getItem(`gb_streak_date_${user}`));
-  if (serverEntry.streak > localStreak || !localLastISO) {
-    localStorage.setItem(`gb_streak_${user}`, serverEntry.streak);
-    localStorage.setItem(`gb_streak_date_${user}`, serverLastISO);
+  if (serverEntry && serverEntry.streak && serverEntry.lastUpdated) {
+    const serverLastISO = normalizeToISO(serverEntry.lastUpdated);
+    if (serverLastISO && daysBetween(serverLastISO, getTodayISO()) <= 1) {
+      const localStreak = parseInt(localStorage.getItem(`gb_streak_${user}`) || "0");
+      const localLastISO = normalizeToISO(localStorage.getItem(`gb_streak_date_${user}`));
+      if (serverEntry.streak > localStreak || !localLastISO) {
+        localStorage.setItem(`gb_streak_${user}`, serverEntry.streak);
+        localStorage.setItem(`gb_streak_date_${user}`, serverLastISO);
+      }
+    }
   }
+  triggerStreakIncrement(); // opening the app counts as daily activity
 }
 
 function getTodayISO() {
@@ -1202,7 +1204,7 @@ function triggerStreakIncrement() {
     const diff = daysBetween(lastISO, todayISO);
     currentStreak = diff === 1 ? currentStreak + 1 : 1;
   } else {
-    currentStreak = currentStreak > 0 ? currentStreak + 1 : 1;
+    currentStreak = 1;
   }
   localStorage.setItem(streakKey, currentStreak);
   localStorage.setItem(lastDateKey, todayISO);
