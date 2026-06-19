@@ -346,6 +346,16 @@ function closeCropModal() {
   if(activeCropperInstance) activeCropperInstance.destroy();
 }
 
+function toggleReactionNames(rowIndex) {
+  const moreSpan = document.getElementById(`rxn-more-${rowIndex}`);
+  const allSpan = document.getElementById(`rxn-all-${rowIndex}`);
+  if (moreSpan && allSpan) {
+    const expanding = allSpan.style.display === 'none';
+    allSpan.style.display = expanding ? 'inline' : 'none';
+    moreSpan.textContent = expanding ? 'less' : `+${allSpan.querySelectorAll('b').length} more`;
+  }
+}
+
 function toggleCommentsVisibility(rowIndex) {
   const tray = document.getElementById(`comments-tray-${rowIndex}`);
   const label = document.getElementById(`toggle-label-${rowIndex}`);
@@ -666,7 +676,17 @@ function render() {
       const likeBadge = (filterType === 'likes') ? `<span style="color:#e74c3c; font-size:11px; font-weight:normal; background:#fff0f0; padding:2px 6px; border-radius:10px; margin-left:8px; border:1px solid #ffccd5;">❤️ ${index + 1} of ${totalInFilter}</span>` : '';
       const reactions = normalizeLikes(p.likes);
       const reactionCount = Object.keys(reactions).length;
-      const likeNames = reactionCount > 0 ? Object.entries(reactions).map(([name, em]) => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()} ${em}</b>`).join(', ') : '';
+      let likeNames = '';
+      if (reactionCount > 0) {
+        const rxnEntries = Object.entries(reactions);
+        const shownNames = rxnEntries.slice(0, 3).map(([name, em]) => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()} ${em}</b>`).join(', ');
+        if (reactionCount > 3) {
+          const hiddenNames = rxnEntries.slice(3).map(([name, em]) => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()} ${em}</b>`).join(', ');
+          likeNames = shownNames + `, <span id="rxn-more-${p.rowIndex}" style="color:var(--gb-blue);cursor:pointer;font-weight:bold;" onclick="toggleReactionNames(${p.rowIndex})">+${reactionCount - 3} more</span><span id="rxn-all-${p.rowIndex}" style="display:none;">, ${hiddenNames}</span>`;
+        } else {
+          likeNames = shownNames;
+        }
+      }
       const reactionBarHTML = ['❤️','🤯','🙄','😉'].map(em => { const cnt = Object.values(reactions).filter(e=>e===em).length; const isActive = reactions[u]===em; return `<button class="reaction-btn${isActive?' active':''}" data-emoji="${em}" onclick="apiCall('like',${p.rowIndex},event,'${em}')">${em}${cnt>0?` <span class='rxn-count'>${cnt}</span>`:''}</button>`; }).join('');
       const totalCommentsCount = p.comments.length;
       const initialComments = p.comments.slice(0, 2);
