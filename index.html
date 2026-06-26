@@ -479,26 +479,29 @@ function acceptNewPosts() {
   render();
 }
 
+const _b64Cache = {};
 function base64CacheProxy(url) {
   return new Promise((resolve) => {
     if (!url || url.length < 10) return resolve("");
     if (url.startsWith('data:image')) return resolve(url);
+    if (_b64Cache[url]) return resolve(_b64Cache[url]);
 
     const img = new Image();
     img.crossOrigin = "anonymous";
-    img.src = url + (url.includes('?') ? '&' : '?') + 't=' + new Date().getTime();
-    
+    img.src = url;
+
     img.onload = () => {
       try {
         const canvas = document.createElement('canvas');
         canvas.width = img.naturalWidth;
         canvas.height = img.naturalHeight;
-        const outCtx = canvas.getContext('2d');
-        outCtx.drawImage(img, 0, 0);
-        resolve(canvas.toDataURL('image/jpeg', 0.9));
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        const result = canvas.toDataURL('image/jpeg', 0.9);
+        _b64Cache[url] = result;
+        resolve(result);
       } catch(err) {
         console.warn("CORS proxy canvas write failed.", err);
-        resolve(""); 
+        resolve("");
       }
     };
     img.onerror = () => resolve("");
