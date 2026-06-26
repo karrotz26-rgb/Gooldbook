@@ -419,6 +419,8 @@ async function loadFeed() {
     syncStreakFromServer();
     document.getElementById('refreshPill').classList.remove('show');
     render();
+    const deepPost = new URLSearchParams(window.location.search).get('post');
+    if (deepPost) scrollToPost(parseInt(deepPost));
   } catch(e) { console.error("Load failed", e); }
 }
 
