@@ -967,13 +967,32 @@ async function sharePost(rowIndex, event) {
   try {
     const safeBase64Image = await base64CacheProxy(targetImageUrl);
     const allCommentsHTML = post.comments.slice(0, 3).map(c => `<div style="background:#f0f2f5;padding:8px;border-radius:8px;margin-top:5px;font-size:13px;text-align:left;"><b>${c.user}</b>: ${c.text}</div>`).join('');
+
+    // Build media card for YouTube or Apple Music links
+    let mediaCardHTML = '';
+    const ytShareMatch = (post.message || "").match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    const amShareMatch = (post.message || "").match(/https?:\/\/music\.apple\.com\/[^\s"<>]+/);
+    if (ytShareMatch && ytShareMatch[1]) {
+      const thumbBase64 = await base64CacheProxy(`https://img.youtube.com/vi/${ytShareMatch[1]}/hqdefault.jpg`);
+      if (thumbBase64) {
+        mediaCardHTML = `<div style="position:relative;margin-bottom:12px;border-radius:8px;overflow:hidden;"><img src="${thumbBase64}" style="width:100%;display:block;"><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:54px;height:54px;background:rgba(255,0,0,0.92);border-radius:50%;display:flex;align-items:center;justify-content:center;"><div style="width:0;height:0;border-style:solid;border-width:11px 0 11px 22px;border-color:transparent transparent transparent white;margin-left:5px;"></div></div></div>`;
+      }
+    } else if (amShareMatch) {
+      const amUrl = amShareMatch[0];
+      const isTrack = amUrl.includes('?i=');
+      const pathParts = amUrl.replace(/\?.*/, '').split('/').filter(p => p && !/^\d+$/.test(p) && !['https:', 'music.apple.com', 'us', 'album', 'playlist', 'song'].includes(p));
+      const songName = (pathParts[pathParts.length - 1] || '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Apple Music';
+      mediaCardHTML = `<div style="background:#1c1c1e;border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px;margin-bottom:12px;"><div style="width:48px;height:48px;background:linear-gradient(135deg,#fc3c44,#ff6b6b);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">🎵</div><div style="overflow:hidden;"><div style="color:#fff;font-size:13px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${songName}</div><div style="color:#fc3c44;font-size:11px;margin-top:2px;">${isTrack ? '🎵 Song · Apple Music' : '💿 Album/Playlist · Apple Music'}</div></div></div>`;
+    }
+
     renderFrame.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
         <div style="width:36px;height:36px;border-radius:50%;background:#3b5998;display:flex;align-items:center;justify-content:center;font-size:18px;color:white;">🦄</div>
         <div><div style="font-weight:bold;color:#3b5998;">${post.user}</div><div style="font-size:11px;color:#888;">theGooldbook 🦄</div></div>
       </div>
       <div style="font-size:15px;margin-bottom:15px;line-height:1.4;color:#1c1e21;">${post.message}</div>
-      ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px;margin-bottom:10px;display:block;">` : ''}
+      ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px;margin-bottom:12px;display:block;">` : ''}
+      ${mediaCardHTML}
       <div style="border-top:2px solid #f0f2f5;padding-top:12px;margin-top:5px;">
         <div style="display:flex;gap:15px;font-size:14px;font-weight:bold;color:#65676b;margin-bottom:4px;"><span>❤️ ${Object.keys(postReactions).length} Reactions</span><span>💬 ${post.comments.length} Comments</span></div>
         ${names ? `<div style="font-size:11px;color:#888;margin-bottom:10px;">Reacted: <b>${names}</b></div>` : ''}
