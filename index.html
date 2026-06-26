@@ -673,6 +673,14 @@ function render() {
         mediaHTML += `<div style="margin-top:10px; position:relative; aspect-ratio: 16/9; width:100%; overflow:hidden; border-radius:8px;"><iframe src="https://www.youtube.com/embed/${videoId}?rel=0" style="position:absolute;top:0;left:0;width:100%;height:100%;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
       }
 
+      const amMatch = (p.message || "").match(/https?:\/\/music\.apple\.com\/[^\s"<>]+/);
+      if (amMatch) {
+        const embedUrl = amMatch[0].replace('music.apple.com', 'embed.music.apple.com');
+        const isTrack = amMatch[0].includes('?i=');
+        const embedHeight = isTrack ? 175 : 450;
+        mediaHTML += `<div style="margin-top:10px; border-radius:12px; overflow:hidden;"><iframe allow="autoplay *; encrypted-media *; fullscreen *; clipboard-write" frameborder="0" height="${embedHeight}" style="width:100%;overflow:hidden;border-radius:12px;background:#000;" sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-storage-access-by-user-activation allow-top-navigation-by-user-activation" src="${embedUrl}"></iframe></div>`;
+      }
+
       const likeBadge = (filterType === 'likes') ? `<span style="color:#e74c3c; font-size:11px; font-weight:normal; background:#fff0f0; padding:2px 6px; border-radius:10px; margin-left:8px; border:1px solid #ffccd5;">❤️ ${index + 1} of ${totalInFilter}</span>` : '';
       const reactions = normalizeLikes(p.likes);
       const reactionCount = Object.keys(reactions).length;
