@@ -268,7 +268,7 @@ let chosenFilterStyleName = "normal";
 
 let selfieSegmentationModelInstance = null;
 
-const HASHTAG_URL_REGEX = /(https?:\/\/[^\s]+)|#(\w+)/g;
+const HASHTAG_URL_REGEX = /(https?:\/\/[^\s]+)|#(\w+)|@(\w+)/g;
 
 const filterMatrixConfigurations = {
   normal: 'none',
@@ -580,7 +580,7 @@ async function saveBio(user) {
 function highlightHashtags(t) {
   if(!t) return "";
   HASHTAG_URL_REGEX.lastIndex = 0;
-  return t.replace(HASHTAG_URL_REGEX, (match, url, tag) => {
+  return t.replace(HASHTAG_URL_REGEX, (match, url, tag, mention) => {
     if (url) {
       try {
         const urlObj = new URL(url);
@@ -598,6 +598,9 @@ function highlightHashtags(t) {
     }
     if (tag) {
       return `<span style="color:var(--gb-hover);font-weight:bold;cursor:pointer" onclick="setFilter('hashtag','${match.toLowerCase()}')">${match}</span>`;
+    }
+    if (mention) {
+      return `<span style="color:#3b5998;font-weight:bold;background:#e8f0fe;padding:1px 6px;border-radius:4px;">@${mention}</span>`;
     }
     return match;
   });
