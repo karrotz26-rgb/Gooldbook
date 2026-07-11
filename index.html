@@ -849,6 +849,19 @@ async function upload() {
   const user = document.getElementById('user').value.trim();
   const msg = document.getElementById('msg').value.trim();
   if(!user || !msg) return alert("Fill in name and message!");
+
+  const postTimesKey = `gb_postTimes_${user}`;
+  const now = Date.now();
+  const oneHour = 60 * 60 * 1000;
+  let recentPosts = JSON.parse(localStorage.getItem(postTimesKey) || '[]');
+  recentPosts = recentPosts.filter(t => now - t < oneHour);
+  if (recentPosts.length >= 2) {
+    const mins = Math.ceil((recentPosts[0] + oneHour - now) / 60000);
+    return alert(`You've already posted twice this hour. Try again in ${mins} minute${mins !== 1 ? 's' : ''}.`);
+  }
+  recentPosts.push(now);
+  localStorage.setItem(postTimesKey, JSON.stringify(recentPosts));
+
   const postBtn = document.getElementById('postBtn');
   postBtn.innerText = "⏳ Uploading...";
   postBtn.disabled = true;
@@ -874,7 +887,13 @@ async function upload() {
     postBtn.innerText = "✨ Finalizing post...";
     await new Promise(resolve => setTimeout(resolve, 2500));
     await loadFeed(); 
-  } catch(e) { console.error("Upload failed:", e); alert("Post creation failed. Please try again."); } finally { postBtn.innerText = "Post Update"; postBtn.disabled = false; }
+  } catch(e) {
+    console.error("Upload failed:", e);
+    alert("Post creation failed. Please try again.");
+    const saved = JSON.parse(localStorage.getItem(postTimesKey) || '[]');
+    saved.pop();
+    localStorage.setItem(postTimesKey, JSON.stringify(saved));
+  } finally { postBtn.innerText = "Post Update"; postBtn.disabled = false; }
 }
 
 async function compressImage(file) {
