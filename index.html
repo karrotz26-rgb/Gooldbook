@@ -161,7 +161,7 @@
       <div class="filter-preview-box" style="background-color: #555;"></div>Normal
     </div>
     <div class="filter-option" onclick="selectPostFilter('film1982', this)">
-      <div class="filter-preview-box" style="background-color: #555; filter: sepia(0.35) contrast(1.2) brightness(1.05) saturate(1.3) hue-rotate(-2deg);"></div>1982 Film 🎞️
+      <div class="filter-preview-box" style="background-color: #555; filter: sepia(0.5) contrast(1.05) brightness(1.0) saturate(1.2) hue-rotate(-4deg);"></div>1982 Film 🎞️
     </div>
     <div class="filter-option" onclick="selectPostFilter('cyberpunk', this)">
       <div class="filter-preview-box" style="background-color: #555; filter: hue-rotate(140deg) saturate(1.8) contrast(1.3) brightness(0.9);"></div>Cyberpunk 🤖
@@ -980,25 +980,57 @@ async function applyImageCropAndFilter() {
       let modificationAmount = 0;
 
       if (chosenFilterStyleName === 'film1982') {
+        // Warm color matrix
         let tr = (r * 0.42) + (g * 0.73) + (b * 0.22);
         let tg = (r * 0.35) + (g * 0.64) + (b * 0.18);
         let tb = (r * 0.26) + (g * 0.48) + (b * 0.12);
-        
         r = (tr * 0.45 + r * 0.55) * 1.15;
         g = (tg * 0.45 + g * 0.55) * 1.05;
         b = (tb * 0.45 + b * 0.55) * 0.95;
-        
-        modificationAmount = (Math.random() - 0.5) * 32;
-        
+
+        // Lift blacks — film never goes pure black
+        r = r * 0.91 + 18;
+        g = g * 0.91 + 13;
+        b = b * 0.91 + 8;
+
+        // Split toning: amber warmth in shadows, cool back off in highlights
+        const lum = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+        if (lum < 0.55) {
+          const shadow = (0.55 - lum) * 1.8;
+          r += shadow * 14;
+          g += shadow * 4;
+          b -= shadow * 6;
+        } else {
+          const hi = (lum - 0.55) * 0.8;
+          r -= hi * 6;
+          b += hi * 8;
+        }
+
+        // Midtone-weighted grain (strongest in midtones, fades at pure shadows/highlights)
+        const midFactor = Math.max(0, 1 - Math.abs(lum - 0.45) * 2.2);
+        const grain = (Math.random() - 0.5) * 30 * midFactor;
+        r += grain;
+        g += grain * 0.9;
+        b += grain * 0.75;
+
+        // Left-edge light leak
         if (colX < 280) {
-          let leakIntensity = (1 - (colX / 280)) * 65;
-          let verticalDistanceFactor = Math.abs(rowY - leakCenterY) / 400;
+          const leakIntensity = (1 - (colX / 280)) * 65;
+          const verticalDistanceFactor = Math.abs(rowY - leakCenterY) / 400;
           if (verticalDistanceFactor < 1) {
-            let localizedFalloff = Math.cos(verticalDistanceFactor * Math.PI / 2);
+            const localizedFalloff = Math.cos(verticalDistanceFactor * Math.PI / 2);
             r += leakIntensity * localizedFalloff * 1.3;
             g += leakIntensity * localizedFalloff * 0.5;
           }
         }
+
+        // Vignette — darken corners like a lens
+        const dx = (colX - 400) / 400;
+        const dy = (rowY - 400) / 400;
+        const vign = 1 - Math.min(1, (dx * dx + dy * dy) * 0.72);
+        r *= vign;
+        g *= vign;
+        b *= vign;
       } 
       else if (chosenFilterStyleName === 'cyberpunk') {
         let rShift = r * 0.3 + g * 0.5 + b * 0.2;
