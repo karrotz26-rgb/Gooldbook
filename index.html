@@ -119,7 +119,7 @@
 .f-film1982, .f-film1982 .cropper-container, .f-film1982 .cropper-wrap-box { filter: sepia(0.35) contrast(1.2) brightness(1.05) saturate(1.3) hue-rotate(-2deg) !important; }
 .f-cyberpunk, .f-cyberpunk .cropper-container, .f-cyberpunk .cropper-wrap-box { filter: hue-rotate(140deg) saturate(1.8) contrast(1.3) brightness(0.9) !important; }
 .f-vhs90s, .f-vhs90s .cropper-container, .f-vhs90s .cropper-wrap-box { filter: contrast(1.1) saturate(1.3) brightness(1.05) blur(0.3px) !important; }
-.f-technopunk, .f-technopunk .cropper-container, .f-technopunk .cropper-wrap-box { filter: contrast(2.2) brightness(0.5) grayscale(1) !important; }
+.f-technopunk, .f-technopunk .cropper-container, .f-technopunk .cropper-wrap-box { filter: saturate(4) contrast(1.8) brightness(1.1) !important; }
 .f-aiportrait, .f-aiportrait .cropper-container, .f-aiportrait .cropper-wrap-box { filter: saturate(1.4) contrast(1.25) brightness(1.05) !important; }
 
     @media(max-width:700px){ .container { flex-direction:column; } .sidebar { width:100%; position:static; max-height: none; overflow-y: visible; } }
@@ -307,8 +307,15 @@ function renderFilterPreviews(imageDataUrl) {
     'saturate(1.45) contrast(1.25) brightness(1.05)'
   ];
   document.querySelectorAll('.filter-preview-box').forEach(function(box, idx) {
-    box.style.backgroundImage = `url('${imageDataUrl}')`;
-    box.style.filter = cssFilters[idx] || 'none';
+    if (idx === 4) {
+      box.style.background = `repeating-linear-gradient(to bottom, transparent 0px, transparent 4px, rgba(0,0,0,0.5) 4px, rgba(0,0,0,0.5) 6px), url('${imageDataUrl}')`;
+      box.style.backgroundSize = 'cover';
+      box.style.backgroundPosition = 'center';
+      box.style.filter = 'saturate(4) contrast(1.8)';
+    } else {
+      box.style.backgroundImage = `url('${imageDataUrl}')`;
+      box.style.filter = cssFilters[idx] || 'none';
+    }
   });
 }
 
@@ -1116,9 +1123,26 @@ async function applyImageCropAndFilter() {
     outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
     outContext.filter = 'none';
   } else if (chosenFilterStyleName === 'technopunk') {
-    outContext.filter = 'contrast(2.2) brightness(0.5) grayscale(1)';
     outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
-    outContext.filter = 'none';
+    const tpData = outContext.getImageData(0, 0, 800, 800);
+    const tpPixels = tpData.data;
+    for (let i = 0; i < tpPixels.length; i += 4) {
+      let r = tpPixels[i], g = tpPixels[i+1], b = tpPixels[i+2];
+      const rowY = Math.floor((i / 4) / 800);
+      // Boost saturation to pop art extremes
+      const avg = (r + g + b) / 3;
+      r = Math.min(255, Math.max(0, avg + (r - avg) * 4));
+      g = Math.min(255, Math.max(0, avg + (g - avg) * 4));
+      b = Math.min(255, Math.max(0, avg + (b - avg) * 4));
+      // Posterize to 3 levels per channel
+      r = r < 100 ? 0 : r < 200 ? 180 : 255;
+      g = g < 100 ? 0 : g < 200 ? 180 : 255;
+      b = b < 100 ? 0 : b < 200 ? 180 : 255;
+      // Comic scanline bars
+      if (rowY % 6 < 2) { r = Math.max(0, r - 90); g = Math.max(0, g - 90); b = Math.max(0, b - 90); }
+      tpPixels[i] = r; tpPixels[i+1] = g; tpPixels[i+2] = b;
+    }
+    outContext.putImageData(tpData, 0, 0);
   } else {
     outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
     const imgData = outContext.getImageData(0, 0, 800, 800);
