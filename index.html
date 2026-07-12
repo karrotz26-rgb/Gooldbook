@@ -119,7 +119,7 @@
 .f-film1982, .f-film1982 .cropper-container, .f-film1982 .cropper-wrap-box { filter: sepia(0.35) contrast(1.2) brightness(1.05) saturate(1.3) hue-rotate(-2deg) !important; }
 .f-cyberpunk, .f-cyberpunk .cropper-container, .f-cyberpunk .cropper-wrap-box { filter: hue-rotate(140deg) saturate(1.8) contrast(1.3) brightness(0.9) !important; }
 .f-vhs90s, .f-vhs90s .cropper-container, .f-vhs90s .cropper-wrap-box { filter: contrast(1.1) saturate(1.3) brightness(1.05) blur(0.3px) !important; }
-.f-technopunk, .f-technopunk .cropper-container, .f-technopunk .cropper-wrap-box { filter: contrast(1.9) brightness(0.7) grayscale(1) !important; }
+.f-technopunk, .f-technopunk .cropper-container, .f-technopunk .cropper-wrap-box { filter: contrast(3) brightness(0.4) grayscale(0.9) !important; }
 .f-aiportrait, .f-aiportrait .cropper-container, .f-aiportrait .cropper-wrap-box { filter: saturate(1.4) contrast(1.25) brightness(1.05) !important; }
 
     @media(max-width:700px){ .container { flex-direction:column; } .sidebar { width:100%; position:static; max-height: none; overflow-y: visible; } }
@@ -315,6 +315,10 @@ function renderFilterPreviews(imageDataUrl) {
       if (fname === 'aiportrait') {
         ctx.filter = 'saturate(1.45) contrast(1.25) brightness(1.05)';
         ctx.drawImage(srcCanvas, 0, 0);
+      } else if (fname === 'cyberpunk') {
+        ctx.filter = 'hue-rotate(140deg) saturate(1.8) contrast(1.3) brightness(0.9)';
+        ctx.drawImage(srcCanvas, 0, 0);
+        ctx.filter = 'none';
       } else {
         ctx.drawImage(srcCanvas, 0, 0);
         if (fname !== 'normal') {
@@ -1164,6 +1168,10 @@ async function applyImageCropAndFilter() {
       });
       selfieSegmentationModelInstance.send({ image: croppedCanvas });
     });
+  } else if (chosenFilterStyleName === 'cyberpunk') {
+    outContext.filter = 'hue-rotate(140deg) saturate(1.8) contrast(1.3) brightness(0.9)';
+    outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
+    outContext.filter = 'none';
   } else {
     outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
     const imgData = outContext.getImageData(0, 0, 800, 800);
