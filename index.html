@@ -1048,26 +1048,15 @@ async function applyImageCropAndFilter() {
         modificationAmount = scanlineDrop + subtleNoise;
       } 
       else if (chosenFilterStyleName === 'technopunk') {
-        let luminance = (r * 0.299) + (g * 0.587) + (b * 0.114);
-        let gray = luminance < 115 ? (luminance * 0.35) : (luminance * 1.85);
-        
-        let staticGrain = Math.random();
-        if (staticGrain > 0.93) gray += 50;
-        if (staticGrain < 0.07) gray -= 50;
-
-        if (rowY % 5 === 0) gray -= 30;
-
-        if (luminance > 175) {
-          if ((rowY + colX) % 16 < 8) {
-            r = 255;  g = 0;    b = 160; 
-          } else {
-            r = 0;    g = 255;  b = 220; 
-          }
-        } else {
-          r = gray;
-          g = gray;
-          b = gray;
-        }
+        // Replicate CSS: grayscale(1) brightness(0.7) contrast(1.9)
+        let v = r * 0.299 + g * 0.587 + b * 0.114; // grayscale
+        v = v * 0.7;                                 // brightness(0.7)
+        v = (v - 127.5) * 1.9 + 127.5;              // contrast(1.9)
+        if (rowY % 5 === 0) v -= 45;                 // scanline bars
+        v += (Math.random() - 0.5) * 10;             // subtle grain
+        const tv = Math.min(255, Math.max(0, v));
+        r = tv; g = tv; b = tv;
+        modificationAmount = 0;
       }
 
       pixels[i]     = Math.min(255, Math.max(0, r + modificationAmount));     
