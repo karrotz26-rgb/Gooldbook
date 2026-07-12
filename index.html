@@ -930,22 +930,33 @@ async function applyImageCropAndFilter() {
     await new Promise((resolve) => {
       selfieSegmentationModelInstance.onResults((results) => {
         outContext.clearRect(0, 0, 800, 800);
-        
+
+        // 1. Blurred background (natural, no color cast)
         outContext.save();
-        outContext.filter = 'blur(16px) brightness(0.7) saturate(3) hue-rotate(135deg)';
+        outContext.filter = 'blur(22px) brightness(0.88) saturate(0.8)';
         outContext.drawImage(results.image, 0, 0, 800, 800);
         outContext.restore();
-        
+
+        // 2. Cut person's shape out of the blurred layer
         outContext.save();
-        outContext.globalCompositeOperation = 'destination-in';
+        outContext.globalCompositeOperation = 'destination-out';
         outContext.drawImage(results.segmentationMask, 0, 0, 800, 800);
         outContext.restore();
-        
+
+        // 3. Place sharp enhanced person behind (fills the cutout hole)
         outContext.save();
         outContext.globalCompositeOperation = 'destination-over';
-        outContext.filter = 'contrast(1.25) saturate(1.45) brightness(1.05)';
+        outContext.filter = 'contrast(1.08) saturate(1.2) brightness(1.04)';
         outContext.drawImage(results.image, 0, 0, 800, 800);
         outContext.restore();
+
+        // 4. Subtle vignette on top
+        outContext.globalCompositeOperation = 'source-over';
+        const vig = outContext.createRadialGradient(400, 400, 180, 400, 400, 580);
+        vig.addColorStop(0, 'rgba(0,0,0,0)');
+        vig.addColorStop(1, 'rgba(0,0,0,0.3)');
+        outContext.fillStyle = vig;
+        outContext.fillRect(0, 0, 800, 800);
         
         resolve();
       });
