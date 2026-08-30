@@ -926,38 +926,62 @@ async function applyImageCropAndFilter() {
   
   if (chosenFilterStyleName === 'aiportrait' && selfieSegmentationModelInstance) {
     outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
-    
+
     await new Promise((resolve) => {
       selfieSegmentationModelInstance.onResults((results) => {
-        outContext.clearRect(0, 0, 800, 800);
+        // Blur background via downsample trick (works on iOS — no ctx.filter needed)
+        const tiny = document.createElement('canvas');
+        tiny.width = 40; tiny.height = 40;
+        tiny.getContext('2d').drawImage(results.image, 0, 0, 40, 40);
+        const blurC = document.createElement('canvas');
+        blurC.width = 800; blurC.height = 800;
+        const blurCtx = blurC.getContext('2d');
+        blurCtx.imageSmoothingEnabled = true;
+        blurCtx.imageSmoothingQuality = 'high';
+        blurCtx.drawImage(tiny, 0, 0, 800, 800);
 
-        // 1. Blurred background (natural, no color cast)
-        outContext.save();
-        outContext.filter = 'blur(22px) brightness(0.88) saturate(0.8)';
-        outContext.drawImage(results.image, 0, 0, 800, 800);
-        outContext.restore();
+        // Slightly dim and desaturate background via pixel manipulation
+        const bgData = blurCtx.getImageData(0, 0, 800, 800);
+        const bgPx = bgData.data;
+        for (let j = 0; j < bgPx.length; j += 4) {
+          const lum = bgPx[j]*0.299 + bgPx[j+1]*0.587 + bgPx[j+2]*0.114;
+          bgPx[j]   = Math.min(255, (lum + (bgPx[j]   - lum) * 0.65) * 0.82);
+          bgPx[j+1] = Math.min(255, (lum + (bgPx[j+1] - lum) * 0.65) * 0.82);
+          bgPx[j+2] = Math.min(255, (lum + (bgPx[j+2] - lum) * 0.65) * 0.82);
+        }
+        blurCtx.putImageData(bgData, 0, 0);
 
-        // 2. Cut person's shape out of the blurred layer
-        outContext.save();
-        outContext.globalCompositeOperation = 'destination-out';
-        outContext.drawImage(results.segmentationMask, 0, 0, 800, 800);
-        outContext.restore();
+        // Get segmentation mask pixel data (white = person)
+        const maskC = document.createElement('canvas');
+        maskC.width = 800; maskC.height = 800;
+        maskC.getContext('2d').drawImage(results.segmentationMask, 0, 0, 800, 800);
+        const maskPx = maskC.getContext('2d').getImageData(0, 0, 800, 800).data;
 
-        // 3. Place sharp enhanced person behind (fills the cutout hole)
-        outContext.save();
-        outContext.globalCompositeOperation = 'destination-over';
-        outContext.filter = 'contrast(1.08) saturate(1.2) brightness(1.04)';
-        outContext.drawImage(results.image, 0, 0, 800, 800);
-        outContext.restore();
+        // Get sharp original image pixels
+        const origC = document.createElement('canvas');
+        origC.width = 800; origC.height = 800;
+        origC.getContext('2d').drawImage(results.image, 0, 0, 800, 800);
+        const origPx = origC.getContext('2d').getImageData(0, 0, 800, 800).data;
 
-        // 4. Subtle vignette on top
-        outContext.globalCompositeOperation = 'source-over';
+        // Blend: person=sharp original, background=blurred
+        const outData = outContext.createImageData(800, 800);
+        const op = outData.data;
+        for (let j = 0; j < op.length; j += 4) {
+          const a = maskPx[j] / 255; // 1=person, 0=background
+          op[j]   = origPx[j]   * a + bgPx[j]   * (1 - a);
+          op[j+1] = origPx[j+1] * a + bgPx[j+1] * (1 - a);
+          op[j+2] = origPx[j+2] * a + bgPx[j+2] * (1 - a);
+          op[j+3] = 255;
+        }
+        outContext.putImageData(outData, 0, 0);
+
+        // Vignette
         const vig = outContext.createRadialGradient(400, 400, 180, 400, 400, 580);
         vig.addColorStop(0, 'rgba(0,0,0,0)');
         vig.addColorStop(1, 'rgba(0,0,0,0.3)');
         outContext.fillStyle = vig;
         outContext.fillRect(0, 0, 800, 800);
-        
+
         resolve();
       });
       selfieSegmentationModelInstance.send({ image: croppedCanvas });
