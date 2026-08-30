@@ -839,66 +839,36 @@ async function apiCall(action, rowIndex, event, emoji) {
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex);
   if (!post) return;
-  const btn = event.target; const originalText = btn.innerText; btn.innerText = "⏳ Preparing...";
-  const shareText = `🦄 Gooldbook Post by ${post.user}:\n\n"${post.message}"`;
-  const postReactions = normalizeLikes(post.likes);
-  const names = Object.keys(postReactions).length > 0 ? Object.entries(postReactions).map(([n,e]) => `${n} ${e}`).join(', ') : '';
-  const imgs = (() => {
-    if (Array.isArray(post.images) && post.images.length) return post.images;
-    const v = post.image || "";
-    if (!v) return [];
-    try { const parsed = JSON.parse(v); return Array.isArray(parsed) ? parsed : [v]; }
-    catch { return [v]; }
-  })();
-  const carEl = document.getElementById(`carousel-${rowIndex}`);
-  const activeIdx = carEl ? parseInt(carEl.dataset.idx || 0) : 0;
-  const targetImageUrl = imgs[activeIdx] || "";
+  const btn = event.target;
+  const originalText = btn.innerText;
+  const shareUrl = `https://karrotz26-rgb.github.io/Gooldbook/?post=${rowIndex}`;
+  const shareText = `🦄 ${post.user} on theGooldbook:\n"${(post.message || '').substring(0, 120)}"`;
 
-  let canvas = null;
-  const renderFrame = document.createElement('div');
-  renderFrame.style.cssText = `position:fixed;left:-9999px;top:0;width:400px;background:#ffffff;padding:24px;border-radius:12px;font-family:system-ui,-apple-system,sans-serif;color:#1c1e21;box-sizing:border-box;`;
+  // On iOS, navigator.share must be called immediately (within the user gesture).
+  // Call it first before any async work so iOS doesn't drop the gesture context.
+  if (navigator.share) {
+    btn.innerText = "⏳";
+    try {
+      await navigator.share({ title: 'theGooldbook 🦄', text: shareText, url: shareUrl });
+      btn.innerText = originalText;
+      return;
+    } catch(e) {
+      btn.innerText = originalText;
+      if (e.name === 'AbortError') return; // user cancelled — do nothing
+      // fall through to clipboard
+    }
+  }
 
+  // Desktop fallback: copy link to clipboard
+  btn.innerText = "⏳";
   try {
-    const safeBase64Image = await base64CacheProxy(targetImageUrl);
-    const allCommentsHTML = post.comments.slice(0, 3).map(c => `<div style="background:#f0f2f5;padding:8px;border-radius:8px;margin-top:5px;font-size:13px;text-align:left;"><b>${c.user}</b>: ${c.text}</div>`).join('');
-    renderFrame.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
-        <div style="width:36px;height:36px;border-radius:50%;background:#3b5998;display:flex;align-items:center;justify-content:center;font-size:18px;color:white;">🦄</div>
-        <div><div style="font-weight:bold;color:#3b5998;">${post.user}</div><div style="font-size:11px;color:#888;">theGooldbook 🦄</div></div>
-      </div>
-      <div style="font-size:15px;margin-bottom:15px;line-height:1.4;color:#1c1e21;">${post.message}</div>
-      ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px;margin-bottom:10px;display:block;">` : ''}
-      <div style="border-top:2px solid #f0f2f5;padding-top:12px;margin-top:5px;">
-        <div style="display:flex;gap:15px;font-size:14px;font-weight:bold;color:#65676b;margin-bottom:4px;"><span>❤️ ${Object.keys(postReactions).length} Reactions</span><span>💬 ${post.comments.length} Comments</span></div>
-        ${names ? `<div style="font-size:11px;color:#888;margin-bottom:10px;">Reacted: <b>${names}</b></div>` : ''}
-      </div>
-      <div style="margin-top:10px;">${allCommentsHTML}</div>
-      <div style="margin-top:15px;border-top:1px dashed #ccc;padding-top:8px;font-size:10px;color:#aaa;text-align:center;font-weight:bold;">SHARED VIA THEGOOLDBOOK 🦄</div>`;
-
-    document.body.appendChild(renderFrame);
-    canvas = await html2canvas(renderFrame, { useCORS: true, allowTaint: false, scale: 2, backgroundColor: "#ffffff", logging: false, width: 400 });
-    if (document.body.contains(renderFrame)) document.body.removeChild(renderFrame);
-
-    const imageBlob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-    const sharedFile = new File([imageBlob], `Gooldbook_${rowIndex}.png`, { type: 'image/png' });
-
-    if (navigator.canShare && navigator.canShare({ files: [sharedFile] })) {
-      await navigator.share({ files: [sharedFile], title: 'TheGooldbook Post', text: shareText });
-    } else if (navigator.share) {
-      await navigator.share({ title: 'TheGooldbook Post', text: shareText });
-    } else {
-      shareDownload(canvas, rowIndex);
-    }
-  } catch(e) {
-    if (document.body.contains(renderFrame)) document.body.removeChild(renderFrame);
-    if (e.name === 'AbortError') return;
-    if (canvas) {
-      shareDownload(canvas, rowIndex);
-    } else {
-      try { await navigator.clipboard.writeText(shareText); alert("Copied post text to clipboard!"); }
-      catch { alert("Sharing not available on this device."); }
-    }
-  } finally { btn.innerText = originalText; }
+    await navigator.clipboard.writeText(shareUrl);
+    btn.innerText = "✅ Copied!";
+    setTimeout(() => { btn.innerText = originalText; }, 2000);
+  } catch {
+    btn.innerText = originalText;
+    alert(`Post link:\n${shareUrl}`);
+  }
 }
 
 function shareDownload(canvas, rowIndex) {
