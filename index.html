@@ -105,21 +105,21 @@
     .unicorn-pop { position: fixed; font-size: 40px; pointer-events: none; z-index: 9999; animation: unicornFloat 1.5s ease-out forwards; }
     @keyframes unicornFloat { 0% { transform: translateY(0) scale(0); opacity: 0; } 30% { opacity: 1; transform: translateY(-40px) scale(1.2); } 100% { transform: translateY(-120px) scale(0); opacity: 0; } }
 
-    .crop-modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; height: 100dvh; background: rgba(0,0,0,0.9); z-index: 50000; display: none; flex-direction: column; align-items: center; justify-content: flex-start; padding: 15px; padding-top: max(15px, env(safe-area-inset-top) + 10px); padding-bottom: max(20px, env(safe-area-inset-bottom) + 15px); box-sizing: border-box; overflow-y: auto; }
-    .crop-workspace { width: 100%; max-width: 420px; max-height: 45vh; aspect-ratio: 1/1; background: #000; margin-bottom: 15px; overflow: hidden; border-radius: 8px; position: relative; }
+    .crop-modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 50000; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 15px; box-sizing: border-box; }
+    .crop-workspace { width: 100%; max-width: 420px; aspect-ratio: 1/1; background: #000; margin-bottom: 15px; overflow: hidden; border-radius: 8px; position: relative; }
     .crop-workspace img { max-width: 100%; display: block; }
     
     .filter-tray { display: flex; gap: 10px; width: 100%; max-width: 420px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 15px; scrollbar-width: none; }
     .filter-tray::-webkit-scrollbar { display: none; }
-    .filter-option { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; font-size: 11px; color: #ccc; cursor: pointer; width: 90px; font-weight: bold; }
-    .filter-preview-box { width: 75px; height: 75px; border-radius: 6px; background: #333; margin-bottom: 4px; border: 2px solid transparent; background-size: cover; background-position: center; transition: border-color 0.2s; overflow: hidden; }
+    .filter-option { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; font-size: 11px; color: #ccc; cursor: pointer; width: 75px; font-weight: bold; }
+    .filter-preview-box { width: 55px; height: 55px; border-radius: 6px; background: #333; margin-bottom: 4px; border: 2px solid transparent; background-size: cover; background-position: center; transition: border-color 0.2s; }
     .filter-option.active .filter-preview-box { border-color: #3498db; }
 
 .f-normal, .f-normal .cropper-container, .f-normal .cropper-wrap-box { filter: none !important; }
 .f-film1982, .f-film1982 .cropper-container, .f-film1982 .cropper-wrap-box { filter: sepia(0.35) contrast(1.2) brightness(1.05) saturate(1.3) hue-rotate(-2deg) !important; }
 .f-cyberpunk, .f-cyberpunk .cropper-container, .f-cyberpunk .cropper-wrap-box { filter: hue-rotate(140deg) saturate(1.8) contrast(1.3) brightness(0.9) !important; }
 .f-vhs90s, .f-vhs90s .cropper-container, .f-vhs90s .cropper-wrap-box { filter: contrast(1.1) saturate(1.3) brightness(1.05) blur(0.3px) !important; }
-.f-technopunk, .f-technopunk .cropper-container, .f-technopunk .cropper-wrap-box { filter: saturate(4) contrast(1.8) brightness(1.1) !important; }
+.f-technopunk, .f-technopunk .cropper-container, .f-technopunk .cropper-wrap-box { filter: contrast(1.9) brightness(0.7) grayscale(1) !important; }
 .f-aiportrait, .f-aiportrait .cropper-container, .f-aiportrait .cropper-wrap-box { filter: saturate(1.4) contrast(1.25) brightness(1.05) !important; }
 
     @media(max-width:700px){ .container { flex-direction:column; } .sidebar { width:100%; position:static; max-height: none; overflow-y: visible; } }
@@ -151,16 +151,6 @@
 
 <div id="backToTop" onclick="window.scrollTo({top: 0, behavior: 'smooth'}); document.body.scrollTop = 0; document.documentElement.scrollTop = 0;">⬆️</div>
 
-<div class="crop-modal" id="gifModal">
-  <div style="background:#fff; border-radius:12px; width:100%; max-width:480px; max-height:80vh; display:flex; flex-direction:column; overflow:hidden;">
-    <div style="padding:12px 16px; border-bottom:1px solid #eee; display:flex; align-items:center; gap:10px;">
-      <input id="gifSearch" placeholder="Search GIFs..." style="flex:1; margin:0;" oninput="debouncedGifSearch(this.value)">
-      <button class="btn btn-alt" onclick="closeGifPicker()">Cancel</button>
-    </div>
-    <div id="gifGrid" class="gif-grid"></div>
-  </div>
-</div>
-
 <div class="crop-modal" id="cropModal">
   <div class="crop-workspace" id="cropWorkspaceContainer">
     <img id="cropTargetImage" src="">
@@ -171,25 +161,19 @@
       <div class="filter-preview-box" style="background-color: #555;"></div>Normal
     </div>
     <div class="filter-option" onclick="selectPostFilter('film1982', this)">
-      <div class="filter-preview-box" style="background-color: #555;"></div>1982 Film 🎞️
+      <div class="filter-preview-box" style="background-color: #555; filter: sepia(0.5) contrast(1.05) brightness(1.0) saturate(1.2) hue-rotate(-4deg);"></div>1982 Film 🎞️
     </div>
     <div class="filter-option" onclick="selectPostFilter('cyberpunk', this)">
-      <div class="filter-preview-box" style="background-color: #555;"></div>Cyberpunk 🤖
+      <div class="filter-preview-box" style="background-color: #555; filter: hue-rotate(140deg) saturate(1.8) contrast(1.3) brightness(0.9);"></div>Cyberpunk 🤖
     </div>
     <div class="filter-option" onclick="selectPostFilter('vhs90s', this)">
-      <div class="filter-preview-box" style="background-color: #555;"></div>90s VHS 📼
+      <div class="filter-preview-box" style="background-color: #555; filter: contrast(1.1) saturate(1.3) brightness(1.05);"></div>90s VHS 📼
     </div>
     <div class="filter-option" onclick="selectPostFilter('technopunk', this)">
-      <div class="filter-preview-box" style="background-color: #111;"></div>Technopunk ⚡
+      <div class="filter-preview-box" style="background-color: #111; border: 1px solid #ff00ff; filter: contrast(1.9) brightness(0.7) grayscale(1);"></div>Technopunk ⚡
     </div>
     <div class="filter-option" onclick="selectPostFilter('aiportrait', this)">
-      <div class="filter-preview-box" style="background-color: #2c3e50;"></div>AI Portrait 🧠
-    </div>
-    <div class="filter-option" onclick="selectPostFilter('8bit', this)">
-      <div class="filter-preview-box" style="background-color: #1a1a3e;"></div>8-Bit 👾
-    </div>
-    <div class="filter-option" onclick="selectPostFilter('noinnoir', this)">
-      <div class="filter-preview-box" style="background-color: #000;"></div>Neon Noir 🌃
+      <div class="filter-preview-box" style="background-color: #2c3e50; border: 1px dashed #3498db;"></div>AI Portrait 🧠
     </div>
   </div>
 
@@ -230,11 +214,7 @@
     <div class="card" id="postComposer">
       <input id="user" placeholder="Your Name" onchange="saveUser()">
       <textarea id="msg" rows="2" placeholder="What's on your mind?"></textarea>
-      <div style="display:flex; gap:6px; margin-bottom:4px;">
-        <input type="file" id="file" accept="image/*" onchange="initiateCropper(event)" style="display:none;">
-        <button class="btn btn-alt" onclick="document.getElementById('file').click()">📷 Photo</button>
-        <button class="btn btn-alt" onclick="openGifPicker()">GIF</button>
-      </div>
+      <input type="file" id="file" accept="image/*" onchange="initiateCropper(event)">
       <div id="imagePreviewStrip" style="display:none; flex-wrap:wrap; gap:8px; margin:8px 0;"></div>
       <button id="addAnotherPhotoBtn" style="display:none;" onclick="document.getElementById('file').click()">+ Add another photo</button>
       <div style="display: flex; gap: 5px;">
@@ -248,9 +228,7 @@
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyDPhZ4y9YBcOpB78FKx2cwnqH-N2krx395t0kfD2VNpf4vLr0WEDsW0QSlyZJaSBjY/exec";
-const GIPHY_API_KEY = "3N3VPi3QqCKZOwSBO6Tn7vjJvgSLLxck";
-let gifSearchTimer;
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw_PEAG-FeMsmmKZ6vGl338lua4wOVsb696EtqNQpwbdZcQWe2H8DcyWfaDl6fbVabr/exec";
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let incomingPostsCache = null; 
 let allBios = {}, allAvatars = {};
@@ -303,80 +281,6 @@ function initializeSelfieSegmentationAI() {
   selfieSegmentationModelInstance.setOptions({ modelSelection: 1 });
 }
 
-function renderFilterPreviews(imageDataUrl) {
-  const cssFilters = [
-    'none',
-    'sepia(0.35) contrast(1.2) brightness(1.05) saturate(1.3) hue-rotate(-2deg)',
-    'hue-rotate(140deg) saturate(1.8) contrast(1.3) brightness(0.9)',
-    'contrast(1.1) saturate(1.3) brightness(1.05)',
-    null,
-    'saturate(1.45) contrast(1.25) brightness(1.05)'
-  ];
-  const boxes = document.querySelectorAll('.filter-preview-box');
-  boxes.forEach(function(box, idx) {
-    if (idx === 4) {
-      box.style.background = `repeating-linear-gradient(to bottom, transparent 0px, transparent 4px, rgba(0,0,0,0.5) 4px, rgba(0,0,0,0.5) 6px), url('${imageDataUrl}')`;
-      box.style.backgroundSize = 'cover';
-      box.style.backgroundPosition = 'center';
-      box.style.filter = 'saturate(4) contrast(1.8)';
-    } else if (idx === 6) {
-      const img8 = new Image();
-      img8.onload = function() {
-        const tiny = document.createElement('canvas');
-        tiny.width = 13; tiny.height = 13;
-        tiny.getContext('2d').drawImage(img8, 0, 0, 13, 13);
-        const big = document.createElement('canvas');
-        big.width = 75; big.height = 75;
-        const bigCtx = big.getContext('2d');
-        bigCtx.imageSmoothingEnabled = false;
-        bigCtx.drawImage(tiny, 0, 0, 75, 75);
-        box.style.backgroundImage = `url('${big.toDataURL()}')`;
-        box.style.backgroundSize = 'cover';
-        box.style.filter = 'saturate(1.5) contrast(1.2)';
-      };
-      img8.src = imageDataUrl;
-    } else if (idx === 7) {
-      const imgNN = new Image();
-      imgNN.onload = function() {
-        const sz = 75;
-        const c = document.createElement('canvas');
-        c.width = sz; c.height = sz;
-        const ctx = c.getContext('2d');
-        ctx.drawImage(imgNN, 0, 0, sz, sz);
-        const id = ctx.getImageData(0, 0, sz, sz);
-        const px = id.data;
-        const gr = new Uint8ClampedArray(sz*sz);
-        for (let i = 0; i < px.length; i += 4) gr[i/4] = px[i]*0.299 + px[i+1]*0.587 + px[i+2]*0.114;
-        for (let i = 0; i < px.length; i += 4) {
-          const pi = i/4, row = Math.floor(pi/sz), col = pi%sz;
-          const oR=px[i], oG=px[i+1], oB=px[i+2];
-          if (row===0||row===sz-1||col===0||col===sz-1){px[i]=px[i+1]=px[i+2]=0;continue;}
-          const tl=gr[(row-1)*sz+(col-1)],tc=gr[(row-1)*sz+col],tr=gr[(row-1)*sz+(col+1)];
-          const ml=gr[row*sz+(col-1)],mr=gr[row*sz+(col+1)];
-          const bl=gr[(row+1)*sz+(col-1)],bc=gr[(row+1)*sz+col],br=gr[(row+1)*sz+(col+1)];
-          const gx=-tl+tr-2*ml+2*mr-bl+br, gy=-tl-2*tc-tr+bl+2*bc+br;
-          const mag=Math.min(255,Math.sqrt(gx*gx+gy*gy));
-          if (mag>20) {
-            const t=Math.min(1,mag/80), avg=(oR+oG+oB)/3;
-            const sat=Math.max(oR,oG,oB)-Math.min(oR,oG,oB);
-            let nr,ng,nb;
-            if(sat<30){nr=0;ng=200;nb=255;}
-            else{nr=avg+(oR-avg)*5;ng=avg+(oG-avg)*5;nb=avg+(oB-avg)*5;}
-            px[i]=Math.min(255,Math.max(0,nr*t));px[i+1]=Math.min(255,Math.max(0,ng*t));px[i+2]=Math.min(255,Math.max(0,nb*t));
-          } else {px[i]=px[i+1]=px[i+2]=0;}
-        }
-        ctx.putImageData(id, 0, 0);
-        box.style.backgroundImage = `url('${c.toDataURL()}')`;
-        box.style.filter = 'none';
-      };
-      imgNN.src = imageDataUrl;
-    } else {
-      box.style.backgroundImage = `url('${imageDataUrl}')`;
-      box.style.filter = cssFilters[idx] || 'none';
-    }
-  });
-}
-
 function initiateCropper(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -393,7 +297,9 @@ function initiateCropper(event) {
     elements.forEach(el => el.classList.remove('active'));
     if(elements[0]) elements[0].classList.add('active');
 
-    renderFilterPreviews(e.target.result);
+    document.querySelectorAll('.filter-preview-box').forEach(box => {
+       box.style.backgroundImage = `url('${e.target.result}')`;
+    });
 
     document.getElementById('cropModal').style.display = 'flex';
     if(activeCropperInstance) activeCropperInstance.destroy();
@@ -413,22 +319,15 @@ function selectPostFilter(filterType, triggerElement) {
   chosenFilterStyleName = filterType;
   document.querySelectorAll('.filter-option').forEach(el => el.classList.remove('active'));
   triggerElement.classList.add('active');
+  
+  const container = document.getElementById('cropWorkspaceContainer');
+  container.className = "crop-workspace f-" + filterType;
 }
 
 function closeCropModal() {
   document.getElementById('cropModal').style.display = 'none';
   document.getElementById('file').value = "";
   if(activeCropperInstance) activeCropperInstance.destroy();
-}
-
-function toggleReactionNames(rowIndex) {
-  const moreSpan = document.getElementById(`rxn-more-${rowIndex}`);
-  const allSpan = document.getElementById(`rxn-all-${rowIndex}`);
-  if (moreSpan && allSpan) {
-    const expanding = allSpan.style.display === 'none';
-    allSpan.style.display = expanding ? 'inline' : 'none';
-    moreSpan.textContent = expanding ? 'less' : `+${allSpan.querySelectorAll('b').length} more`;
-  }
 }
 
 function toggleCommentsVisibility(rowIndex) {
@@ -487,15 +386,12 @@ async function loadFeed() {
     allPosts = data.posts || [];
     allBios = data.bios || {};
     allAvatars = data.avatars || {};
-    allStreaks = data.streaks || [];
+    allStreaks = data.streaks || []; 
     localStorage.setItem("gb_cache", JSON.stringify(allPosts));
     lastPostCount = allPosts.length;
     incomingPostsCache = null;
-    syncStreakFromServer();
     document.getElementById('refreshPill').classList.remove('show');
     render();
-    const deepPost = new URLSearchParams(window.location.search).get('post');
-    if (deepPost) scrollToPost(parseInt(deepPost));
   } catch(e) { console.error("Load failed", e); }
 }
 
@@ -554,29 +450,26 @@ function acceptNewPosts() {
   render();
 }
 
-const _b64Cache = {};
 function base64CacheProxy(url) {
   return new Promise((resolve) => {
     if (!url || url.length < 10) return resolve("");
     if (url.startsWith('data:image')) return resolve(url);
-    if (_b64Cache[url]) return resolve(_b64Cache[url]);
 
     const img = new Image();
     img.crossOrigin = "anonymous";
-    img.src = url;
-
+    img.src = url + (url.includes('?') ? '&' : '?') + 't=' + new Date().getTime();
+    
     img.onload = () => {
       try {
         const canvas = document.createElement('canvas');
         canvas.width = img.naturalWidth;
         canvas.height = img.naturalHeight;
-        canvas.getContext('2d').drawImage(img, 0, 0);
-        const result = canvas.toDataURL('image/jpeg', 0.9);
-        _b64Cache[url] = result;
-        resolve(result);
+        const outCtx = canvas.getContext('2d');
+        outCtx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/jpeg', 0.9));
       } catch(err) {
         console.warn("CORS proxy canvas write failed.", err);
-        resolve("");
+        resolve(""); 
       }
     };
     img.onerror = () => resolve("");
@@ -723,27 +616,17 @@ function render() {
   const feedHTML = filtered.slice(0, postsToShow).map((p, index) => {
     try {
       let mediaHTML = "";
-      const imgs = (() => {
-        if (Array.isArray(p.images) && p.images.length) return p.images;
-        const v = p.image || "";
-        if (!v) return [];
-        try { const parsed = JSON.parse(v); return Array.isArray(parsed) ? parsed : [v]; }
-        catch { return [v]; }
-      })();
+      const imgs = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []);
       if (imgs.length === 1) {
-        if (imgs[0].includes('giphy.com')) {
-          mediaHTML = `<img src="${imgs[0]}" style="width:100%; border-radius:6px; margin-top:10px; display:block;" loading="lazy">`;
+        const existingImg = document.querySelector(`#post-${p.rowIndex} .post-img`);
+        if (existingImg && existingImg.getAttribute('src') === imgs[0]) {
+          mediaHTML = existingImg.closest('.img-container').outerHTML;
         } else {
-          const existingImg = document.querySelector(`#post-${p.rowIndex} .post-img`);
-          if (existingImg && existingImg.getAttribute('src') === imgs[0]) {
-            mediaHTML = existingImg.closest('.img-container').outerHTML;
-          } else {
-            mediaHTML = `<div class="img-container"><div class="skeleton-loader"></div><img src="${imgs[0]}" class="post-img" loading="lazy" onload="onImageLoad(this)"></div>`;
-          }
+          mediaHTML = `<div class="img-container"><div class="skeleton-loader"></div><img src="${imgs[0]}" class="post-img" loading="lazy" onload="onImageLoad(this)"></div>`;
         }
       } else if (imgs.length > 1) {
         mediaHTML = `<div class="carousel" id="carousel-${p.rowIndex}" data-idx="0">
-          ${imgs.map((src, i) => `<img src="${src}" class="post-img carousel-slide${i===0?' active':''}" loading="lazy" onload="onImageLoad(this)">`).join('')}
+          ${imgs.map((src, i) => `<img src="${src}" class="post-img carousel-slide${i===0?' active':''}" loading="lazy">`).join('')}
           <button class="car-btn car-prev" onclick="carouselMove(${p.rowIndex},-1)">&#8249;</button>
           <button class="car-btn car-next" onclick="carouselMove(${p.rowIndex},1)">&#8250;</button>
           <div class="car-dots">${imgs.map((_,i) => `<span class="car-dot${i===0?' active':''}" onclick="carouselGo(${p.rowIndex},${i})"></span>`).join('')}</div>
@@ -753,32 +636,15 @@ function render() {
       const ytMatch = (p.message || "").match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
       if (ytMatch && ytMatch[1]) {
         const videoId = ytMatch[1];
-        mediaHTML += `<div style="margin-top:10px; position:relative; aspect-ratio: 16/9; width:100%; overflow:hidden; border-radius:8px;"><iframe src="https://www.youtube.com/embed/${videoId}?rel=0" style="position:absolute;top:0;left:0;width:100%;height:100%;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
-      }
-
-      const amMatch = (p.message || "").match(/https?:\/\/music\.apple\.com\/[^\s"<>]+/);
-      if (amMatch) {
-        const embedUrl = amMatch[0].replace('music.apple.com', 'embed.music.apple.com');
-        const isTrack = amMatch[0].includes('?i=');
-        const embedHeight = isTrack ? 175 : 450;
-        mediaHTML += `<div style="margin-top:10px; border-radius:12px; overflow:hidden;"><iframe allow="autoplay *; encrypted-media *; fullscreen *; clipboard-write" frameborder="0" height="${embedHeight}" style="width:100%;overflow:hidden;border-radius:12px;background:#000;" sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-storage-access-by-user-activation allow-top-navigation-by-user-activation" src="${embedUrl}"></iframe></div>`;
+        const thumbUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+        mediaHTML += `<div style="margin-top:10px; position:relative; aspect-ratio: 16/9; width:100%; overflow:hidden; border-radius:8px; background: #000 url(${thumbUrl}) center/cover no-repeat; cursor:pointer;" onclick="this.innerHTML='<iframe src=\'https://www.youtube.com/embed/${videoId}?autoplay=1\' style=\'position:absolute;top:0;left:0;width:100%;height:100%;\' frameborder=\'0\' allow=\'autoplay; encrypted-media\' allowfullscreen></iframe>'; this.onclick=null;"><div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:60px; height:60px; background:rgba(0,0,0,0.7); border-radius:50%; display:flex; align-items:center; justify-content:center; border:3px solid white;"><div style="width: 0; height: 0; border-top: 15px solid transparent; border-bottom: 15px solid transparent; border-left: 25px solid white; margin-left: 5px;"></div></div><div style="position:absolute; bottom:10px; right:10px; background:rgba(0,0,0,0.8); color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold;">▶ WATCH</div></div>`;
       }
 
       const likeBadge = (filterType === 'likes') ? `<span style="color:#e74c3c; font-size:11px; font-weight:normal; background:#fff0f0; padding:2px 6px; border-radius:10px; margin-left:8px; border:1px solid #ffccd5;">❤️ ${index + 1} of ${totalInFilter}</span>` : '';
       const reactions = normalizeLikes(p.likes);
       const reactionCount = Object.keys(reactions).length;
-      let likeNames = '';
-      if (reactionCount > 0) {
-        const rxnEntries = Object.entries(reactions);
-        const shownNames = rxnEntries.slice(0, 3).map(([name, em]) => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()} ${em}</b>`).join(', ');
-        if (reactionCount > 3) {
-          const hiddenNames = rxnEntries.slice(3).map(([name, em]) => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()} ${em}</b>`).join(', ');
-          likeNames = shownNames + `, <span id="rxn-more-${p.rowIndex}" style="color:var(--gb-blue);cursor:pointer;font-weight:bold;" onclick="toggleReactionNames(${p.rowIndex})">+${reactionCount - 3} more</span><span id="rxn-all-${p.rowIndex}" style="display:none;">, ${hiddenNames}</span>`;
-        } else {
-          likeNames = shownNames;
-        }
-      }
-      const reactionBarHTML = ['❤️','🤯','🙄','😉'].map(em => { const cnt = Object.values(reactions).filter(e=>e===em).length; const isActive = reactions[u]===em; return `<button class="reaction-btn${isActive?' active':''}" data-emoji="${em}" onclick="apiCall('like',${p.rowIndex},event,'${em}')">${em}${cnt>0?` <span class='rxn-count'>${cnt}</span>`:''}</button>`; }).join('');
+      const likeNames = reactionCount > 0 ? Object.entries(reactions).map(([name, em]) => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()} ${em}</b>`).join(', ') : '';
+      const reactionBarHTML = ['❤️','🤯','😡','🙄','😉'].map(em => { const cnt = Object.values(reactions).filter(e=>e===em).length; const isActive = reactions[u]===em; return `<button class="reaction-btn${isActive?' active':''}" data-emoji="${em}" onclick="apiCall('like',${p.rowIndex},event,'${em}')">${em}${cnt>0?` <span class='rxn-count'>${cnt}</span>`:''}</button>`; }).join('');
       const totalCommentsCount = p.comments.length;
       const initialComments = p.comments.slice(0, 2);
       const hiddenComments = p.comments.slice(2);
@@ -831,59 +697,6 @@ function updateSidebar() {
 function scrollToPost(id) { if (filterVal) { setFilter(null, null); setTimeout(() => performScroll(id), 300); } else performScroll(id); }
 function performScroll(id) { const el = document.getElementById(`post-${id}`); if (el) { window.scrollTo({ top: el.offsetTop - 70, behavior: 'smooth' }); el.classList.add('highlight-card'); setTimeout(() => el.classList.remove('highlight-card'), 2000); } else { postsToShow += 10; render(); setTimeout(() => performScroll(id), 100); } }
 
-function openGifPicker() {
-  document.getElementById('gifModal').style.display = 'flex';
-  document.getElementById('gifSearch').value = '';
-  loadTrendingGifs();
-}
-
-function closeGifPicker() {
-  document.getElementById('gifModal').style.display = 'none';
-}
-
-function debouncedGifSearch(query) {
-  clearTimeout(gifSearchTimer);
-  gifSearchTimer = setTimeout(() => {
-    query.trim() ? searchGiphy(query.trim()) : loadTrendingGifs();
-  }, 400);
-}
-
-async function loadTrendingGifs() {
-  const grid = document.getElementById('gifGrid');
-  grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:20px; color:#888;">Loading...</div>';
-  try {
-    const res = await fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_API_KEY}&limit=21&rating=g`);
-    const data = await res.json();
-    renderGifGrid(data.data);
-  } catch { grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:20px; color:#e74c3c;">Could not load GIFs.</div>'; }
-}
-
-async function searchGiphy(query) {
-  const grid = document.getElementById('gifGrid');
-  grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:20px; color:#888;">Searching...</div>';
-  try {
-    const res = await fetch(`https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query)}&limit=21&rating=g`);
-    const data = await res.json();
-    renderGifGrid(data.data);
-  } catch { grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:20px; color:#e74c3c;">Search failed.</div>'; }
-}
-
-function renderGifGrid(gifs) {
-  const grid = document.getElementById('gifGrid');
-  if (!gifs || !gifs.length) { grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:20px; color:#888;">No GIFs found.</div>'; return; }
-  grid.innerHTML = gifs.map(g =>
-    `<img src="${g.images.fixed_height_small.url}" class="gif-item" onclick="selectGif('${g.images.fixed_height.url}')" loading="lazy">`
-  ).join('');
-}
-
-function selectGif(gifUrl) {
-  if (processedBase64Images.length < 4) {
-    processedBase64Images.push(gifUrl);
-    updateImagePreviewStrip();
-  }
-  closeGifPicker();
-}
-
 function updateImagePreviewStrip() {
   const strip = document.getElementById('imagePreviewStrip');
   const addBtn = document.getElementById('addAnotherPhotoBtn');
@@ -924,19 +737,6 @@ async function upload() {
   const user = document.getElementById('user').value.trim();
   const msg = document.getElementById('msg').value.trim();
   if(!user || !msg) return alert("Fill in name and message!");
-
-  const postTimesKey = `gb_postTimes_${user}`;
-  const now = Date.now();
-  const oneHour = 60 * 60 * 1000;
-  let recentPosts = JSON.parse(localStorage.getItem(postTimesKey) || '[]');
-  recentPosts = recentPosts.filter(t => now - t < oneHour);
-  if (recentPosts.length >= 2) {
-    const mins = Math.ceil((recentPosts[0] + oneHour - now) / 60000);
-    return alert(`You've already posted twice this hour. Try again in ${mins} minute${mins !== 1 ? 's' : ''}.`);
-  }
-  recentPosts.push(now);
-  localStorage.setItem(postTimesKey, JSON.stringify(recentPosts));
-
   const postBtn = document.getElementById('postBtn');
   postBtn.innerText = "⏳ Uploading...";
   postBtn.disabled = true;
@@ -962,13 +762,7 @@ async function upload() {
     postBtn.innerText = "✨ Finalizing post...";
     await new Promise(resolve => setTimeout(resolve, 2500));
     await loadFeed(); 
-  } catch(e) {
-    console.error("Upload failed:", e);
-    alert("Post creation failed. Please try again.");
-    const saved = JSON.parse(localStorage.getItem(postTimesKey) || '[]');
-    saved.pop();
-    localStorage.setItem(postTimesKey, JSON.stringify(saved));
-  } finally { postBtn.innerText = "Post Update"; postBtn.disabled = false; }
+  } catch(e) { console.error("Upload failed:", e); alert("Post creation failed. Please try again."); } finally { postBtn.innerText = "Post Update"; postBtn.disabled = false; }
 }
 
 async function compressImage(file) {
@@ -1045,85 +839,36 @@ async function apiCall(action, rowIndex, event, emoji) {
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex);
   if (!post) return;
-  const btn = event.target; const originalText = btn.innerText; btn.innerText = "⏳ Preparing...";
-  const shareText = `🦄 Gooldbook Post by ${post.user}:\n\n"${post.message}"`;
-  const postReactions = normalizeLikes(post.likes);
-  const names = Object.keys(postReactions).length > 0 ? Object.entries(postReactions).map(([n,e]) => `${n} ${e}`).join(', ') : '';
-  const imgs = (() => {
-    if (Array.isArray(post.images) && post.images.length) return post.images;
-    const v = post.image || "";
-    if (!v) return [];
-    try { const parsed = JSON.parse(v); return Array.isArray(parsed) ? parsed : [v]; }
-    catch { return [v]; }
-  })();
-  const carEl = document.getElementById(`carousel-${rowIndex}`);
-  const activeIdx = carEl ? parseInt(carEl.dataset.idx || 0) : 0;
-  const targetImageUrl = imgs[activeIdx] || "";
+  const btn = event.target;
+  const originalText = btn.innerText;
+  const shareUrl = `https://karrotz26-rgb.github.io/Gooldbook/?post=${rowIndex}`;
+  const shareText = `🦄 ${post.user} on theGooldbook:\n"${(post.message || '').substring(0, 120)}"`;
 
-  let canvas = null;
-  const renderFrame = document.createElement('div');
-  renderFrame.style.cssText = `position:fixed;left:-9999px;top:0;width:400px;background:#ffffff;padding:24px;border-radius:12px;font-family:system-ui,-apple-system,sans-serif;color:#1c1e21;box-sizing:border-box;`;
+  // On iOS, navigator.share must be called immediately (within the user gesture).
+  // Call it first before any async work so iOS doesn't drop the gesture context.
+  if (navigator.share) {
+    btn.innerText = "⏳";
+    try {
+      await navigator.share({ title: 'theGooldbook 🦄', text: shareText, url: shareUrl });
+      btn.innerText = originalText;
+      return;
+    } catch(e) {
+      btn.innerText = originalText;
+      if (e.name === 'AbortError') return; // user cancelled — do nothing
+      // fall through to clipboard
+    }
+  }
 
+  // Desktop fallback: copy link to clipboard
+  btn.innerText = "⏳";
   try {
-    const safeBase64Image = await base64CacheProxy(targetImageUrl);
-    const allCommentsHTML = post.comments.slice(0, 3).map(c => `<div style="background:#f0f2f5;padding:8px;border-radius:8px;margin-top:5px;font-size:13px;text-align:left;"><b>${c.user}</b>: ${c.text}</div>`).join('');
-
-    // Build media card for YouTube or Apple Music links
-    let mediaCardHTML = '';
-    const ytShareMatch = (post.message || "").match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-    const amShareMatch = (post.message || "").match(/https?:\/\/music\.apple\.com\/[^\s"<>]+/);
-    if (ytShareMatch && ytShareMatch[1]) {
-      const thumbBase64 = await base64CacheProxy(`https://img.youtube.com/vi/${ytShareMatch[1]}/hqdefault.jpg`);
-      if (thumbBase64) {
-        mediaCardHTML = `<div style="position:relative;margin-bottom:12px;border-radius:8px;overflow:hidden;"><img src="${thumbBase64}" style="width:100%;display:block;"><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:54px;height:54px;background:rgba(255,0,0,0.92);border-radius:50%;display:flex;align-items:center;justify-content:center;"><div style="width:0;height:0;border-style:solid;border-width:11px 0 11px 22px;border-color:transparent transparent transparent white;margin-left:5px;"></div></div></div>`;
-      }
-    } else if (amShareMatch) {
-      const amUrl = amShareMatch[0];
-      const isTrack = amUrl.includes('?i=');
-      const pathParts = amUrl.replace(/\?.*/, '').split('/').filter(p => p && !/^\d+$/.test(p) && !['https:', 'music.apple.com', 'us', 'album', 'playlist', 'song'].includes(p));
-      const songName = (pathParts[pathParts.length - 1] || '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Apple Music';
-      mediaCardHTML = `<div style="background:#1c1c1e;border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px;margin-bottom:12px;"><div style="width:48px;height:48px;background:linear-gradient(135deg,#fc3c44,#ff6b6b);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">🎵</div><div style="overflow:hidden;"><div style="color:#fff;font-size:13px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${songName}</div><div style="color:#fc3c44;font-size:11px;margin-top:2px;">${isTrack ? '🎵 Song · Apple Music' : '💿 Album/Playlist · Apple Music'}</div></div></div>`;
-    }
-
-    renderFrame.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
-        <div style="width:36px;height:36px;border-radius:50%;background:#3b5998;display:flex;align-items:center;justify-content:center;font-size:18px;color:white;">🦄</div>
-        <div><div style="font-weight:bold;color:#3b5998;">${post.user}</div><div style="font-size:11px;color:#888;">theGooldbook 🦄</div></div>
-      </div>
-      <div style="font-size:15px;margin-bottom:15px;line-height:1.4;color:#1c1e21;">${post.message}</div>
-      ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px;margin-bottom:12px;display:block;">` : ''}
-      ${mediaCardHTML}
-      <div style="border-top:2px solid #f0f2f5;padding-top:12px;margin-top:5px;">
-        <div style="display:flex;gap:15px;font-size:14px;font-weight:bold;color:#65676b;margin-bottom:4px;"><span>❤️ ${Object.keys(postReactions).length} Reactions</span><span>💬 ${post.comments.length} Comments</span></div>
-        ${names ? `<div style="font-size:11px;color:#888;margin-bottom:10px;">Reacted: <b>${names}</b></div>` : ''}
-      </div>
-      <div style="margin-top:10px;">${allCommentsHTML}</div>
-      <div style="margin-top:15px;border-top:1px dashed #ccc;padding-top:8px;font-size:10px;color:#aaa;text-align:center;font-weight:bold;">SHARED VIA THEGOOLDBOOK 🦄</div>`;
-
-    document.body.appendChild(renderFrame);
-    canvas = await html2canvas(renderFrame, { useCORS: true, allowTaint: false, scale: 2, backgroundColor: "#ffffff", logging: false, width: 400 });
-    if (document.body.contains(renderFrame)) document.body.removeChild(renderFrame);
-
-    const imageBlob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-    const sharedFile = new File([imageBlob], `Gooldbook_${rowIndex}.png`, { type: 'image/png' });
-
-    if (navigator.canShare && navigator.canShare({ files: [sharedFile] })) {
-      await navigator.share({ files: [sharedFile], title: 'TheGooldbook Post', text: shareText });
-    } else if (navigator.share) {
-      await navigator.share({ title: 'TheGooldbook Post', text: shareText });
-    } else {
-      shareDownload(canvas, rowIndex);
-    }
-  } catch(e) {
-    if (document.body.contains(renderFrame)) document.body.removeChild(renderFrame);
-    if (e.name === 'AbortError') return;
-    if (canvas) {
-      shareDownload(canvas, rowIndex);
-    } else {
-      try { await navigator.clipboard.writeText(shareText); alert("Copied post text to clipboard!"); }
-      catch { alert("Sharing not available on this device."); }
-    }
-  } finally { btn.innerText = originalText; }
+    await navigator.clipboard.writeText(shareUrl);
+    btn.innerText = "✅ Copied!";
+    setTimeout(() => { btn.innerText = originalText; }, 2000);
+  } catch {
+    btn.innerText = originalText;
+    alert(`Post link:\n${shareUrl}`);
+  }
 }
 
 function shareDownload(canvas, rowIndex) {
@@ -1151,102 +896,66 @@ async function applyImageCropAndFilter() {
   
   if (chosenFilterStyleName === 'aiportrait' && selfieSegmentationModelInstance) {
     outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
-    
+
     await new Promise((resolve) => {
       selfieSegmentationModelInstance.onResults((results) => {
-        outContext.clearRect(0, 0, 800, 800);
-        
-        outContext.save();
-        outContext.filter = 'blur(16px) brightness(0.7) saturate(3) hue-rotate(135deg)';
-        outContext.drawImage(results.image, 0, 0, 800, 800);
-        outContext.restore();
-        
-        outContext.save();
-        outContext.globalCompositeOperation = 'destination-in';
-        outContext.drawImage(results.segmentationMask, 0, 0, 800, 800);
-        outContext.restore();
-        
-        outContext.save();
-        outContext.globalCompositeOperation = 'destination-over';
-        outContext.filter = 'contrast(1.25) saturate(1.45) brightness(1.05)';
-        outContext.drawImage(results.image, 0, 0, 800, 800);
-        outContext.restore();
-        
+        // Blur background via downsample trick (works on iOS — no ctx.filter needed)
+        const tiny = document.createElement('canvas');
+        tiny.width = 40; tiny.height = 40;
+        tiny.getContext('2d').drawImage(results.image, 0, 0, 40, 40);
+        const blurC = document.createElement('canvas');
+        blurC.width = 800; blurC.height = 800;
+        const blurCtx = blurC.getContext('2d');
+        blurCtx.imageSmoothingEnabled = true;
+        blurCtx.imageSmoothingQuality = 'high';
+        blurCtx.drawImage(tiny, 0, 0, 800, 800);
+
+        // Slightly dim and desaturate background via pixel manipulation
+        const bgData = blurCtx.getImageData(0, 0, 800, 800);
+        const bgPx = bgData.data;
+        for (let j = 0; j < bgPx.length; j += 4) {
+          const lum = bgPx[j]*0.299 + bgPx[j+1]*0.587 + bgPx[j+2]*0.114;
+          bgPx[j]   = Math.min(255, (lum + (bgPx[j]   - lum) * 0.65) * 0.82);
+          bgPx[j+1] = Math.min(255, (lum + (bgPx[j+1] - lum) * 0.65) * 0.82);
+          bgPx[j+2] = Math.min(255, (lum + (bgPx[j+2] - lum) * 0.65) * 0.82);
+        }
+        blurCtx.putImageData(bgData, 0, 0);
+
+        // Get segmentation mask pixel data (white = person)
+        const maskC = document.createElement('canvas');
+        maskC.width = 800; maskC.height = 800;
+        maskC.getContext('2d').drawImage(results.segmentationMask, 0, 0, 800, 800);
+        const maskPx = maskC.getContext('2d').getImageData(0, 0, 800, 800).data;
+
+        // Get sharp original image pixels
+        const origC = document.createElement('canvas');
+        origC.width = 800; origC.height = 800;
+        origC.getContext('2d').drawImage(results.image, 0, 0, 800, 800);
+        const origPx = origC.getContext('2d').getImageData(0, 0, 800, 800).data;
+
+        // Blend: person=sharp original, background=blurred
+        const outData = outContext.createImageData(800, 800);
+        const op = outData.data;
+        for (let j = 0; j < op.length; j += 4) {
+          const a = maskPx[j] / 255; // 1=person, 0=background
+          op[j]   = origPx[j]   * a + bgPx[j]   * (1 - a);
+          op[j+1] = origPx[j+1] * a + bgPx[j+1] * (1 - a);
+          op[j+2] = origPx[j+2] * a + bgPx[j+2] * (1 - a);
+          op[j+3] = 255;
+        }
+        outContext.putImageData(outData, 0, 0);
+
+        // Vignette
+        const vig = outContext.createRadialGradient(400, 400, 180, 400, 400, 580);
+        vig.addColorStop(0, 'rgba(0,0,0,0)');
+        vig.addColorStop(1, 'rgba(0,0,0,0.3)');
+        outContext.fillStyle = vig;
+        outContext.fillRect(0, 0, 800, 800);
+
         resolve();
       });
       selfieSegmentationModelInstance.send({ image: croppedCanvas });
     });
-  } else if (chosenFilterStyleName === 'cyberpunk') {
-    outContext.filter = 'hue-rotate(140deg) saturate(1.8) contrast(1.3) brightness(0.9)';
-    outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
-    outContext.filter = 'none';
-  } else if (chosenFilterStyleName === 'technopunk') {
-    outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
-    const tpData = outContext.getImageData(0, 0, 800, 800);
-    const tpPixels = tpData.data;
-    for (let i = 0; i < tpPixels.length; i += 4) {
-      let r = tpPixels[i], g = tpPixels[i+1], b = tpPixels[i+2];
-      const rowY = Math.floor((i / 4) / 800);
-      // Boost saturation to pop art extremes
-      const avg = (r + g + b) / 3;
-      r = Math.min(255, Math.max(0, avg + (r - avg) * 4));
-      g = Math.min(255, Math.max(0, avg + (g - avg) * 4));
-      b = Math.min(255, Math.max(0, avg + (b - avg) * 4));
-      // Posterize to 3 levels per channel
-      r = r < 100 ? 0 : r < 200 ? 180 : 255;
-      g = g < 100 ? 0 : g < 200 ? 180 : 255;
-      b = b < 100 ? 0 : b < 200 ? 180 : 255;
-      // Comic scanline bars
-      if (rowY % 6 < 2) { r = Math.max(0, r - 90); g = Math.max(0, g - 90); b = Math.max(0, b - 90); }
-      tpPixels[i] = r; tpPixels[i+1] = g; tpPixels[i+2] = b;
-    }
-    outContext.putImageData(tpData, 0, 0);
-  } else if (chosenFilterStyleName === '8bit') {
-    outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
-    const imgData8 = outContext.getImageData(0, 0, 800, 800);
-    const px8 = imgData8.data;
-    const BLOCK = 6, GRID = Math.ceil(800/6);
-    const bR = new Float32Array(GRID*GRID), bG = new Float32Array(GRID*GRID), bB = new Float32Array(GRID*GRID), bC = new Uint32Array(GRID*GRID);
-    for (let i = 0; i < px8.length; i += 4) {
-      const pi = i/4, row = Math.floor(pi/800), col = pi%800;
-      const bi = Math.floor(row/BLOCK)*GRID + Math.floor(col/BLOCK);
-      bR[bi] += px8[i]; bG[bi] += px8[i+1]; bB[bi] += px8[i+2]; bC[bi]++;
-    }
-    for (let j = 0; j < GRID*GRID; j++) {
-      if (bC[j]) { bR[j] = Math.round(bR[j]/bC[j]/64)*64; bG[j] = Math.round(bG[j]/bC[j]/64)*64; bB[j] = Math.round(bB[j]/bC[j]/64)*64; }
-    }
-    for (let i = 0; i < px8.length; i += 4) {
-      const pi = i/4, row = Math.floor(pi/800), col = pi%800;
-      const bi = Math.floor(row/BLOCK)*GRID + Math.floor(col/BLOCK);
-      px8[i] = bR[bi]; px8[i+1] = bG[bi]; px8[i+2] = bB[bi];
-    }
-    outContext.putImageData(imgData8, 0, 0);
-  } else if (chosenFilterStyleName === 'noinnoir') {
-    outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
-    const imgDataNN = outContext.getImageData(0, 0, 800, 800);
-    const pxNN = imgDataNN.data;
-    const gray = new Uint8ClampedArray(800*800);
-    for (let i = 0; i < pxNN.length; i += 4) gray[i/4] = pxNN[i]*0.299 + pxNN[i+1]*0.587 + pxNN[i+2]*0.114;
-    for (let i = 0; i < pxNN.length; i += 4) {
-      const pi = i/4, row = Math.floor(pi/800), col = pi%800;
-      const oR = pxNN[i], oG = pxNN[i+1], oB = pxNN[i+2];
-      if (row === 0 || row === 799 || col === 0 || col === 799) { pxNN[i] = pxNN[i+1] = pxNN[i+2] = 0; continue; }
-      const tl = gray[(row-1)*800+(col-1)], tc = gray[(row-1)*800+col], tr = gray[(row-1)*800+(col+1)];
-      const ml = gray[row*800+(col-1)], mr = gray[row*800+(col+1)];
-      const bl = gray[(row+1)*800+(col-1)], bc = gray[(row+1)*800+col], br = gray[(row+1)*800+(col+1)];
-      const gx = -tl+tr-2*ml+2*mr-bl+br, gy = -tl-2*tc-tr+bl+2*bc+br;
-      const mag = Math.min(255, Math.sqrt(gx*gx + gy*gy));
-      if (mag > 20) {
-        const t = Math.min(1, mag / 80);
-        const sat = Math.max(oR,oG,oB) - Math.min(oR,oG,oB);
-        const avg = (oR+oG+oB)/3;
-        let nr, ng, nb;
-        if (sat < 30) { nr = 0; ng = 200; nb = 255; }
-        else { nr = avg+(oR-avg)*5; ng = avg+(oG-avg)*5; nb = avg+(oB-avg)*5; }
-        pxNN[i] = Math.min(255,Math.max(0,nr*t)); pxNN[i+1] = Math.min(255,Math.max(0,ng*t)); pxNN[i+2] = Math.min(255,Math.max(0,nb*t));
-      } else { pxNN[i] = pxNN[i+1] = pxNN[i+2] = 0; }
-    }
-    outContext.putImageData(imgDataNN, 0, 0);
   } else {
     outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
     const imgData = outContext.getImageData(0, 0, 800, 800);
@@ -1265,62 +974,97 @@ async function applyImageCropAndFilter() {
       let modificationAmount = 0;
 
       if (chosenFilterStyleName === 'film1982') {
+        // Warm color matrix
         let tr = (r * 0.42) + (g * 0.73) + (b * 0.22);
         let tg = (r * 0.35) + (g * 0.64) + (b * 0.18);
         let tb = (r * 0.26) + (g * 0.48) + (b * 0.12);
-        
         r = (tr * 0.45 + r * 0.55) * 1.15;
         g = (tg * 0.45 + g * 0.55) * 1.05;
         b = (tb * 0.45 + b * 0.55) * 0.95;
-        
-        modificationAmount = (Math.random() - 0.5) * 32;
-        
+
+        // Lift blacks — film never goes pure black
+        r = r * 0.91 + 18;
+        g = g * 0.91 + 13;
+        b = b * 0.91 + 8;
+
+        // Split toning: amber warmth in shadows, cool back off in highlights
+        const lum = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+        if (lum < 0.55) {
+          const shadow = (0.55 - lum) * 1.8;
+          r += shadow * 14;
+          g += shadow * 4;
+          b -= shadow * 6;
+        } else {
+          const hi = (lum - 0.55) * 0.8;
+          r -= hi * 6;
+          b += hi * 8;
+        }
+
+        // Midtone-weighted grain (strongest in midtones, fades at pure shadows/highlights)
+        const midFactor = Math.max(0, 1 - Math.abs(lum - 0.45) * 2.2);
+        const grain = (Math.random() - 0.5) * 30 * midFactor;
+        r += grain;
+        g += grain * 0.9;
+        b += grain * 0.75;
+
+        // Left-edge light leak
         if (colX < 280) {
-          let leakIntensity = (1 - (colX / 280)) * 65;
-          let verticalDistanceFactor = Math.abs(rowY - leakCenterY) / 400;
+          const leakIntensity = (1 - (colX / 280)) * 65;
+          const verticalDistanceFactor = Math.abs(rowY - leakCenterY) / 400;
           if (verticalDistanceFactor < 1) {
-            let localizedFalloff = Math.cos(verticalDistanceFactor * Math.PI / 2);
+            const localizedFalloff = Math.cos(verticalDistanceFactor * Math.PI / 2);
             r += leakIntensity * localizedFalloff * 1.3;
             g += leakIntensity * localizedFalloff * 0.5;
           }
         }
+
+        // Vignette — darken corners like a lens
+        const dx = (colX - 400) / 400;
+        const dy = (rowY - 400) / 400;
+        const vign = 1 - Math.min(1, (dx * dx + dy * dy) * 0.72);
+        r *= vign;
+        g *= vign;
+        b *= vign;
       } 
       else if (chosenFilterStyleName === 'cyberpunk') {
-        let rShift = r * 0.3 + g * 0.5 + b * 0.2;
-        r = Math.min(255, ((rShift - 128) * 1.3) + 128 + 30);
-        g = Math.min(255, ((g - 128) * 1.5) + 128 - 20);
-        b = Math.min(255, ((b - 128) * 1.8) + 128 + 40);
-      } 
+        // hue-rotate(140deg) — W3C color matrix
+        const hr = r * (-0.5269) + g * 0.8031 + b * 0.7237;
+        const hg = r * 0.4681   + g * 0.5867  + b * (-0.0548);
+        const hb = r * (-0.1297) + g * 1.7223  + b * (-0.5926);
+        // saturate(1.8) via luminance boost
+        const lh = hr * 0.299 + hg * 0.587 + hb * 0.114;
+        r = lh + (hr - lh) * 1.8;
+        g = lh + (hg - lh) * 1.8;
+        b = lh + (hb - lh) * 1.8;
+        // brightness(0.9) then contrast(1.3)
+        r = (r * 0.9 - 127.5) * 1.3 + 127.5;
+        g = (g * 0.9 - 127.5) * 1.3 + 127.5;
+        b = (b * 0.9 - 127.5) * 1.3 + 127.5;
+      }
       else if (chosenFilterStyleName === 'vhs90s') {
-        r = ((r - 128) * 1.2) + 128;
-        g = ((g - 128) * 1.2) + 128;
-        b = ((b - 128) * 1.2) + 128;
-        const isScanlineRow = rowY % 4 === 0; 
-        const scanlineDrop = isScanlineRow ? -15 : 0;
-        const subtleNoise = (Math.random() - 0.5) * 8;
-        modificationAmount = scanlineDrop + subtleNoise;
+        // saturate(1.3) via luminance boost
+        const lv = r * 0.299 + g * 0.587 + b * 0.114;
+        r = lv + (r - lv) * 1.3;
+        g = lv + (g - lv) * 1.3;
+        b = lv + (b - lv) * 1.3;
+        // brightness(1.05) then contrast(1.1)
+        r = (r * 1.05 - 127.5) * 1.1 + 127.5;
+        g = (g * 1.05 - 127.5) * 1.1 + 127.5;
+        b = (b * 1.05 - 127.5) * 1.1 + 127.5;
+        // scanlines + grain
+        if (rowY % 4 === 0) modificationAmount -= 20;
+        modificationAmount += (Math.random() - 0.5) * 8;
       } 
       else if (chosenFilterStyleName === 'technopunk') {
-        let luminance = (r * 0.299) + (g * 0.587) + (b * 0.114);
-        let gray = luminance < 115 ? (luminance * 0.35) : (luminance * 1.85);
-        
-        let staticGrain = Math.random();
-        if (staticGrain > 0.93) gray += 50;
-        if (staticGrain < 0.07) gray -= 50;
-
-        if (rowY % 5 === 0) gray -= 30;
-
-        if (luminance > 175) {
-          if ((rowY + colX) % 16 < 8) {
-            r = 255;  g = 0;    b = 160; 
-          } else {
-            r = 0;    g = 255;  b = 220; 
-          }
-        } else {
-          r = gray;
-          g = gray;
-          b = gray;
-        }
+        // Replicate CSS: grayscale(1) brightness(0.7) contrast(1.9)
+        let v = r * 0.299 + g * 0.587 + b * 0.114; // grayscale
+        v = v * 0.7;                                 // brightness(0.7)
+        v = (v - 127.5) * 1.9 + 127.5;              // contrast(1.9)
+        if (rowY % 5 === 0) v -= 45;                 // scanline bars
+        v += (Math.random() - 0.5) * 10;             // subtle grain
+        const tv = Math.min(255, Math.max(0, v));
+        r = tv; g = tv; b = tv;
+        modificationAmount = 0;
       }
 
       pixels[i]     = Math.min(255, Math.max(0, r + modificationAmount));     
@@ -1359,76 +1103,61 @@ function saveUser() {
   updateAndRenderStreak();
 }
 
-function syncStreakFromServer() {
-  const user = document.getElementById('user').value.trim();
-  if (!user || !allStreaks.length) { triggerStreakIncrement(); return; }
-  const serverEntry = allStreaks.find(s => s.user === user);
-  if (serverEntry && serverEntry.streak && serverEntry.lastUpdated) {
-    const serverLastISO = normalizeToISO(serverEntry.lastUpdated);
-    if (serverLastISO && daysBetween(serverLastISO, getTodayISO()) <= 1) {
-      const localStreak = parseInt(localStorage.getItem(`gb_streak_${user}`) || "0");
-      const localLastISO = normalizeToISO(localStorage.getItem(`gb_streak_date_${user}`));
-      if (serverEntry.streak > localStreak || !localLastISO) {
-        localStorage.setItem(`gb_streak_${user}`, serverEntry.streak);
-        localStorage.setItem(`gb_streak_date_${user}`, serverLastISO);
-      }
-    }
-  }
-  triggerStreakIncrement(); // opening the app counts as daily activity
-}
-
-function getTodayISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-
-function normalizeToISO(dateStr) {
-  if (!dateStr) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-  const d = new Date(dateStr);
-  if (isNaN(d)) return null;
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-
-function daysBetween(isoA, isoB) {
-  const a = new Date(isoA + 'T00:00:00');
-  const b = new Date(isoB + 'T00:00:00');
-  return Math.round((b - a) / 86400000);
-}
-
 function updateAndRenderStreak() {
   const user = document.getElementById('user').value.trim();
   if (!user) return;
+  
   const streakKey = `gb_streak_${user}`;
   const lastDateKey = `gb_streak_date_${user}`;
+  
   let currentStreak = parseInt(localStorage.getItem(streakKey) || "0");
-  const lastISO = normalizeToISO(localStorage.getItem(lastDateKey));
-  if (lastISO && currentStreak > 0 && daysBetween(lastISO, getTodayISO()) > 1) {
-    currentStreak = 0;
-    localStorage.setItem(streakKey, "0");
-    localStorage.removeItem(lastDateKey);
+  const lastActiveDateStr = localStorage.getItem(lastDateKey);
+  
+  if (lastActiveDateStr) {
+    const lastDate = new Date(lastActiveDateStr);
+    const today = new Date(new Date().toDateString());
+    const diffTime = today - lastDate;
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays > 1) {
+      currentStreak = 0; 
+      localStorage.setItem(streakKey, "0");
+    }
   }
+  
   updateSidebar();
 }
 
 function triggerStreakIncrement() {
   const user = document.getElementById('user').value.trim();
   if (!user) return;
+  
   const streakKey = `gb_streak_${user}`;
   const lastDateKey = `gb_streak_date_${user}`;
+  
   let currentStreak = parseInt(localStorage.getItem(streakKey) || "0");
-  const lastISO = normalizeToISO(localStorage.getItem(lastDateKey));
-  const todayISO = getTodayISO();
-  if (lastISO === todayISO) return;
-  if (lastISO) {
-    const diff = daysBetween(lastISO, todayISO);
-    currentStreak = diff === 1 ? currentStreak + 1 : 1;
-  } else {
-    currentStreak = 1;
+  const lastActiveDateStr = localStorage.getItem(lastDateKey);
+  const todayStr = new Date().toDateString();
+  
+  if (lastActiveDateStr !== todayStr) {
+    if (lastActiveDateStr) {
+      const lastDate = new Date(lastActiveDateStr);
+      const today = new Date(todayStr);
+      const diffDays = Math.floor((today - lastDate) / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 1) {
+        currentStreak += 1;
+      } else {
+        currentStreak = 1;
+      }
+    } else {
+      currentStreak = 1;
+    }
+    
+    localStorage.setItem(streakKey, currentStreak);
+    localStorage.setItem(lastDateKey, todayStr);
+    updateAndRenderStreak();
   }
-  localStorage.setItem(streakKey, currentStreak);
-  localStorage.setItem(lastDateKey, todayISO);
-  updateAndRenderStreak();
 }
 </script>
 </body>
