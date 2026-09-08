@@ -151,6 +151,16 @@
 
 <div id="backToTop" onclick="window.scrollTo({top: 0, behavior: 'smooth'}); document.body.scrollTop = 0; document.documentElement.scrollTop = 0;">⬆️</div>
 
+<div class="crop-modal" id="gifModal">
+  <div style="background:#fff; border-radius:12px; width:100%; max-width:480px; max-height:80vh; display:flex; flex-direction:column; overflow:hidden;">
+    <div style="padding:12px 16px; border-bottom:1px solid #eee; display:flex; align-items:center; gap:10px;">
+      <input id="gifSearch" placeholder="Search GIFs..." style="flex:1; margin:0;" oninput="debouncedGifSearch(this.value)">
+      <button class="btn btn-alt" onclick="closeGifPicker()">Cancel</button>
+    </div>
+    <div id="gifGrid" class="gif-grid"></div>
+  </div>
+</div>
+
 <div class="crop-modal" id="cropModal">
   <div class="crop-workspace" id="cropWorkspaceContainer">
     <img id="cropTargetImage" src="">
@@ -214,7 +224,11 @@
     <div class="card" id="postComposer">
       <input id="user" placeholder="Your Name" onchange="saveUser()">
       <textarea id="msg" rows="2" placeholder="What's on your mind?"></textarea>
-      <input type="file" id="file" accept="image/*" onchange="initiateCropper(event)">
+      <div style="display:flex; gap:6px; margin-bottom:4px;">
+        <input type="file" id="file" accept="image/*" onchange="initiateCropper(event)" style="display:none;">
+        <button class="btn btn-alt" onclick="document.getElementById('file').click()">📷 Photo</button>
+        <button class="btn btn-alt" onclick="openGifPicker()">GIF</button>
+      </div>
       <div id="imagePreviewStrip" style="display:none; flex-wrap:wrap; gap:8px; margin:8px 0;"></div>
       <button id="addAnotherPhotoBtn" style="display:none;" onclick="document.getElementById('file').click()">+ Add another photo</button>
       <div style="display: flex; gap: 5px;">
@@ -229,6 +243,8 @@
 
 <script>
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw_PEAG-FeMsmmKZ6vGl338lua4wOVsb696EtqNQpwbdZcQWe2H8DcyWfaDl6fbVabr/exec";
+const GIPHY_API_KEY = "3N3VPi3QqCKZOwSBO6Tn7vjJvgSLLxck";
+let gifSearchTimer;
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
 let incomingPostsCache = null; 
 let allBios = {}, allAvatars = {};
@@ -708,6 +724,59 @@ function updateSidebar() {
   const hCounts = {}; allPosts.forEach(p => { const tags = ((p.message||"") + " " + p.comments.map(c=>c.text).join(" ")).match(/#(\w+)/g) || []; tags.forEach(t => { const ct = t.toLowerCase().trim(); hCounts[ct] = (hCounts[ct]||0)+1; }); });
   const topTags = Object.entries(hCounts).sort((a,b) => b[1] - a[1]).slice(0, 8);
   document.getElementById('hashtags').innerHTML = `<div class="sidebar-card"><b>#️⃣ Trending Tags</b><div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">${topTags.map(([tag, count]) => `<div class="sidebar-item" style="background: #f0f2f5; padding: 5px 10px; border-radius: 15px; font-size: 12px; cursor: pointer;" onclick="setFilter('hashtag','${tag}')"><span style="color:var(--gb-hover); font-weight:bold;">${tag}</span> <span style="color:#888; font-size: 10px;">${count}</span></div>`).join('') || 'None'}</div></div>`;
+}
+
+function openGifPicker() {
+  document.getElementById('gifModal').style.display = 'flex';
+  document.getElementById('gifSearch').value = '';
+  loadTrendingGifs();
+}
+
+function closeGifPicker() {
+  document.getElementById('gifModal').style.display = 'none';
+}
+
+function debouncedGifSearch(query) {
+  clearTimeout(gifSearchTimer);
+  gifSearchTimer = setTimeout(() => {
+    query.trim() ? searchGiphy(query.trim()) : loadTrendingGifs();
+  }, 400);
+}
+
+async function loadTrendingGifs() {
+  const grid = document.getElementById('gifGrid');
+  grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:20px; color:#888;">Loading...</div>';
+  try {
+    const res = await fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_API_KEY}&limit=21&rating=g`);
+    const data = await res.json();
+    renderGifGrid(data.data);
+  } catch { grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:20px; color:#e74c3c;">Could not load GIFs.</div>'; }
+}
+
+async function searchGiphy(query) {
+  const grid = document.getElementById('gifGrid');
+  grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:20px; color:#888;">Searching...</div>';
+  try {
+    const res = await fetch(`https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query)}&limit=21&rating=g`);
+    const data = await res.json();
+    renderGifGrid(data.data);
+  } catch { grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:20px; color:#e74c3c;">Search failed.</div>'; }
+}
+
+function renderGifGrid(gifs) {
+  const grid = document.getElementById('gifGrid');
+  if (!gifs || !gifs.length) { grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:20px; color:#888;">No GIFs found.</div>'; return; }
+  grid.innerHTML = gifs.map(g =>
+    `<img src="${g.images.fixed_height_small.url}" class="gif-item" onclick="selectGif('${g.images.fixed_height.url}')" loading="lazy">`
+  ).join('');
+}
+
+function selectGif(gifUrl) {
+  if (processedBase64Images.length < 4) {
+    processedBase64Images.push(gifUrl);
+    updateImagePreviewStrip();
+  }
+  closeGifPicker();
 }
 
 function scrollToPost(id) { if (filterVal) { setFilter(null, null); setTimeout(() => performScroll(id), 300); } else performScroll(id); }
