@@ -512,6 +512,45 @@ function renderLinkPreviewHTML(data, url) {
   return `<a href="${url}" target="_blank" rel="noopener" class="link-preview-card">${imgHTML}<div class="link-preview-body"><div class="link-preview-site">🔗 ${escapeHtml(site)}</div>${titleHTML}${descHTML}</div></a>`;
 }
 
+async function buildLinkPreviewShareHTML(post, amShareMatch) {
+  if (amShareMatch) return '';
+  const previewUrl = extractPreviewUrl(post.message);
+  if (!previewUrl) return '';
+
+  let previewData = linkPreviewCache[previewUrl];
+  if (previewData === undefined) {
+    previewData = await Promise.race([
+      (async () => {
+        try {
+          const res = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(previewUrl)}&palette=false`);
+          const json = await res.json();
+          const d = json && json.data;
+          const result = (json.status === 'success' && d && (d.title || (d.image && d.image.url)))
+            ? { title: d.title || '', description: d.description || '', image: (d.image && d.image.url) || '', siteName: d.publisher || '' }
+            : null;
+          linkPreviewCache[previewUrl] = result;
+          saveLinkPreviewCache();
+          return result;
+        } catch { return null; }
+      })(),
+      new Promise(res => setTimeout(() => res(null), 4000))
+    ]);
+  }
+  if (!previewData) return '';
+
+  const safePreviewImg = previewData.image
+    ? await Promise.race([base64CacheProxy(previewData.image), new Promise(res => setTimeout(() => res(""), 3000))])
+    : "";
+  const previewHost = (() => { try { return new URL(previewUrl).hostname.replace('www.', ''); } catch { return previewUrl; } })();
+  return `<div style="margin-top:10px;border:1px solid #e0e2e5;border-radius:10px;overflow:hidden;">
+    ${safePreviewImg ? `<img src="${safePreviewImg}" style="width:100%;aspect-ratio:1.91/1;object-fit:cover;display:block;">` : ''}
+    <div style="padding:10px 12px;background:#fafbfc;text-align:left;">
+      <div style="font-size:10px;color:#65676b;text-transform:uppercase;font-weight:bold;letter-spacing:0.3px;margin-bottom:3px;">🔗 ${escapeHtml(previewData.siteName || previewHost)}</div>
+      ${previewData.title ? `<div style="font-size:13px;font-weight:bold;color:#1c1e21;line-height:1.3;">${escapeHtml(previewData.title)}</div>` : ''}
+    </div>
+  </div>`;
+}
+
 function applyLinkPreviewToEl(el, url) {
   const data = linkPreviewCache[url];
   if (!data) { el.remove(); return; }
@@ -1042,13 +1081,16 @@ async function sharePost(rowIndex, event) {
   renderFrame.style.cssText = `position:fixed;left:-9999px;top:0;width:400px;background:#ffffff;padding:24px;border-radius:12px;font-family:system-ui,-apple-system,sans-serif;color:#1c1e21;box-sizing:border-box;`;
 
   try {
-    const safeBase64Image = await Promise.race([
-      base64CacheProxy(targetImageUrl),
-      new Promise(res => setTimeout(() => res(""), 4000))
+    const [safeBase64Image, linkPreviewShareHTML, allCommentsHTML] = await Promise.all([
+      Promise.race([
+        base64CacheProxy(targetImageUrl),
+        new Promise(res => setTimeout(() => res(""), 4000))
+      ]),
+      buildLinkPreviewShareHTML(post, amShareMatch),
+      Promise.resolve(post.comments.slice(0, 3).map(c =>
+        `<div style="background:#f0f2f5;padding:8px;border-radius:8px;margin-top:5px;font-size:13px;text-align:left;"><b>${c.user}</b>: ${c.text}</div>`
+      ).join(''))
     ]);
-    const allCommentsHTML = post.comments.slice(0, 3).map(c =>
-      `<div style="background:#f0f2f5;padding:8px;border-radius:8px;margin-top:5px;font-size:13px;text-align:left;"><b>${c.user}</b>: ${c.text}</div>`
-    ).join('');
 
     renderFrame.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:15px;">
@@ -1065,6 +1107,7 @@ async function sharePost(rowIndex, event) {
         ${names ? `<div style="font-size:11px;color:#888;margin-bottom:10px;">Reacted: <b>${names}</b></div>` : ''}
       </div>
       ${amShareMatch ? `<div style="margin-top:10px;padding:10px 12px;background:linear-gradient(135deg,#fc3c44,#c90a31);border-radius:10px;display:flex;align-items:center;gap:10px;"><span style="font-size:26px;">🎵</span><div><div style="color:white;font-weight:bold;font-size:13px;">Apple Music</div><div style="color:rgba(255,255,255,0.8);font-size:11px;word-break:break-all;">${amShareMatch[0].replace('https://music.apple.com/','').split('?')[0].split('/').slice(0,3).join(' · ')}</div></div></div>` : ''}
+      ${linkPreviewShareHTML}
       <div style="margin-top:10px;">${allCommentsHTML}</div>
       <div style="margin-top:15px;border-top:1px dashed #ccc;padding-top:8px;font-size:10px;color:#aaa;text-align:center;font-weight:bold;">SHARED VIA THEGOOLDBOOK 🦄</div>`;
 
