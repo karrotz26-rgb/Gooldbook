@@ -386,8 +386,8 @@ function handleWindowScroll() {
         (p.message || "").toLowerCase().includes(s) || (p.user || "").toLowerCase().includes(s)
       );
       if (filterVal) {
-        if (filterType === 'author') filtered = filtered.filter(p => p.user === filterVal);
-        if (filterType === 'likes') filtered = allPosts.filter(p => Object.keys(normalizeLikes(p.likes)).includes(filterVal));
+        if (filterType === 'author') filtered = filtered.filter(p => sameUser(p.user, filterVal));
+        if (filterType === 'likes') filtered = allPosts.filter(p => Object.keys(normalizeLikes(p.likes)).some(n => sameUser(n, filterVal)));
         if (filterType === 'hashtag') {
           const tag = filterVal.toLowerCase();
           filtered = filtered.filter(p => (p.message || "").toLowerCase().includes(tag));
@@ -631,7 +631,7 @@ function setFilter(type, val) {
 }
 
 function getAvatarMarkup(user, sizeClass) {
-  const ava = allAvatars[user];
+  const ava = ciLookup(allAvatars, user);
   if (!ava || ava === "" || ava === "undefined") return `<div class="${sizeClass}">🦄</div>`;
   return `<img src="${ava}" class="${sizeClass}" loading="lazy" onerror="this.onerror=null; this.src='https://via.placeholder.com/150?text=🦄';">`;
 }
@@ -643,32 +643,34 @@ async function uploadAvatar(user) {
   if(btn) btn.innerText = "Processing...";
   
   const base64 = await compressImage(file);
-  await fetch(SCRIPT_URL, { 
-    method: 'POST', 
-    mode: 'no-cors', 
-    body: JSON.stringify({ 
-      action: 'updateBio', 
-      username: user, 
-      bio: allBios[user] || "", 
-      avatar: base64 
-    }) 
+  const canonical = canonicalUser(user);
+  await fetch(SCRIPT_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    body: JSON.stringify({
+      action: 'updateBio',
+      username: canonical,
+      bio: ciLookup(allBios, user) || "",
+      avatar: base64
+    })
   });
-  setTimeout(async () => { await loadFeed(); if(btn) btn.innerText = "Edit Bio"; render(); }, 1500); 
+  setTimeout(async () => { await loadFeed(); if(btn) btn.innerText = "Edit Bio"; render(); }, 1500);
 }
 
 async function saveBio(user) {
   const bio = document.getElementById('newBio').value;
-  allBios[user] = bio;
+  const canonical = canonicalUser(user);
+  allBios[canonical] = bio;
   render();
-  await fetch(SCRIPT_URL, { 
-    method: 'POST', 
-    mode: 'no-cors', 
-    body: JSON.stringify({ 
-      action: 'updateBio', 
-      username: user, 
-      bio: bio, 
-      avatar: allAvatars[user] || "" 
-    }) 
+  await fetch(SCRIPT_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    body: JSON.stringify({
+      action: 'updateBio',
+      username: canonical,
+      bio: bio,
+      avatar: ciLookup(allAvatars, user) || ""
+    })
   });
   setTimeout(loadFeed, 1000);
 }
@@ -728,14 +730,14 @@ function render() {
   if (filterVal) {
     composer.style.display = "none";
     if (filterType === 'author') {
-        const bio = allBios[filterVal] || "A mysterious Gooldbooker.";
-        const isMe = filterVal === u;
+        const bio = ciLookup(allBios, filterVal) || "A mysterious Gooldbooker.";
+        const isMe = sameUser(filterVal, u);
         statusEl.innerHTML = `<div class="card" style="text-align:center;">${getAvatarMarkup(filterVal, 'avatar-large')}${isMe ? `<input type="file" id="avaPick" style="display:none" onchange="uploadAvatar('${u}')"><button class="btn-alt" style="margin-bottom:10px" onclick="document.getElementById('avaPick').click()">Change Photo</button>` : ''}<h2 style="margin:0">${filterVal}</h2><p style="font-style:italic; color:#555">"${bio}"</p>${isMe ? `<div id="bioEdit" style="display:none"><textarea id="newBio">${bio}</textarea><button class="btn" onclick="saveBio('${u}')">Save</button></div><button class="btn-alt" id="editBioBtn" onclick="document.getElementById('bioEdit').style.display='block'; this.style.display='none'">Edit Bio</button>` : ''}<hr style="border:0; border-top:1px solid #eee; margin:15px 0;"><button class="btn-alt" onclick="setFilter(null,null)">← Back to Feed</button></div>`;
-        filtered = filtered.filter(p => p.user === filterVal);
+        filtered = filtered.filter(p => sameUser(p.user, filterVal));
     } else {
         let label = filterType === 'likes' ? `Liked by ${filterVal}` : `Tagged ${filterVal}`;
         statusEl.innerHTML = `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>Showing: <b>${label}</b></span><button class="btn-alt" onclick="setFilter(null,null)">Clear</button></div>`;
-        if(filterType === 'likes') { filtered = allPosts.filter(p => Object.keys(normalizeLikes(p.likes)).includes(filterVal)); }
+        if(filterType === 'likes') { filtered = allPosts.filter(p => Object.keys(normalizeLikes(p.likes)).some(n => sameUser(n, filterVal))); }
         if(filterType === 'hashtag') {
           const tag = filterVal.toLowerCase();
           filtered = filtered.filter(p => (p.message || "").toLowerCase().includes(tag) || p.comments.some(c => (c.text || "").toLowerCase().includes(tag)));
@@ -800,7 +802,7 @@ function render() {
       const reactions = normalizeLikes(p.likes);
       const reactionCount = Object.keys(reactions).length;
       const likeNames = reactionCount > 0 ? Object.entries(reactions).map(([name, em]) => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', '${name.trim()}')">${name.trim()} ${em}</b>`).join(', ') : '';
-      const reactionBarHTML = ['❤️','🤯','😡','🙄','😉'].map(em => { const cnt = Object.values(reactions).filter(e=>e===em).length; const isActive = reactions[u]===em; return `<button class="reaction-btn${isActive?' active':''}" data-emoji="${em}" onclick="apiCall('like',${p.rowIndex},event,'${em}')">${em}${cnt>0?` <span class='rxn-count'>${cnt}</span>`:''}</button>`; }).join('');
+      const reactionBarHTML = ['❤️','🤯','😡','🙄','😉'].map(em => { const cnt = Object.values(reactions).filter(e=>e===em).length; const isActive = ciLookup(reactions, u)===em; return `<button class="reaction-btn${isActive?' active':''}" data-emoji="${em}" onclick="apiCall('like',${p.rowIndex},event,'${em}')">${em}${cnt>0?` <span class='rxn-count'>${cnt}</span>`:''}</button>`; }).join('');
       const totalCommentsCount = p.comments.length;
       const initialComments = p.comments.slice(0, 2);
       const hiddenComments = p.comments.slice(2);
@@ -833,12 +835,19 @@ function updateSidebar() {
   const topPosts = [...allPosts].sort((a,b) => (Object.keys(normalizeLikes(b.likes)).length+(b.comments?.length||0)) - (Object.keys(normalizeLikes(a.likes)).length+(a.comments?.length||0))).slice(0,3);
   document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b><br>${topPosts.map(p => `<div class="sidebar-item" onclick="scrollToPost(${p.rowIndex})"><div style="font-weight:bold; color:var(--gb-blue);">${p.user}</div><div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.message}</div><span class="trend-stats">❤️ ${Object.keys(normalizeLikes(p.likes)).length} • 💬 ${p.comments.length}</span></div>`).join('')}</div>`;
 
-  const lCounts = {}; allPosts.forEach(p => Object.keys(normalizeLikes(p.likes)).forEach(n => lCounts[n] = (lCounts[n]||0)+1));
+  const lCounts = {}; allPosts.forEach(p => Object.keys(normalizeLikes(p.likes)).forEach(n => { const k = ciKey(lCounts, n); lCounts[k] = (lCounts[k]||0)+1; }));
   const topLikers = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
   document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${topLikers.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes','${n}')">${i===0?'🥇':i===1?'🥈':'🥉'} ${n} <b>${c} ❤️</b></div>`).join('')}</div>`;
   
   /* PERSONAL STREAK PANEL HTML REMOVED HERE */
-  const sortedStreaks = [...allStreaks].sort((a, b) => b.streak - a.streak).slice(0, 3);
+  const streakByUser = {};
+  allStreaks.forEach(s => {
+    const k = ciKey(streakByUser, s.user);
+    if (!streakByUser[k] || s.streak > streakByUser[k].streak) {
+      streakByUser[k] = { user: streakByUser[k] ? streakByUser[k].user : s.user, streak: s.streak };
+    }
+  });
+  const sortedStreaks = Object.values(streakByUser).sort((a, b) => b.streak - a.streak).slice(0, 3);
   document.getElementById('streakLeaderboard').innerHTML = `
     <div class="sidebar-card">
       <b style="color: #d35400;">👑 Top Streaks</b><br>
@@ -957,7 +966,7 @@ async function upload() {
   postBtn.disabled = true;
   
   triggerStreakIncrement();
-  const currentLocalStreak = localStorage.getItem(`gb_streak_${user}`) || "1";
+  const currentLocalStreak = localStorage.getItem(`gb_streak_${normUser(user)}`) || "1";
   
   try {
     await fetch(SCRIPT_URL, {
@@ -995,6 +1004,20 @@ async function compressImage(file) {
   });
 }
 
+function normUser(name) { return (name || '').trim().toLowerCase(); }
+function sameUser(a, b) { return normUser(a) === normUser(b); }
+function ciKey(obj, key) {
+  const target = normUser(key);
+  const found = Object.keys(obj).find(k => normUser(k) === target);
+  return found !== undefined ? found : key;
+}
+function ciLookup(obj, key) { return obj[ciKey(obj, key)]; }
+function canonicalUser(name) {
+  const b = ciKey(allBios, name);
+  if (b !== name) return b;
+  return ciKey(allAvatars, name);
+}
+
 function normalizeLikes(data) {
   if (!data) return {};
   if (Array.isArray(data)) { const o = {}; data.forEach(n => { if (n) o[String(n)] = '❤️'; }); return o; }
@@ -1007,7 +1030,7 @@ async function apiCall(action, rowIndex, event, emoji) {
   if(!user) return alert("Name required!");
 
   triggerStreakIncrement();
-  const currentLocalStreak = localStorage.getItem(`gb_streak_${user}`) || "1";
+  const currentLocalStreak = localStorage.getItem(`gb_streak_${normUser(user)}`) || "1";
 
   const p = allPosts.find(x => x.rowIndex === rowIndex);
   const postEl = document.getElementById(`post-${rowIndex}`);
@@ -1015,14 +1038,15 @@ async function apiCall(action, rowIndex, event, emoji) {
   if(action==='like') {
     const em = emoji || '❤️';
     const reactions = normalizeLikes(p.likes);
-    const wasReacted = reactions[user] === em;
-    if (wasReacted) { delete reactions[user]; } else { reactions[user] = em; }
+    const reactionKey = ciKey(reactions, user);
+    const wasReacted = reactions[reactionKey] === em;
+    if (wasReacted) { delete reactions[reactionKey]; } else { reactions[reactionKey] = em; }
     p.likes = reactions;
     if (postEl) {
       postEl.querySelectorAll('.reaction-btn').forEach(btn => {
         const bEm = btn.dataset.emoji;
         const cnt = Object.values(reactions).filter(e=>e===bEm).length;
-        btn.className = 'reaction-btn' + (reactions[user]===bEm ? ' active' : '');
+        btn.className = 'reaction-btn' + (reactions[reactionKey]===bEm ? ' active' : '');
         btn.innerHTML = bEm + (cnt > 0 ? ` <span class='rxn-count'>${cnt}</span>` : '');
         if (bEm === em && !wasReacted) { btn.classList.add('pop'); setTimeout(() => btn.classList.remove('pop'), 120); }
       });
@@ -1387,8 +1411,8 @@ function updateAndRenderStreak() {
   const user = document.getElementById('user').value.trim();
   if (!user) return;
   
-  const streakKey = `gb_streak_${user}`;
-  const lastDateKey = `gb_streak_date_${user}`;
+  const streakKey = `gb_streak_${normUser(user)}`;
+  const lastDateKey = `gb_streak_date_${normUser(user)}`;
   
   let currentStreak = parseInt(localStorage.getItem(streakKey) || "0");
   const lastActiveDateStr = localStorage.getItem(lastDateKey);
@@ -1412,8 +1436,8 @@ function triggerStreakIncrement() {
   const user = document.getElementById('user').value.trim();
   if (!user) return;
   
-  const streakKey = `gb_streak_${user}`;
-  const lastDateKey = `gb_streak_date_${user}`;
+  const streakKey = `gb_streak_${normUser(user)}`;
+  const lastDateKey = `gb_streak_date_${normUser(user)}`;
   
   let currentStreak = parseInt(localStorage.getItem(streakKey) || "0");
   const lastActiveDateStr = localStorage.getItem(lastDateKey);
