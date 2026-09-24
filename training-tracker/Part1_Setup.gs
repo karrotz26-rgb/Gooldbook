@@ -42,31 +42,73 @@ function onOpen() {
 }
 
 /**
+ * Finds which column(s) hold the name. Checks NAME_QUESTIONS first, then any
+ * question with "name" in its title (ignoring "Username"), then First/Last Name.
+ */
+function findNameColumns(headers) {
+  var clean = headers.map(function(h) { return String(h).toLowerCase().trim(); });
+  for (var i = 0; i < NAME_QUESTIONS.length; i++) {
+    var exact = clean.indexOf(NAME_QUESTIONS[i].toLowerCase());
+    if (exact !== -1) return { full: exact };
+  }
+  var first = -1, last = -1, full = -1;
+  for (var j = 0; j < clean.length; j++) {
+    var h = clean[j];
+    if (h.indexOf("name") === -1 || h.indexOf("user") !== -1 || h.indexOf("email") !== -1) continue;
+    if (h.indexOf("first") !== -1) { if (first === -1) first = j; }
+    else if (h.indexOf("last") !== -1 || h.indexOf("sur") !== -1) { if (last === -1) last = j; }
+    else if (full === -1) full = j;
+  }
+  if (full !== -1) return { full: full };
+  return { first: first, last: last };
+}
+
+/**
+ * Backup plan when the form has no name answer: turn "jane.doe@company.com"
+ * into "Jane Doe".
+ */
+function nameFromEmail(email) {
+  var local = String(email || "").split("@")[0].replace(/[0-9]/g, "");
+  return local.split(/[._\-]+/).filter(String).map(function(part) {
+    return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+  }).join(" ");
+}
+
+/**
+ * Gets the name from a list of headers and the matching answers.
+ */
+function readName(headers, values) {
+  var cols = findNameColumns(headers);
+  var name = "";
+  if (cols.full !== undefined) {
+    name = String(values[cols.full] || "").trim();
+  } else {
+    var first = cols.first !== -1 ? String(values[cols.first] || "").trim() : "";
+    var last = cols.last !== -1 ? String(values[cols.last] || "").trim() : "";
+    name = (first + " " + last).trim();
+  }
+  if (!name) {
+    var clean = headers.map(function(h) { return String(h).toLowerCase().trim(); });
+    var emailIdx = clean.indexOf("email address") !== -1 ? clean.indexOf("email address") : clean.indexOf("username");
+    if (emailIdx !== -1) name = nameFromEmail(values[emailIdx]);
+  }
+  return name;
+}
+
+/**
  * Pulls the staff member's name out of a form submission (e.namedValues).
  */
 function getNameFromSubmission(namedValues) {
-  for (var i = 0; i < NAME_QUESTIONS.length; i++) {
-    var v = namedValues[NAME_QUESTIONS[i]];
-    if (v && v[0] && v[0].toString().trim() !== "") return v[0].toString().trim();
-  }
-  var first = (namedValues[FIRST_NAME_QUESTION] || [""])[0].toString().trim();
-  var last = (namedValues[LAST_NAME_QUESTION] || [""])[0].toString().trim();
-  return (first + " " + last).trim();
+  var headers = Object.keys(namedValues);
+  var values = headers.map(function(k) { return (namedValues[k] || [""])[0]; });
+  return readName(headers, values);
 }
 
 /**
  * Pulls the staff member's name out of a row of the "Form Responses 1" sheet.
  */
 function getNameFromRow(row, headers) {
-  for (var i = 0; i < NAME_QUESTIONS.length; i++) {
-    var idx = headers.indexOf(NAME_QUESTIONS[i]);
-    if (idx !== -1 && row[idx] && row[idx].toString().trim() !== "") return row[idx].toString().trim();
-  }
-  var firstIdx = headers.indexOf(FIRST_NAME_QUESTION);
-  var lastIdx = headers.indexOf(LAST_NAME_QUESTION);
-  var first = firstIdx !== -1 ? row[firstIdx].toString().trim() : "";
-  var last = lastIdx !== -1 ? row[lastIdx].toString().trim() : "";
-  return (first + " " + last).trim();
+  return readName(headers, row);
 }
 
 /**
