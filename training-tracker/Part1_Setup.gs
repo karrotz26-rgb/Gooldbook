@@ -148,7 +148,11 @@ function updateStaffTrainingSmart(e) {
   var wasUpdated = false;
   for (var question in TRAINING_COLUMNS) {
     if (e.namedValues[question] && e.namedValues[question][0] !== "") {
-      masterSheet.getRange(rowIndex, TRAINING_COLUMNS[question]).setValue(e.namedValues[question][0]);
+      var cell = masterSheet.getRange(rowIndex, TRAINING_COLUMNS[question]);
+      // Only replace the date if the new one is more recent than what's there
+      if (isNewerDate(e.namedValues[question][0], cell.getValue())) {
+        cell.setValue(e.namedValues[question][0]);
+      }
       wasUpdated = true;
     }
   }
@@ -158,3 +162,14 @@ function updateStaffTrainingSmart(e) {
   }
 }
 
+/**
+ * True if newVal is a more recent date than oldVal (or oldVal is blank/not a date).
+ */
+function isNewerDate(newVal, oldVal) {
+  if (newVal === "" || newVal === null || newVal === undefined) return false;
+  var newDate = new Date(newVal);
+  var oldDate = new Date(oldVal);
+  var oldMissing = oldVal === "" || oldVal === null || oldVal === undefined || isNaN(oldDate.getTime());
+  if (isNaN(newDate.getTime())) return oldMissing;
+  return oldMissing || newDate > oldDate;
+}

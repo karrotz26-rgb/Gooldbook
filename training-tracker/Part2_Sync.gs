@@ -59,10 +59,10 @@ function populateTrackerFromHistory() {
     var issaVal = colMap.issa !== -1 ? getValidDate(row[colMap.issa]) : "";
     var mcnVal = colMap.mcn !== -1 ? getValidDate(row[colMap.mcn]) : "";
 
-    if (blsVal !== "") tracker[email].bls = blsVal;
-    if (hipaaVal !== "") tracker[email].hipaa = hipaaVal;
-    if (issaVal !== "") tracker[email].issa = issaVal;
-    if (mcnVal !== "") tracker[email].mcn = mcnVal;
+    if (isNewerDate(blsVal, tracker[email].bls)) tracker[email].bls = blsVal;
+    if (isNewerDate(hipaaVal, tracker[email].hipaa)) tracker[email].hipaa = hipaaVal;
+    if (isNewerDate(issaVal, tracker[email].issa)) tracker[email].issa = issaVal;
+    if (isNewerDate(mcnVal, tracker[email].mcn)) tracker[email].mcn = mcnVal;
 
     var rowTimestamp = new Date(row[colMap.timestamp]);
     if (rowTimestamp > tracker[email].lastUpdated) {
