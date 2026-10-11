@@ -1644,11 +1644,13 @@ function renderAuth() {
     el.innerHTML = `<div class="card" style="text-align:center;">
       <div style="display:flex; justify-content:center; margin:6px 0 10px;">${memberAvatar(st.selected, 64)}</div>
       <h2 style="margin:0 0 6px;">Hi ${escapeHtml(st.selected.name)}!</h2>
-      <div class="auth-muted">We emailed a 6-digit code to<br><b>${escapeHtml(st.emailHint)}</b></div>
+      <div class="auth-muted">${st.textHint
+        ? `We texted a 6-digit code to <b>${escapeHtml(st.textHint)}</b><br>and emailed it to <b>${escapeHtml(st.emailHint)}</b>`
+        : `We emailed a 6-digit code to<br><b>${escapeHtml(st.emailHint)}</b>`}</div>
       <input id="codeInput" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" oninput="if(this.value.replace(/\\D/g,'').length===6) submitCode()">
       ${authMsgHTML()}
       <button class="btn auth-btn" style="background:#2ecc71;" ${busy} onclick="submitCode()">${st.busy ? 'Checking…' : 'Sign in'}</button>
-      <div class="auth-muted" style="margin-top:10px;">The code works for 10 minutes. Check your junk folder if you don't see it.</div>
+      <div class="auth-muted" style="margin-top:10px;">The code works for 10 minutes. ${st.textHint ? 'Check your messages or email.' : "Check your junk folder if you don't see it."}</div>
       <button class="auth-link" ${busy} onclick="sendCode()">Resend code</button>
       <button class="auth-link quiet" onclick="showAuthScreen('pick')">Not you? Pick a different name</button>
     </div>`;
@@ -1695,6 +1697,7 @@ async function sendCode() {
     authState.busy = false;
     if (r.ok) {
       authState.emailHint = r.emailHint;
+      authState.textHint = r.textHint || '';
       authState.step = 'code';
       authState.msg = { type: 'info', text: 'Code sent! Check your email.' };
     } else {

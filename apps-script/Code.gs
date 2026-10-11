@@ -22,6 +22,9 @@ const USER_CONTACTS = {
 //   "text"    = one Shortcut for everything: subject "Gooldbook text to: <who>", body = the message to send
 const NOTIFY_MODE = "classic";
 const TEXT_SUBJECT = "Gooldbook text to: ";
+// In "text" mode, also text sign-in codes through the Shortcut (they're still emailed to the person too,
+// so sign-in works even if your phone is off). Codes pass through MY_EMAIL's inbox when this is on.
+const CODE_BY_TEXT = true;
 
 const CODE_TTL_SECONDS = 600;      // sign-in codes expire after 10 minutes
 const CODE_MAX_TRIES = 5;          // wrong guesses allowed per code
@@ -215,7 +218,20 @@ function requestCode(data) {
     subject: `Your Gooldbook code: ${code}`,
     body: `Hi ${member.name}!\n\nYour theGooldbook sign-in code is: ${code}\n\nIt works for 10 minutes. If you didn't ask for this, you can ignore this email.\n\n🦄 ${APP_URL}`
   });
-  return { ok: true, name: member.name, emailHint: maskEmail(member.email) };
+  let textedTo = "";
+  if (NOTIFY_MODE === "text" && CODE_BY_TEXT) {
+    try {
+      // The last line lets iPhone offer the code above the keyboard, but only on the Gooldbook site
+      const host = APP_URL.replace(/^https?:\/\//, "").split("/")[0];
+      MailApp.sendEmail({
+        to: MY_EMAIL,
+        subject: TEXT_SUBJECT + textTarget(member),
+        body: `Your Gooldbook sign-in code is ${code}. It works for 10 minutes.\n\n@${host} #${code}`
+      });
+      textedTo = textHint(textTarget(member));
+    } catch (err) { Logger.log("Code text failed: " + err); }
+  }
+  return { ok: true, name: member.name, emailHint: maskEmail(member.email), textHint: textedTo };
 }
 
 function verifyCode(data) {
