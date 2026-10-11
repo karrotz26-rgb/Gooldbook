@@ -557,7 +557,7 @@ function render() {
     if (filterType === 'author') {
         const bio = escapeHtml(ciLookup(allBios, filterVal) || "A mysterious Gooldbooker.");
         const isMe = sameUser(filterVal, u);
-        statusEl.innerHTML = `<div class="card" style="text-align:center;">${getAvatarMarkup(filterVal, 'avatar-large')}${isMe ? `<input type="file" id="avaPick" style="display:none" onchange="uploadAvatar(${jsArg(u)})"><button class="btn-alt" style="margin-bottom:10px" onclick="document.getElementById('avaPick').click()">Change Photo</button>` : ''}<h2 style="margin:0">${escapeHtml(filterVal)}</h2><p style="font-style:italic; color:#555">"${bio}"</p>${isMe ? `<div id="bioEdit" style="display:none"><textarea id="newBio">${bio}</textarea><button class="btn" onclick="saveBio(${jsArg(u)})">Save</button></div><button class="btn-alt" id="editBioBtn" onclick="document.getElementById('bioEdit').style.display='block'; this.style.display='none'">Edit Bio</button>${notifySettingsHTML()}<hr style="border:0; border-top:1px solid #eee; margin:15px 0;"><div class="auth-muted" style="margin-bottom:10px;">🔒 Signed in on this device</div><div style="display:flex; gap:8px;"><button class="btn btn-alt" style="flex:1;" onclick="signOut(false)">Sign out</button><button class="btn btn-alt" style="flex:1; color:#c0392b;" onclick="signOut(true)">Sign out everywhere</button></div>` : ''}<hr style="border:0; border-top:1px solid #eee; margin:15px 0;"><button class="btn-alt" onclick="setFilter(null,null)">← Back to Feed</button></div>`;
+        statusEl.innerHTML = `<div class="card" style="text-align:center;">${getAvatarMarkup(filterVal, 'avatar-large')}${isMe ? `<input type="file" id="avaPick" style="display:none" onchange="uploadAvatar(${jsArg(u)})"><button class="btn-alt" style="margin-bottom:10px" onclick="document.getElementById('avaPick').click()">Change Photo</button>` : ''}<h2 style="margin:0">${escapeHtml(filterVal)}</h2><p style="font-style:italic; color:#555">"${bio}"</p>${isMe ? `<div id="bioEdit" style="display:none"><textarea id="newBio">${bio}</textarea><button class="btn" onclick="saveBio(${jsArg(u)})">Save</button></div><button class="btn-alt" id="editBioBtn" onclick="document.getElementById('bioEdit').style.display='block'; this.style.display='none'">Edit Bio</button>${settingsHTML()}<hr style="border:0; border-top:1px solid #eee; margin:15px 0;"><div class="auth-muted" style="margin-bottom:10px;">🔒 Signed in on this device</div><div style="display:flex; gap:8px;"><button class="btn btn-alt" style="flex:1;" onclick="signOut(false)">Sign out</button><button class="btn btn-alt" style="flex:1; color:#c0392b;" onclick="signOut(true)">Sign out everywhere</button></div>` : ''}<hr style="border:0; border-top:1px solid #eee; margin:15px 0;"><button class="btn-alt" onclick="setFilter(null,null)">← Back to Feed</button></div>`;
     } else {
         let label = escapeHtml(filterType === 'likes' ? `Liked by ${filterVal}` : `Tagged ${filterVal}`);
         statusEl.innerHTML = `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>Showing: <b>${label}</b></span><button class="btn-alt" onclick="setFilter(null,null)">Clear</button></div>`;
@@ -1839,15 +1839,94 @@ const NOTIFY_OPTIONS = [
   ['mentions', 'Someone @mentions me']
 ];
 
-function notifySettingsHTML() {
+let settingsOpen = false;     // keeps the section open across re-renders
+let emailChangeHint = '';     // set while waiting for the code sent to a new email
+
+function notifySummary() {
   if (!currentMe || currentMe.notifyMode !== 'text' || !currentMe.notify) return '';
-  const who = currentMe.role === 'admin' ? 'Change it in the Members tab of the Sheet.' : 'Ask Steven if that should change.';
-  return `<hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
-    <div style="text-align:left;">
-      <b>📱 Text me when…</b>
+  const on = NOTIFY_OPTIONS.filter(([key]) => currentMe.notify[key]).length;
+  return ` · ${on} of ${NOTIFY_OPTIONS.length} texts on`;
+}
+
+// Collapsed "Notifications & contact" box on your own profile
+function settingsHTML() {
+  if (!currentMe) return '';
+  const textMode = currentMe.notifyMode === 'text' && currentMe.notify;
+  const hasEmail = typeof currentMe.email === 'string';
+  if (!textMode && !hasEmail) return '';
+  const toggles = textMode ? `<div class="settings-group"><b>📱 Text me when…</b>
       ${NOTIFY_OPTIONS.map(([key, label]) => `<label class="notify-row"><input type="checkbox" ${currentMe.notify[key] ? 'checked' : ''} onchange="setNotifyPref('${key}', this)"><span>${label}</span></label>`).join('')}
-      <div class="auth-muted" style="text-align:left; margin-top:6px;">Texts go to <b>${escapeHtml(currentMe.textTo || '')}</b>. ${who}</div>
+    </div>` : '';
+  const textTo = textMode && hasEmail ? `<div class="settings-group">
+      <label class="auth-label" for="textToInput">📱 Texts go to</label>
+      <div class="settings-row"><input id="textToInput" maxlength="100" autocomplete="tel" value="${escapeHtml(currentMe.textToRaw || '')}" placeholder="${escapeHtml(currentMe.email)}"><button class="btn" onclick="saveTextTo(this)">Save</button></div>
+      <div class="settings-hint">A cell number (with country code if outside the US) or an iMessage email. Leave blank to use your sign-in email.</div>
+    </div>` : '';
+  const email = !hasEmail ? '' : emailChangeHint ? `<div class="settings-group">
+      <label class="auth-label" for="emailCodeInput">✉️ Confirm your new email</label>
+      <div class="settings-hint" style="margin-bottom:6px;">We emailed a 6-digit code to <b>${escapeHtml(emailChangeHint)}</b>. Your email changes once you enter it.</div>
+      <div class="settings-row"><input id="emailCodeInput" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••"><button class="btn" onclick="confirmEmailChange(this)">Confirm</button></div>
+      <button class="auth-link quiet" style="margin:6px 0 0;" onclick="emailChangeHint=''; render();">Cancel</button>
+    </div>` : `<div class="settings-group">
+      <label class="auth-label" for="emailInput">✉️ Sign-in email</label>
+      <div class="settings-row"><input id="emailInput" type="email" maxlength="100" autocomplete="email" value="${escapeHtml(currentMe.email)}"><button class="btn" onclick="startEmailChange(this)">Change</button></div>
+      <div class="settings-hint">Where your sign-in codes are emailed. We'll send a code to the new address to confirm it.</div>
     </div>`;
+  const where = textMode ? `<div class="settings-hint">Texts currently go to <b>${escapeHtml(currentMe.textTo || '')}</b>.</div>` : '';
+  return `<hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
+    <details class="settings-box" ${settingsOpen ? 'open' : ''} ontoggle="settingsOpen = this.open">
+      <summary>⚙️ Notifications &amp; contact<span class="settings-note">${notifySummary()}</span></summary>
+      <div style="text-align:left;">${toggles}${textTo}${email}${where}</div>
+    </details>`;
+}
+
+function saveMe() {
+  localStorage.setItem('gb_me', JSON.stringify(currentMe));
+}
+
+async function saveTextTo(btn) {
+  const value = document.getElementById('textToInput').value.trim();
+  btn.disabled = true;
+  try {
+    const r = await apiPost({ action: 'setTextTo', textTo: value });
+    if (!r.ok) { alert(r.message || "That didn't save — please try again."); return; }
+    currentMe.textToRaw = r.textToRaw; currentMe.textTo = r.textTo; saveMe();
+    showNotif(r.textToRaw ? `Texts will go to ${r.textTo}.` : 'Texts will go to your sign-in email.');
+    render();
+  } catch (e) { alert("Couldn't reach theGooldbook. Please try again."); }
+  finally { btn.disabled = false; }
+}
+
+async function startEmailChange(btn) {
+  const value = document.getElementById('emailInput').value.trim();
+  if (value.toLowerCase() === String(currentMe.email).toLowerCase()) return;
+  btn.disabled = true;
+  try {
+    const r = await apiPost({ action: 'requestEmailChange', email: value });
+    if (!r.ok) { alert(r.message || "Couldn't send a code — please try again."); return; }
+    emailChangeHint = r.emailHint;
+    render();
+  } catch (e) { alert("Couldn't reach theGooldbook. Please try again."); }
+  finally { btn.disabled = false; }
+}
+
+async function confirmEmailChange(btn) {
+  const code = document.getElementById('emailCodeInput').value.replace(/\D/g, '');
+  if (code.length !== 6) return alert('Enter the 6-digit code from the email.');
+  btn.disabled = true;
+  try {
+    const r = await apiPost({ action: 'confirmEmailChange', code });
+    if (!r.ok) {
+      alert(r.message || "That didn't work — please try again.");
+      if (r.error === 'expired') { emailChangeHint = ''; render(); }
+      return;
+    }
+    emailChangeHint = '';
+    currentMe.email = r.email; currentMe.textTo = r.textTo; saveMe();
+    showNotif('Your sign-in email was changed.');
+    render();
+  } catch (e) { alert("Couldn't reach theGooldbook. Please try again."); }
+  finally { btn.disabled = false; }
 }
 
 async function setNotifyPref(key, box) {
@@ -1857,7 +1936,9 @@ async function setNotifyPref(key, box) {
     const r = await apiPost({ action: 'setNotify', notify: { [key]: wanted } });
     if (!r.ok) throw new Error(r.error || 'failed');
     currentMe.notify = r.notify || { ...currentMe.notify, [key]: wanted };
-    localStorage.setItem('gb_me', JSON.stringify(currentMe));
+    saveMe();
+    const note = document.querySelector('.settings-note');
+    if (note) note.textContent = notifySummary();
     showNotif(wanted ? 'Turned on.' : 'Turned off.');
   } catch (e) {
     box.checked = !wanted;
