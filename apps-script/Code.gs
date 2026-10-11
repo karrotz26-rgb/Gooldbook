@@ -21,7 +21,7 @@ const USER_CONTACTS = {
 //   "classic" = the original subjects ("[Gooldbook] New Post", "[Gooldbook] Interaction - Name", "[Gooldbook] Mention - Name")
 //   "text"    = one Shortcut for everything: subject "Gooldbook text to: <who>" (what the automation
 //               triggers on), body = "<who>###<message>" on one line (what the Shortcut reads)
-const NOTIFY_MODE = "classic";
+const NOTIFY_MODE = "text";
 const TEXT_SUBJECT = "Gooldbook text to: ";
 const TEXT_SEPARATOR = "###";
 // In "text" mode, also text sign-in codes through the Shortcut (they're still emailed to the person too,
