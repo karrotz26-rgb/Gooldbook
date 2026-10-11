@@ -1699,7 +1699,7 @@ async function sendCode() {
       authState.emailHint = r.emailHint;
       authState.textHint = r.textHint || '';
       authState.step = 'code';
-      authState.msg = { type: 'info', text: 'Code sent! Check your email.' };
+      authState.msg = { type: 'info', text: authState.textHint ? 'Code sent! Check your messages or email.' : 'Code sent! Check your email.' };
     } else {
       authState.msg = { type: 'error', text: r.message || "Couldn't send a code. Please try again." };
     }
