@@ -19,9 +19,11 @@ const USER_CONTACTS = {
 
 // How notifications are sent (all as emails to MY_EMAIL, which your iPhone Shortcuts turn into texts):
 //   "classic" = the original subjects ("[Gooldbook] New Post", "[Gooldbook] Interaction - Name", "[Gooldbook] Mention - Name")
-//   "text"    = one Shortcut for everything: subject "Gooldbook text to: <who>", body = the message to send
-const NOTIFY_MODE = "classic";
+//   "text"    = one Shortcut for everything: subject "Gooldbook text to: <who>" (what the automation
+//               triggers on), body = "<who>###<message>" on one line (what the Shortcut reads)
+const NOTIFY_MODE = "text";
 const TEXT_SUBJECT = "Gooldbook text to: ";
+const TEXT_SEPARATOR = "###";
 // In "text" mode, also text sign-in codes through the Shortcut (they're still emailed to the person too,
 // so sign-in works even if your phone is off). Codes pass through MY_EMAIL's inbox when this is on.
 const CODE_BY_TEXT = true;
@@ -221,13 +223,7 @@ function requestCode(data) {
   let textedTo = "";
   if (NOTIFY_MODE === "text" && CODE_BY_TEXT) {
     try {
-      // The last line lets iPhone offer the code above the keyboard, but only on the Gooldbook site
-      const host = APP_URL.replace(/^https?:\/\//, "").split("/")[0];
-      MailApp.sendEmail({
-        to: MY_EMAIL,
-        subject: TEXT_SUBJECT + textTarget(member),
-        body: `Your Gooldbook sign-in code is ${code}. It works for 10 minutes.\n\n@${host} #${code}`
-      });
+      sendTextEmail([textTarget(member)], `Your Gooldbook sign-in code is ${code}. It works for 10 minutes.`);
       textedTo = textHint(textTarget(member));
     } catch (err) { Logger.log("Code text failed: " + err); }
   }
@@ -759,8 +755,22 @@ function sendTextNotifications(ev) {
 
   Object.keys(groups).forEach(message => {
     try {
-      MailApp.sendEmail({ to: MY_EMAIL, subject: TEXT_SUBJECT + groups[message].join(", "), body: message });
+      sendTextEmail(groups[message], message);
     } catch (err) { Logger.log("Text notify failed: " + err); }
+  });
+}
+
+// One email for the Shortcut. Shortcuts can read the body but not always the subject, so the body
+// carries everything on a single line: recipients (comma-separated, no spaces), ###, then the message.
+function sendTextEmail(targets, message) {
+  const recipients = targets.map(t => String(t).replace(/[,#]/g, "").trim()).filter(t => t);
+  if (!recipients.length) return;
+  // Keep the separator unique so the Shortcut's split always gives exactly two parts
+  const text = String(message).replace(/\s+/g, " ").replace(/#{3,}/g, "#").trim();
+  MailApp.sendEmail({
+    to: MY_EMAIL,
+    subject: TEXT_SUBJECT + recipients.join(", "),
+    body: recipients.join(",") + TEXT_SEPARATOR + text
   });
 }
 
