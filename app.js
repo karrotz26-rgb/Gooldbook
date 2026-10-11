@@ -1664,6 +1664,8 @@ function renderAuth() {
       <input id="joinName" maxlength="40" autocomplete="name" value="${escapeHtml(j.name || '')}">
       <label class="auth-label" for="joinEmail">Your email</label>
       <input id="joinEmail" type="email" maxlength="100" autocomplete="email" value="${escapeHtml(j.email || '')}">
+      <label class="auth-label" for="joinPhone">Cell phone for texts (optional)</label>
+      <input id="joinPhone" type="tel" maxlength="30" autocomplete="tel" placeholder="Include country code if outside the US" value="${escapeHtml(j.phone || '')}">
       <label class="auth-label" for="joinNote">Note (optional)</label>
       <textarea id="joinNote" rows="2" maxlength="300" placeholder="Who are you in the family?">${escapeHtml(j.note || '')}</textarea>
       ${authMsgHTML()}
@@ -1741,13 +1743,14 @@ async function submitJoin() {
   const j = authState.join = {
     name: document.getElementById('joinName').value.trim(),
     email: document.getElementById('joinEmail').value.trim(),
+    phone: document.getElementById('joinPhone').value.trim(),
     note: document.getElementById('joinNote').value.trim()
   };
   if (j.name.length < 2) { authState.msg = { type: 'error', text: 'Please enter your name.' }; renderAuth(); return; }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(j.email)) { authState.msg = { type: 'error', text: 'Please enter a valid email address.' }; renderAuth(); return; }
   authState.busy = true; authState.msg = null; renderAuth();
   try {
-    const r = await apiPost({ action: 'requestJoin', name: j.name, email: j.email, note: j.note, device: getDeviceId() });
+    const r = await apiPost({ action: 'requestJoin', name: j.name, email: j.email, phone: j.phone, note: j.note, device: getDeviceId() });
     authState.busy = false;
     if (r.ok) {
       localStorage.setItem('gb_join', JSON.stringify({ id: r.id, name: r.name, emailHint: r.emailHint }));
@@ -1801,7 +1804,7 @@ function renderJoinRequests() {
   const el = document.getElementById('joinRequests');
   if (!currentMe || currentMe.role !== 'admin' || !joinRequests.length || filterVal) { el.innerHTML = ''; return; }
   el.innerHTML = `<div class="card join-card"><b>✋ ${joinRequests.length} ${joinRequests.length === 1 ? 'request' : 'requests'} to join</b>${joinRequests.map(r => `
-    <div class="join-req">${memberAvatar({ name: r.name, avatar: '' })}<div style="flex:1; min-width:0;"><b style="color:var(--gb-blue)">${escapeHtml(r.name)}</b><div class="auth-muted" style="text-align:left; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(r.email)} · ${timeAgo(r.time) || 'just now'}</div></div></div>
+    <div class="join-req">${memberAvatar({ name: r.name, avatar: '' })}<div style="flex:1; min-width:0;"><b style="color:var(--gb-blue)">${escapeHtml(r.name)}</b><div class="auth-muted" style="text-align:left; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(r.email)}${r.phone ? ` · 📱 ${escapeHtml(r.phone)}` : ''} · ${timeAgo(r.time) || 'just now'}</div></div></div>
     ${r.note ? `<div class="join-note">"${escapeHtml(r.note)}"</div>` : '<div style="height:10px;"></div>'}
     <div style="display:flex; gap:8px;">
       <button class="btn" style="flex:1; background:#2ecc71;" onclick="decideJoinRequest(${jsArg(r.id)}, true, this)">✓ Approve</button>

@@ -263,15 +263,32 @@ function verifyCode(data) {
 // ==========================================
 // REQUESTS TO JOIN
 // ==========================================
+const REQUEST_HEADERS = ["Id", "Name", "Email", "Note", "Requested", "Status", "Phone"];
+
 function getRequestsSheet() {
-  return getOrCreateSheet("Requests", ["Id", "Name", "Email", "Note", "Requested", "Status"]);
+  const sheet = getOrCreateSheet("Requests", REQUEST_HEADERS);
+  // Requests tabs made before the phone field existed: add the Phone header
+  const header = sheet.getDataRange().getValues()[0] || [];
+  if (!header[6]) sheet.getRange(1, 7).setValue("Phone");
+  return sheet;
+}
+
+// Optional cell number from the join form: digits with the usual separators, 7–15 digits
+function cleanPhone(raw) {
+  const phone = String(raw || "").trim().slice(0, 30);
+  if (!phone) return { ok: true, phone: "" };
+  const digits = phone.replace(/\D/g, "");
+  if (!/^\+?[0-9 ()\-.]+$/.test(phone) || digits.length < 7 || digits.length > 15) return { ok: false };
+  return { ok: true, phone: phone.replace(/\s+/g, " ") };
 }
 
 function requestJoin(data) {
   const name = String(data.name || "").trim().replace(/\s+/g, " ").slice(0, 40);
   const email = String(data.email || "").trim().toLowerCase().slice(0, 100);
   const note = String(data.note || "").trim().slice(0, 300);
+  const phone = cleanPhone(data.phone);
   if (name.length < 2) return { error: "name", message: "Please enter your name." };
+  if (!phone.ok) return { error: "phone", message: "That phone number doesn't look right. Include the country code if you're outside the US, or leave it blank." };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "email", message: "Please enter a valid email address." };
   if (findMember(name)) return { error: "nameTaken", message: "Someone in the family already uses that name. Try adding a last initial." };
   if (getMembers().some(m => m.email.toLowerCase() === email)) {
@@ -297,13 +314,13 @@ function requestJoin(data) {
   cache.put(deviceKey, String(deviceCount + 1), 86400);
 
   const id = Utilities.getUuid();
-  sheet.appendRow([id, name, email, note, new Date(), "pending"]);
+  sheet.appendRow([id, name, email, note, new Date(), "pending", phone.phone]);
   bumpFeedVersion();
   try {
     MailApp.sendEmail({
       to: adminEmails().join(","),
       subject: `[Gooldbook] ${name} asked to join`,
-      body: `✋ ${name} (${email}) asked to join theGooldbook.${note ? `\n\nTheir note: "${note}"` : ""}\n\nOpen the app to approve or decline: ${APP_URL}`
+      body: `✋ ${name} (${email}${phone.phone ? ", " + phone.phone : ""}) asked to join theGooldbook.${note ? `\n\nTheir note: "${note}"` : ""}\n\nOpen the app to approve or decline: ${APP_URL}`
     });
   } catch (err) { Logger.log("Join request email failed: " + err); }
   return { ok: true, id: id, name: name, emailHint: maskEmail(email) };
@@ -319,7 +336,7 @@ function joinStatus(data) {
 function pendingRequests() {
   const rows = getRequestsSheet().getDataRange().getValues();
   return rows.slice(1).filter(r => r[5] === "pending")
-    .map(r => ({ id: r[0], name: r[1], email: r[2], note: r[3], time: r[4] }));
+    .map(r => ({ id: r[0], name: r[1], email: r[2], note: r[3], time: r[4], phone: r[6] || "" }));
 }
 
 function decideRequest(id, approve) {
@@ -327,14 +344,15 @@ function decideRequest(id, approve) {
   const rows = sheet.getDataRange().getValues();
   const i = rows.findIndex((r, idx) => idx > 0 && r[0] === id);
   if (i < 1 || rows[i][5] !== "pending") return { error: "missing", message: "That request was already handled." };
-  const name = rows[i][1], email = rows[i][2];
+  const name = rows[i][1], email = rows[i][2], phone = String(rows[i][6] || "").trim();
   if (!approve) {
     sheet.getRange(i + 1, 6).setValue("declined");
     bumpFeedVersion();
     return { ok: true, name: name };
   }
   if (findMember(name)) return { error: "nameTaken", message: `Someone is already called "${name}". Rename them in the Requests tab first.` };
-  getMembersSheet().appendRow([name, email, "member", new Date(), "", "yes", "yes", "yes", "yes"]);
+  // Their texts (notifications and sign-in codes) go to the phone they gave, if any
+  getMembersSheet().appendRow([name, email, "member", new Date(), phone, "yes", "yes", "yes", "yes"]);
   CacheService.getScriptCache().remove("members");
   sheet.getRange(i + 1, 6).setValue("approved");
   bumpFeedVersion();
