@@ -30,6 +30,7 @@ const MEDIAPIPE_BASE = "https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentat
 
 let pendingDeepLinkPost = parseInt(new URLSearchParams(location.search).get('post'), 10) || null;
 let lastFeedSignature = "";
+let feedVersion = ""; // server's change tag; lets polls skip downloading an unchanged feed
 let lastNotifiedMentionTime = "";
 const ACTIVITY_WINDOW_DAYS = 30;
 
@@ -169,6 +170,7 @@ async function loadFeed() {
     const res = await fetch(SCRIPT_URL);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+    feedVersion = data.version || "";
     allPosts = data.posts || [];
     allBios = data.bios || {};
     allAvatars = data.avatars || {};
@@ -209,8 +211,10 @@ async function pollForUpdates() {
   if (isTyping) { _isPollRunning = false; return; }
 
   try {
-    const res = await fetch(SCRIPT_URL);
+    const res = await fetch(feedVersion ? `${SCRIPT_URL}?v=${encodeURIComponent(feedVersion)}` : SCRIPT_URL);
     const data = await res.json();
+    if (data.unchanged) return;
+    feedVersion = data.version || "";
     const newPosts = data.posts || [];
 
     if (newPosts.length > lastPostCount) {
