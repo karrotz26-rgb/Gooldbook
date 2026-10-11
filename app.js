@@ -557,7 +557,7 @@ function render() {
     if (filterType === 'author') {
         const bio = escapeHtml(ciLookup(allBios, filterVal) || "A mysterious Gooldbooker.");
         const isMe = sameUser(filterVal, u);
-        statusEl.innerHTML = `<div class="card" style="text-align:center;">${getAvatarMarkup(filterVal, 'avatar-large')}${isMe ? `<input type="file" id="avaPick" style="display:none" onchange="uploadAvatar(${jsArg(u)})"><button class="btn-alt" style="margin-bottom:10px" onclick="document.getElementById('avaPick').click()">Change Photo</button>` : ''}<h2 style="margin:0">${escapeHtml(filterVal)}</h2><p style="font-style:italic; color:#555">"${bio}"</p>${isMe ? `<div id="bioEdit" style="display:none"><textarea id="newBio">${bio}</textarea><button class="btn" onclick="saveBio(${jsArg(u)})">Save</button></div><button class="btn-alt" id="editBioBtn" onclick="document.getElementById('bioEdit').style.display='block'; this.style.display='none'">Edit Bio</button><hr style="border:0; border-top:1px solid #eee; margin:15px 0;"><div class="auth-muted" style="margin-bottom:10px;">🔒 Signed in on this device</div><div style="display:flex; gap:8px;"><button class="btn btn-alt" style="flex:1;" onclick="signOut(false)">Sign out</button><button class="btn btn-alt" style="flex:1; color:#c0392b;" onclick="signOut(true)">Sign out everywhere</button></div>` : ''}<hr style="border:0; border-top:1px solid #eee; margin:15px 0;"><button class="btn-alt" onclick="setFilter(null,null)">← Back to Feed</button></div>`;
+        statusEl.innerHTML = `<div class="card" style="text-align:center;">${getAvatarMarkup(filterVal, 'avatar-large')}${isMe ? `<input type="file" id="avaPick" style="display:none" onchange="uploadAvatar(${jsArg(u)})"><button class="btn-alt" style="margin-bottom:10px" onclick="document.getElementById('avaPick').click()">Change Photo</button>` : ''}<h2 style="margin:0">${escapeHtml(filterVal)}</h2><p style="font-style:italic; color:#555">"${bio}"</p>${isMe ? `<div id="bioEdit" style="display:none"><textarea id="newBio">${bio}</textarea><button class="btn" onclick="saveBio(${jsArg(u)})">Save</button></div><button class="btn-alt" id="editBioBtn" onclick="document.getElementById('bioEdit').style.display='block'; this.style.display='none'">Edit Bio</button>${notifySettingsHTML()}<hr style="border:0; border-top:1px solid #eee; margin:15px 0;"><div class="auth-muted" style="margin-bottom:10px;">🔒 Signed in on this device</div><div style="display:flex; gap:8px;"><button class="btn btn-alt" style="flex:1;" onclick="signOut(false)">Sign out</button><button class="btn btn-alt" style="flex:1; color:#c0392b;" onclick="signOut(true)">Sign out everywhere</button></div>` : ''}<hr style="border:0; border-top:1px solid #eee; margin:15px 0;"><button class="btn-alt" onclick="setFilter(null,null)">← Back to Feed</button></div>`;
     } else {
         let label = escapeHtml(filterType === 'likes' ? `Liked by ${filterVal}` : `Tagged ${filterVal}`);
         statusEl.innerHTML = `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>Showing: <b>${label}</b></span><button class="btn-alt" onclick="setFilter(null,null)">Clear</button></div>`;
@@ -1644,11 +1644,13 @@ function renderAuth() {
     el.innerHTML = `<div class="card" style="text-align:center;">
       <div style="display:flex; justify-content:center; margin:6px 0 10px;">${memberAvatar(st.selected, 64)}</div>
       <h2 style="margin:0 0 6px;">Hi ${escapeHtml(st.selected.name)}!</h2>
-      <div class="auth-muted">We emailed a 6-digit code to<br><b>${escapeHtml(st.emailHint)}</b></div>
+      <div class="auth-muted">${st.textHint
+        ? `We texted a 6-digit code to <b>${escapeHtml(st.textHint)}</b><br>and emailed it to <b>${escapeHtml(st.emailHint)}</b>`
+        : `We emailed a 6-digit code to<br><b>${escapeHtml(st.emailHint)}</b>`}</div>
       <input id="codeInput" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" oninput="if(this.value.replace(/\\D/g,'').length===6) submitCode()">
       ${authMsgHTML()}
       <button class="btn auth-btn" style="background:#2ecc71;" ${busy} onclick="submitCode()">${st.busy ? 'Checking…' : 'Sign in'}</button>
-      <div class="auth-muted" style="margin-top:10px;">The code works for 10 minutes. Check your junk folder if you don't see it.</div>
+      <div class="auth-muted" style="margin-top:10px;">The code works for 10 minutes. ${st.textHint ? 'Check your messages or email.' : "Check your junk folder if you don't see it."}</div>
       <button class="auth-link" ${busy} onclick="sendCode()">Resend code</button>
       <button class="auth-link quiet" onclick="showAuthScreen('pick')">Not you? Pick a different name</button>
     </div>`;
@@ -1662,6 +1664,8 @@ function renderAuth() {
       <input id="joinName" maxlength="40" autocomplete="name" value="${escapeHtml(j.name || '')}">
       <label class="auth-label" for="joinEmail">Your email</label>
       <input id="joinEmail" type="email" maxlength="100" autocomplete="email" value="${escapeHtml(j.email || '')}">
+      <label class="auth-label" for="joinPhone">Cell phone for texts (optional)</label>
+      <input id="joinPhone" type="tel" maxlength="30" autocomplete="tel" placeholder="Include country code if outside the US" value="${escapeHtml(j.phone || '')}">
       <label class="auth-label" for="joinNote">Note (optional)</label>
       <textarea id="joinNote" rows="2" maxlength="300" placeholder="Who are you in the family?">${escapeHtml(j.note || '')}</textarea>
       ${authMsgHTML()}
@@ -1695,8 +1699,9 @@ async function sendCode() {
     authState.busy = false;
     if (r.ok) {
       authState.emailHint = r.emailHint;
+      authState.textHint = r.textHint || '';
       authState.step = 'code';
-      authState.msg = { type: 'info', text: 'Code sent! Check your email.' };
+      authState.msg = { type: 'info', text: authState.textHint ? 'Code sent! Check your messages or email.' : 'Code sent! Check your email.' };
     } else {
       authState.msg = { type: 'error', text: r.message || "Couldn't send a code. Please try again." };
     }
@@ -1738,13 +1743,14 @@ async function submitJoin() {
   const j = authState.join = {
     name: document.getElementById('joinName').value.trim(),
     email: document.getElementById('joinEmail').value.trim(),
+    phone: document.getElementById('joinPhone').value.trim(),
     note: document.getElementById('joinNote').value.trim()
   };
   if (j.name.length < 2) { authState.msg = { type: 'error', text: 'Please enter your name.' }; renderAuth(); return; }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(j.email)) { authState.msg = { type: 'error', text: 'Please enter a valid email address.' }; renderAuth(); return; }
   authState.busy = true; authState.msg = null; renderAuth();
   try {
-    const r = await apiPost({ action: 'requestJoin', name: j.name, email: j.email, note: j.note, device: getDeviceId() });
+    const r = await apiPost({ action: 'requestJoin', name: j.name, email: j.email, phone: j.phone, note: j.note, device: getDeviceId() });
     authState.busy = false;
     if (r.ok) {
       localStorage.setItem('gb_join', JSON.stringify({ id: r.id, name: r.name, emailHint: r.emailHint }));
@@ -1798,7 +1804,7 @@ function renderJoinRequests() {
   const el = document.getElementById('joinRequests');
   if (!currentMe || currentMe.role !== 'admin' || !joinRequests.length || filterVal) { el.innerHTML = ''; return; }
   el.innerHTML = `<div class="card join-card"><b>✋ ${joinRequests.length} ${joinRequests.length === 1 ? 'request' : 'requests'} to join</b>${joinRequests.map(r => `
-    <div class="join-req">${memberAvatar({ name: r.name, avatar: '' })}<div style="flex:1; min-width:0;"><b style="color:var(--gb-blue)">${escapeHtml(r.name)}</b><div class="auth-muted" style="text-align:left; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(r.email)} · ${timeAgo(r.time) || 'just now'}</div></div></div>
+    <div class="join-req">${memberAvatar({ name: r.name, avatar: '' })}<div style="flex:1; min-width:0;"><b style="color:var(--gb-blue)">${escapeHtml(r.name)}</b><div class="auth-muted" style="text-align:left; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(r.email)}${r.phone ? ` · 📱 ${escapeHtml(r.phone)}` : ''} · ${timeAgo(r.time) || 'just now'}</div></div></div>
     ${r.note ? `<div class="join-note">"${escapeHtml(r.note)}"</div>` : '<div style="height:10px;"></div>'}
     <div style="display:flex; gap:8px;">
       <button class="btn" style="flex:1; background:#2ecc71;" onclick="decideJoinRequest(${jsArg(r.id)}, true, this)">✓ Approve</button>
@@ -1822,4 +1828,40 @@ async function decideJoinRequest(id, approve, btn) {
     alert("Couldn't reach theGooldbook. Please try again.");
   }
   renderJoinRequests();
+}
+
+// ---- Text notification settings (profile) ----
+
+const NOTIFY_OPTIONS = [
+  ['newPosts', 'Someone posts something new'],
+  ['comments', 'Someone comments on my post'],
+  ['reactions', 'Someone reacts to my post'],
+  ['mentions', 'Someone @mentions me']
+];
+
+function notifySettingsHTML() {
+  if (!currentMe || currentMe.notifyMode !== 'text' || !currentMe.notify) return '';
+  const who = currentMe.role === 'admin' ? 'Change it in the Members tab of the Sheet.' : 'Ask Steven if that should change.';
+  return `<hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
+    <div style="text-align:left;">
+      <b>📱 Text me when…</b>
+      ${NOTIFY_OPTIONS.map(([key, label]) => `<label class="notify-row"><input type="checkbox" ${currentMe.notify[key] ? 'checked' : ''} onchange="setNotifyPref('${key}', this)"><span>${label}</span></label>`).join('')}
+      <div class="auth-muted" style="text-align:left; margin-top:6px;">Texts go to <b>${escapeHtml(currentMe.textTo || '')}</b>. ${who}</div>
+    </div>`;
+}
+
+async function setNotifyPref(key, box) {
+  const wanted = box.checked;
+  box.disabled = true;
+  try {
+    const r = await apiPost({ action: 'setNotify', notify: { [key]: wanted } });
+    if (!r.ok) throw new Error(r.error || 'failed');
+    currentMe.notify = r.notify || { ...currentMe.notify, [key]: wanted };
+    localStorage.setItem('gb_me', JSON.stringify(currentMe));
+    showNotif(wanted ? 'Turned on.' : 'Turned off.');
+  } catch (e) {
+    box.checked = !wanted;
+    showNotif("That didn't save — please try again.");
+  }
+  box.disabled = false;
 }
