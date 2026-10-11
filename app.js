@@ -557,7 +557,7 @@ function render() {
     if (filterType === 'author') {
         const bio = escapeHtml(ciLookup(allBios, filterVal) || "A mysterious Gooldbooker.");
         const isMe = sameUser(filterVal, u);
-        statusEl.innerHTML = `<div class="card" style="text-align:center;">${getAvatarMarkup(filterVal, 'avatar-large')}${isMe ? `<input type="file" id="avaPick" style="display:none" onchange="uploadAvatar(${jsArg(u)})"><button class="btn-alt" style="margin-bottom:10px" onclick="document.getElementById('avaPick').click()">Change Photo</button>` : ''}<h2 style="margin:0">${escapeHtml(filterVal)}</h2><p style="font-style:italic; color:#555">"${bio}"</p>${isMe ? `<div id="bioEdit" style="display:none"><textarea id="newBio">${bio}</textarea><button class="btn" onclick="saveBio(${jsArg(u)})">Save</button></div><button class="btn-alt" id="editBioBtn" onclick="document.getElementById('bioEdit').style.display='block'; this.style.display='none'">Edit Bio</button><hr style="border:0; border-top:1px solid #eee; margin:15px 0;"><div class="auth-muted" style="margin-bottom:10px;">🔒 Signed in on this device</div><div style="display:flex; gap:8px;"><button class="btn btn-alt" style="flex:1;" onclick="signOut(false)">Sign out</button><button class="btn btn-alt" style="flex:1; color:#c0392b;" onclick="signOut(true)">Sign out everywhere</button></div>` : ''}<hr style="border:0; border-top:1px solid #eee; margin:15px 0;"><button class="btn-alt" onclick="setFilter(null,null)">← Back to Feed</button></div>`;
+        statusEl.innerHTML = `<div class="card" style="text-align:center;">${getAvatarMarkup(filterVal, 'avatar-large')}${isMe ? `<input type="file" id="avaPick" style="display:none" onchange="uploadAvatar(${jsArg(u)})"><button class="btn-alt" style="margin-bottom:10px" onclick="document.getElementById('avaPick').click()">Change Photo</button>` : ''}<h2 style="margin:0">${escapeHtml(filterVal)}</h2><p style="font-style:italic; color:#555">"${bio}"</p>${isMe ? `<div id="bioEdit" style="display:none"><textarea id="newBio">${bio}</textarea><button class="btn" onclick="saveBio(${jsArg(u)})">Save</button></div><button class="btn-alt" id="editBioBtn" onclick="document.getElementById('bioEdit').style.display='block'; this.style.display='none'">Edit Bio</button>${notifySettingsHTML()}<hr style="border:0; border-top:1px solid #eee; margin:15px 0;"><div class="auth-muted" style="margin-bottom:10px;">🔒 Signed in on this device</div><div style="display:flex; gap:8px;"><button class="btn btn-alt" style="flex:1;" onclick="signOut(false)">Sign out</button><button class="btn btn-alt" style="flex:1; color:#c0392b;" onclick="signOut(true)">Sign out everywhere</button></div>` : ''}<hr style="border:0; border-top:1px solid #eee; margin:15px 0;"><button class="btn-alt" onclick="setFilter(null,null)">← Back to Feed</button></div>`;
     } else {
         let label = escapeHtml(filterType === 'likes' ? `Liked by ${filterVal}` : `Tagged ${filterVal}`);
         statusEl.innerHTML = `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>Showing: <b>${label}</b></span><button class="btn-alt" onclick="setFilter(null,null)">Clear</button></div>`;
@@ -1822,4 +1822,40 @@ async function decideJoinRequest(id, approve, btn) {
     alert("Couldn't reach theGooldbook. Please try again.");
   }
   renderJoinRequests();
+}
+
+// ---- Text notification settings (profile) ----
+
+const NOTIFY_OPTIONS = [
+  ['newPosts', 'Someone posts something new'],
+  ['comments', 'Someone comments on my post'],
+  ['reactions', 'Someone reacts to my post'],
+  ['mentions', 'Someone @mentions me']
+];
+
+function notifySettingsHTML() {
+  if (!currentMe || currentMe.notifyMode !== 'text' || !currentMe.notify) return '';
+  const who = currentMe.role === 'admin' ? 'Change it in the Members tab of the Sheet.' : 'Ask Steven if that should change.';
+  return `<hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
+    <div style="text-align:left;">
+      <b>📱 Text me when…</b>
+      ${NOTIFY_OPTIONS.map(([key, label]) => `<label class="notify-row"><input type="checkbox" ${currentMe.notify[key] ? 'checked' : ''} onchange="setNotifyPref('${key}', this)"><span>${label}</span></label>`).join('')}
+      <div class="auth-muted" style="text-align:left; margin-top:6px;">Texts go to <b>${escapeHtml(currentMe.textTo || '')}</b>. ${who}</div>
+    </div>`;
+}
+
+async function setNotifyPref(key, box) {
+  const wanted = box.checked;
+  box.disabled = true;
+  try {
+    const r = await apiPost({ action: 'setNotify', notify: { [key]: wanted } });
+    if (!r.ok) throw new Error(r.error || 'failed');
+    currentMe.notify = r.notify || { ...currentMe.notify, [key]: wanted };
+    localStorage.setItem('gb_me', JSON.stringify(currentMe));
+    showNotif(wanted ? 'Turned on.' : 'Turned off.');
+  } catch (e) {
+    box.checked = !wanted;
+    showNotif("That didn't save — please try again.");
+  }
+  box.disabled = false;
 }

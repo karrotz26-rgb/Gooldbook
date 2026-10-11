@@ -17,6 +17,12 @@ const USER_CONTACTS = {
   "cami wami": "cami@example.com"
 };
 
+// How notifications are sent (all as emails to MY_EMAIL, which your iPhone Shortcuts turn into texts):
+//   "classic" = the original subjects ("[Gooldbook] New Post", "[Gooldbook] Interaction - Name", "[Gooldbook] Mention - Name")
+//   "text"    = one Shortcut for everything: subject "Gooldbook text to: <who>", body = the message to send
+const NOTIFY_MODE = "classic";
+const TEXT_SUBJECT = "Gooldbook text to: ";
+
 const CODE_TTL_SECONDS = 600;      // sign-in codes expire after 10 minutes
 const CODE_MAX_TRIES = 5;          // wrong guesses allowed per code
 const CODES_PER_10_MIN = 3;        // emails per person per 10 minutes
@@ -75,17 +81,29 @@ function getOrCreateSheet(name, headers) {
 // ==========================================
 // MEMBERS (the family list)
 // ==========================================
+const MEMBER_HEADERS = ["Name", "Email", "Role", "Added", "Text To", "New posts", "Comments", "Reactions", "Mentions"];
+const NOTIFY_KEYS = ["newPosts", "comments", "reactions", "mentions"]; // columns F–I
+
 function getMembersSheet() {
   const ss = openSpreadsheet();
   let sheet = ss.getSheetByName("Members");
   if (!sheet) {
     sheet = ss.insertSheet("Members");
-    sheet.appendRow(["Name", "Email", "Role", "Added"]);
+    sheet.appendRow(MEMBER_HEADERS);
     Object.entries(USER_CONTACTS).forEach(([name, email]) => {
-      sheet.appendRow([name, email, sameName(email, MY_EMAIL) ? "admin" : "member", new Date()]);
+      sheet.appendRow([name, email, sameName(email, MY_EMAIL) ? "admin" : "member", new Date(), "", "yes", "yes", "yes", "yes"]);
     });
+  } else {
+    // Older Members tabs only had Name/Email/Role/Added: add the notification column headers
+    const header = sheet.getDataRange().getValues()[0] || [];
+    MEMBER_HEADERS.forEach((h, i) => { if (!header[i]) sheet.getRange(1, i + 1).setValue(h); });
   }
   return sheet;
+}
+
+// Blank means on, so existing members get everything until they switch something off
+function isOn(cell) {
+  return !/^(no|n|off|false|0)$/i.test(String(cell == null ? "" : cell).trim());
 }
 
 // Cached for 5 minutes, so hand edits to the Members tab take up to 5 minutes to apply
@@ -96,7 +114,13 @@ function getMembers() {
   const rows = getMembersSheet().getDataRange().getValues();
   const members = rows.slice(1)
     .filter(r => r[0] && r[1])
-    .map(r => ({ name: String(r[0]).trim(), email: String(r[1]).trim(), role: String(r[2] || "member").trim().toLowerCase() }));
+    .map(r => ({
+      name: String(r[0]).trim(),
+      email: String(r[1]).trim(),
+      role: String(r[2] || "member").trim().toLowerCase(),
+      textTo: String(r[4] || "").trim(),
+      notify: { newPosts: isOn(r[5]), comments: isOn(r[6]), reactions: isOn(r[7]), mentions: isOn(r[8]) }
+    }));
   cache.put("members", JSON.stringify(members), 300);
   return members;
 }
@@ -294,7 +318,7 @@ function decideRequest(id, approve) {
     return { ok: true, name: name };
   }
   if (findMember(name)) return { error: "nameTaken", message: `Someone is already called "${name}". Rename them in the Requests tab first.` };
-  getMembersSheet().appendRow([name, email, "member", new Date()]);
+  getMembersSheet().appendRow([name, email, "member", new Date(), "", "yes", "yes", "yes", "yes"]);
   CacheService.getScriptCache().remove("members");
   sheet.getRange(i + 1, 6).setValue("approved");
   bumpFeedVersion();
@@ -394,7 +418,7 @@ function doGet(e) {
 
   const output = {
     posts: posts, bios: bios, avatars: avatars, streaks: streaks, version: version,
-    me: { name: me.name, role: me.role },
+    me: { name: me.name, role: me.role, notify: me.notify, textTo: textHint(textTarget(me)), notifyMode: NOTIFY_MODE },
     requests: me.role === "admin" ? pendingRequests() : []
   };
   return json(output);
@@ -439,6 +463,7 @@ function handlePost(e) {
 
   if (data.action === "signOut") { endSessions(data.token, false); return { ok: true }; }
   if (data.action === "signOutAll") { endSessions(data.token, true); return { ok: true }; }
+  if (data.action === "setNotify") return setNotify(me, data.notify || {});
   if (data.action === "approveRequest" || data.action === "declineRequest") {
     if (me.role !== "admin") return { error: "forbidden", message: "Only the family admin can do that." };
     return decideRequest(data.id, data.action === "approveRequest");
@@ -469,8 +494,12 @@ function handlePost(e) {
     }
     sheet.appendRow([new Date(), data.username, data.message, imgValue, "[]", "[]"]);
     const newRowIndex = sheet.getLastRow();
-    sendFamilyNotification("Post", data.username, data.message, "All", "", "", newRowIndex);
-    sendMentionNotifications(data.message, data.username, newRowIndex);
+    if (NOTIFY_MODE === "text") {
+      sendTextNotifications({ type: "post", author: data.username, text: data.message, rowIndex: newRowIndex });
+    } else {
+      sendFamilyNotification("Post", data.username, data.message, "All", "", "", newRowIndex);
+      sendMentionNotifications(data.message, data.username, newRowIndex);
+    }
   }
 
   // --- ACTION: UPDATE BIO ---
@@ -530,7 +559,9 @@ function handlePost(e) {
         originalMessage = sheet.getRange(rowIndex, 3).getValue();
         targetContact = findContact(originalAuthor) || "All";
       } catch(err) { Logger.log("Contact error: " + err); }
-      if (!sameName(data.username, originalAuthor)) {
+      if (NOTIFY_MODE === "text") {
+        sendTextNotifications({ type: "reaction", author: data.username, emoji: em, rowIndex: rowIndex, postAuthor: originalAuthor, postText: originalMessage });
+      } else if (!sameName(data.username, originalAuthor)) {
         sendFamilyNotification("Like", data.username, "reacted to your post!", targetContact, originalAuthor, originalMessage, rowIndex);
       }
     }
@@ -552,10 +583,14 @@ function handlePost(e) {
       originalMessage = sheet.getRange(rowIndex, 3).getValue();
       targetContact = findContact(originalAuthor) || "All";
     } catch(err) { Logger.log("Contact error: " + err); }
-    if (!sameName(data.username, originalAuthor)) {
-      sendFamilyNotification("Comment", data.username, data.text, targetContact, originalAuthor, originalMessage, rowIndex);
+    if (NOTIFY_MODE === "text") {
+      sendTextNotifications({ type: "comment", author: data.username, text: data.text, rowIndex: rowIndex, postAuthor: originalAuthor, postText: originalMessage });
+    } else {
+      if (!sameName(data.username, originalAuthor)) {
+        sendFamilyNotification("Comment", data.username, data.text, targetContact, originalAuthor, originalMessage, rowIndex);
+      }
+      sendMentionNotifications(data.text, data.username, rowIndex);
     }
-    sendMentionNotifications(data.text, data.username, rowIndex);
   }
 
   else {
@@ -627,20 +662,86 @@ function findContact(name) {
 }
 
 // Same rules as the app: "@Steven B.", "@StevenB." and "@Steven" all mention "Steven B."
-function getMentionedEmails(text, authorName) {
+function getMentionedMembers(text, authorName) {
   const lower = String(text || "").toLowerCase();
-  const results = [];
-  if (!lower.includes("@")) return results;
-  getMembers().forEach(({ name: fullName, email }) => {
-    if (sameName(fullName, authorName)) return;
-    const full = fullName.trim().toLowerCase();
+  if (!lower.includes("@")) return [];
+  return getMembers().filter(m => {
+    if (sameName(m.name, authorName)) return false;
+    const full = m.name.trim().toLowerCase();
     const aliases = [full, full.replace(/\s+/g, ""), full.split(/\s+/)[0]];
-    const mentioned = aliases.some(a => a && new RegExp("@" + escapeRegex(a) + "(?![\\w])").test(lower));
-    if (mentioned && !results.find(r => r.email === email)) {
-      results.push({ name: fullName, email: email });
-    }
+    return aliases.some(a => a && new RegExp("@" + escapeRegex(a) + "(?![\\w])").test(lower));
   });
-  return results;
+}
+
+function getMentionedEmails(text, authorName) {
+  return getMentionedMembers(text, authorName).map(m => ({ name: m.name, email: m.email }));
+}
+
+// ---- "text" mode: one email per message, listing everyone who should get it ----
+
+// Where a member's texts go: the Text To column, or their sign-in email (iMessage) if it's blank
+function textTarget(member) {
+  return member.textTo || member.email;
+}
+
+function textHint(target) {
+  if (String(target).includes("@")) return maskEmail(target);
+  const digits = String(target).replace(/\D/g, "");
+  return "•••" + digits.slice(-4);
+}
+
+function shortPreview(text) {
+  const s = String(text || "").replace(/\s+/g, " ").trim();
+  return s.length > 100 ? s.substring(0, 97) + "..." : s;
+}
+
+// Each person gets at most one text per event; a mention beats "commented on your post" and "new post"
+function sendTextNotifications(ev) {
+  const url = APP_URL + "?post=" + ev.rowIndex;
+  const done = {};
+  done[String(ev.author).trim().toLowerCase()] = true;
+  const groups = {};
+  const add = (member, pref, message) => {
+    const key = member.name.trim().toLowerCase();
+    if (done[key] || !member.notify[pref]) return;
+    done[key] = true;
+    (groups[message] = groups[message] || []).push(textTarget(member));
+  };
+
+  if (ev.type !== "reaction") {
+    getMentionedMembers(ev.text, ev.author).forEach(m =>
+      add(m, "mentions", `📣 ${ev.author} mentioned you on theGooldbook: "${shortPreview(ev.text)}" ${url}`));
+  }
+  const owner = ev.postAuthor ? findMember(ev.postAuthor) : null;
+  if (ev.type === "comment" && owner) {
+    add(owner, "comments", `💬 ${ev.author} commented on your post: "${shortPreview(ev.text)}" ${url}`);
+  }
+  if (ev.type === "reaction" && owner) {
+    add(owner, "reactions", `${ev.emoji || "❤️"} ${ev.author} reacted to your post "${shortPreview(ev.postText)}" ${url}`);
+  }
+  if (ev.type === "post") {
+    getMembers().forEach(m => add(m, "newPosts", `🦄 ${ev.author} posted on theGooldbook: "${shortPreview(ev.text)}" ${url}`));
+  }
+
+  Object.keys(groups).forEach(message => {
+    try {
+      MailApp.sendEmail({ to: MY_EMAIL, subject: TEXT_SUBJECT + groups[message].join(", "), body: message });
+    } catch (err) { Logger.log("Text notify failed: " + err); }
+  });
+}
+
+// Lets each person switch their own texts on and off from their profile
+function setNotify(me, prefs) {
+  const sheet = getMembersSheet();
+  const rows = sheet.getDataRange().getValues();
+  const i = rows.findIndex((r, idx) => idx > 0 && sameName(r[0], me.name));
+  if (i < 1) return { error: "missing" };
+  NOTIFY_KEYS.forEach((key, k) => {
+    if (typeof prefs[key] === "boolean") sheet.getRange(i + 1, 6 + k).setValue(prefs[key] ? "yes" : "no");
+  });
+  CacheService.getScriptCache().remove("members");
+  const updated = findMember(me.name);
+  return { ok: true, notify: updated ? updated.notify : null };
 }
 
 function sendMentionNotifications(text, authorName, rowIndex) {
