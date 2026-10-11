@@ -31,6 +31,9 @@ const MEDIAPIPE_BASE = "https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentat
 let pendingDeepLinkPost = parseInt(new URLSearchParams(location.search).get('post'), 10) || null;
 let lastFeedSignature = "";
 let feedVersion = ""; // server's change tag; lets polls skip downloading an unchanged feed
+let authToken = localStorage.getItem("gb_token") || "";
+let currentMe = JSON.parse(localStorage.getItem("gb_me") || "null"); // { name, role }
+let joinRequests = [];
 let lastNotifiedMentionTime = "";
 const ACTIVITY_WINDOW_DAYS = 30;
 
@@ -44,10 +47,7 @@ const filterMatrixConfigurations = {
 };
 
 window.onload = () => {
-  document.getElementById('user').value = localStorage.getItem("gb_user") || "";
-  lastNotifiedMentionTime = localStorage.getItem("gb_mentions_seen") || "";
-  if(allPosts.length > 0) { lastFeedSignature = feedSignature({ posts: allPosts }); render(); }
-  loadFeed(); 
+  if (authToken && currentMe) enterApp(); else showAuthScreen();
   window.addEventListener('scroll', handleWindowScroll, { passive: true });
   setInterval(() => { if (!document.hidden) pollForUpdates(); }, 30000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) pollForUpdates(); });
@@ -167,9 +167,11 @@ function handleWindowScroll() {
 
 async function loadFeed() {
   try {
-    const res = await fetch(SCRIPT_URL);
+    const res = await fetch(feedUrl());
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+    if (data.error === 'auth') { handleSignedOut("Please sign in again."); return; }
+    applyAccountInfo(data);
     feedVersion = data.version || "";
     allPosts = data.posts || [];
     allBios = data.bios || {};
@@ -189,7 +191,7 @@ async function loadFeed() {
 // Cheap fingerprint of everything the feed shows, so any new reaction/comment/bio triggers a refresh
 function feedSignature(data) {
   const posts = (data.posts || []).map(p => `${p.rowIndex}:${JSON.stringify(normalizeLikes(p.likes))}:${(p.comments || []).length}:${p.message}`).join('|');
-  return posts + JSON.stringify(data.bios || {}) + JSON.stringify(data.avatars || {});
+  return posts + JSON.stringify(data.bios || {}) + JSON.stringify(data.avatars || {}) + JSON.stringify((data.requests || []).map(r => r.id));
 }
 
 // Handles share links like ?post=150
@@ -203,7 +205,7 @@ function openDeepLinkedPost() {
 }
 
 async function pollForUpdates() {
-  if (_isPollRunning) return;
+  if (_isPollRunning || !authToken) return;
   _isPollRunning = true;
   const isTyping = document.activeElement.tagName === 'INPUT' ||
                    document.activeElement.tagName === 'TEXTAREA';
@@ -211,9 +213,11 @@ async function pollForUpdates() {
   if (isTyping) { _isPollRunning = false; return; }
 
   try {
-    const res = await fetch(feedVersion ? `${SCRIPT_URL}?v=${encodeURIComponent(feedVersion)}` : SCRIPT_URL);
+    const res = await fetch(feedUrl(feedVersion ? { v: feedVersion } : {}));
     const data = await res.json();
+    if (data.error === 'auth') { handleSignedOut("You were signed out. Please sign in again."); return; }
     if (data.unchanged) return;
+    applyAccountInfo(data);
     feedVersion = data.version || "";
     const newPosts = data.posts || [];
 
@@ -431,17 +435,7 @@ async function uploadAvatar(user) {
   if(btn) btn.innerText = "Processing...";
   
   const base64 = await compressImage(file);
-  const canonical = canonicalUser(user);
-  await fetch(SCRIPT_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    body: JSON.stringify({
-      action: 'updateBio',
-      username: canonical,
-      bio: ciLookup(allBios, user) || "",
-      avatar: base64
-    })
-  });
+  await apiPost({ action: 'updateBio', bio: ciLookup(allBios, user) || "", avatar: base64 });
   setTimeout(async () => { await loadFeed(); if(btn) btn.innerText = "Edit Bio"; render(); }, 1500);
 }
 
@@ -450,16 +444,7 @@ async function saveBio(user) {
   const canonical = canonicalUser(user);
   allBios[canonical] = bio;
   render();
-  await fetch(SCRIPT_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    body: JSON.stringify({
-      action: 'updateBio',
-      username: canonical,
-      bio: bio,
-      avatar: ciLookup(allAvatars, user) || ""
-    })
-  });
+  await apiPost({ action: 'updateBio', bio: bio, avatar: ciLookup(allAvatars, user) || "" });
   setTimeout(loadFeed, 1000);
 }
 
@@ -572,13 +557,14 @@ function render() {
     if (filterType === 'author') {
         const bio = escapeHtml(ciLookup(allBios, filterVal) || "A mysterious Gooldbooker.");
         const isMe = sameUser(filterVal, u);
-        statusEl.innerHTML = `<div class="card" style="text-align:center;">${getAvatarMarkup(filterVal, 'avatar-large')}${isMe ? `<input type="file" id="avaPick" style="display:none" onchange="uploadAvatar(${jsArg(u)})"><button class="btn-alt" style="margin-bottom:10px" onclick="document.getElementById('avaPick').click()">Change Photo</button>` : ''}<h2 style="margin:0">${escapeHtml(filterVal)}</h2><p style="font-style:italic; color:#555">"${bio}"</p>${isMe ? `<div id="bioEdit" style="display:none"><textarea id="newBio">${bio}</textarea><button class="btn" onclick="saveBio(${jsArg(u)})">Save</button></div><button class="btn-alt" id="editBioBtn" onclick="document.getElementById('bioEdit').style.display='block'; this.style.display='none'">Edit Bio</button>` : ''}<hr style="border:0; border-top:1px solid #eee; margin:15px 0;"><button class="btn-alt" onclick="setFilter(null,null)">← Back to Feed</button></div>`;
+        statusEl.innerHTML = `<div class="card" style="text-align:center;">${getAvatarMarkup(filterVal, 'avatar-large')}${isMe ? `<input type="file" id="avaPick" style="display:none" onchange="uploadAvatar(${jsArg(u)})"><button class="btn-alt" style="margin-bottom:10px" onclick="document.getElementById('avaPick').click()">Change Photo</button>` : ''}<h2 style="margin:0">${escapeHtml(filterVal)}</h2><p style="font-style:italic; color:#555">"${bio}"</p>${isMe ? `<div id="bioEdit" style="display:none"><textarea id="newBio">${bio}</textarea><button class="btn" onclick="saveBio(${jsArg(u)})">Save</button></div><button class="btn-alt" id="editBioBtn" onclick="document.getElementById('bioEdit').style.display='block'; this.style.display='none'">Edit Bio</button><hr style="border:0; border-top:1px solid #eee; margin:15px 0;"><div class="auth-muted" style="margin-bottom:10px;">🔒 Signed in on this device</div><div style="display:flex; gap:8px;"><button class="btn btn-alt" style="flex:1;" onclick="signOut(false)">Sign out</button><button class="btn btn-alt" style="flex:1; color:#c0392b;" onclick="signOut(true)">Sign out everywhere</button></div>` : ''}<hr style="border:0; border-top:1px solid #eee; margin:15px 0;"><button class="btn-alt" onclick="setFilter(null,null)">← Back to Feed</button></div>`;
     } else {
         let label = escapeHtml(filterType === 'likes' ? `Liked by ${filterVal}` : `Tagged ${filterVal}`);
         statusEl.innerHTML = `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>Showing: <b>${label}</b></span><button class="btn-alt" onclick="setFilter(null,null)">Clear</button></div>`;
     }
   } else { composer.style.display = "block"; statusEl.innerHTML = ""; }
   
+  renderJoinRequests();
   const totalInFilter = filtered.length;
   const preserved = captureFeedState();
 
@@ -902,7 +888,7 @@ function carouselGo(rowIndex, idx) {
 async function upload() {
   const user = document.getElementById('user').value.trim();
   const msg = document.getElementById('msg').value.trim();
-  if(!user || !msg) return alert("Fill in name and message!");
+  if(!msg) return alert("Write something first!");
   const postBtn = document.getElementById('postBtn');
   postBtn.innerText = "⏳ Uploading...";
   postBtn.disabled = true;
@@ -910,17 +896,8 @@ async function upload() {
   const currentLocalStreak = String(currentStreakFor(user));
   
   try {
-    await fetch(SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({
-        action: 'post',
-        username: user,
-        message: msg,
-        images: processedBase64Images,
-        streak: currentLocalStreak
-      })
-    });
+    const result = await apiPost({ action: 'post', message: msg, images: processedBase64Images, streak: currentLocalStreak });
+    if (!result.ok) throw new Error(result.error || 'post failed');
 
     document.getElementById('msg').value = ""; document.getElementById('file').value = "";
     processedBase64Images = []; updateImagePreviewStrip();
@@ -979,7 +956,7 @@ function normalizeLikes(data) {
 
 async function apiCall(action, rowIndex, event, emoji) {
   const user = document.getElementById('user').value.trim();
-  if(!user) return alert("Name required!");
+  if(!user) return;
 
   const currentLocalStreak = String(currentStreakFor(user));
 
@@ -1008,22 +985,14 @@ async function apiCall(action, rowIndex, event, emoji) {
     if (!wasReacted && event) { const u = document.createElement('div'); u.className='unicorn-pop'; u.textContent=em; u.style.left=event.clientX+'px'; u.style.top=event.clientY+'px'; document.body.appendChild(u); setTimeout(()=>u.remove(), 1500); }
 
     // PACKAGES STREAK VALUE ON LIKE EXECUTIONS
-    await fetch(SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      body: JSON.stringify({ action, rowIndex, username: user, streak: currentLocalStreak, emoji: em })
-    });
+    apiPost({ action, rowIndex, streak: currentLocalStreak, emoji: em }).then(warnIfNotSaved, warnIfNotSaved);
   } else if (action === 'comment') {
     const input = document.getElementById(`c-${rowIndex}`); if(!input || !input.value.trim()) return; const txt = input.value.trim();
     const newCommentObj = { user, text: txt, time: new Date().toISOString() }; p.comments.push(newCommentObj); input.value = ""; 
     if (postEl) { const list = postEl.querySelector('.comments-list'); if (list) { const div = document.createElement('div'); div.className = 'comment-box'; div.innerHTML = `<div style="display:flex; justify-content:space-between;"><b>${escapeHtml(user)}</b><span style="font-size:10px; color:#888;">just now</span></div><div>${highlightHashtags(txt)}</div>`; list.appendChild(div); } }
     
     // PACKAGES STREAK VALUE ON COMMENT EXECUTIONS
-    await fetch(SCRIPT_URL, { 
-      method: 'POST', 
-      mode: 'no-cors', 
-      body: JSON.stringify({ action, rowIndex, username: user, text: txt, streak: currentLocalStreak }) 
-    });
+    apiPost({ action, rowIndex, text: txt, streak: currentLocalStreak }).then(warnIfNotSaved, warnIfNotSaved);
   }
 }
 
@@ -1357,12 +1326,7 @@ function timeAgo(d) {
   return "just now";
 }
 
-function saveUser() { 
-  localStorage.setItem("gb_user", document.getElementById('user').value); 
-  _sidebarCacheRef = null;
-  lastNotifiedMentionTime = "";
-  loadFeed(); 
-}
+
 
 // ---- @mention notifications ----
 
@@ -1531,4 +1495,331 @@ function setupCarouselSwipe() {
 
 function withTimeout(promise, ms) {
   return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))]);
+}
+
+// ---- Sign-in ----
+
+function getDeviceId() {
+  let id = localStorage.getItem("gb_device");
+  if (!id) {
+    id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
+    localStorage.setItem("gb_device", id);
+  }
+  return id;
+}
+
+function deviceLabel() {
+  const ua = navigator.userAgent;
+  if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'iPad';
+  if (/iPhone/.test(ua)) return 'iPhone';
+  if (/Android/.test(ua)) return 'Android';
+  if (/Macintosh/.test(ua)) return 'Mac';
+  if (/Windows/.test(ua)) return 'Windows';
+  return 'Browser';
+}
+
+function feedUrl(extra = {}) {
+  return `${SCRIPT_URL}?${new URLSearchParams({ token: authToken, ...extra })}`;
+}
+
+// Every write carries this device's sign-in token; the server decides who you are from it
+async function apiPost(body) {
+  const res = await fetch(SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ device: deviceLabel(), ...body, token: authToken })
+  });
+  const data = await res.json();
+  if (data.error === 'auth' && authToken) handleSignedOut("Please sign in again.");
+  return data;
+}
+
+function warnIfNotSaved(result) {
+  if (!result || !result.ok) showNotif("That didn't save — check your connection and try again.");
+}
+
+function applyAccountInfo(data) {
+  if (data.me) {
+    currentMe = data.me;
+    localStorage.setItem("gb_me", JSON.stringify(currentMe));
+    if (document.getElementById('user').value !== currentMe.name) {
+      document.getElementById('user').value = currentMe.name;
+      renderPostingAs();
+    }
+  }
+  joinRequests = Array.isArray(data.requests) ? data.requests : [];
+}
+
+function enterApp() {
+  document.getElementById('user').value = currentMe.name;
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('appMain').style.display = '';
+  document.getElementById('navBell').style.display = '';
+  renderPostingAs();
+  _sidebarCacheRef = null;
+  lastNotifiedMentionTime = "";
+  if (allPosts.length > 0) { lastFeedSignature = feedSignature({ posts: allPosts }); render(); }
+  loadFeed();
+}
+
+function renderPostingAs() {
+  const name = document.getElementById('user').value;
+  document.getElementById('postingAs').innerHTML = name ? `${getAvatarMarkup(name, 'avatar-small')}<span>Posting as <b style="color:var(--gb-blue)">${escapeHtml(name)}</b></span>` : '';
+}
+
+async function signOut(everywhere) {
+  if (everywhere && !confirm("Sign out on all of your devices? You'll need a new code on each one.")) return;
+  try { await apiPost({ action: everywhere ? 'signOutAll' : 'signOut' }); } catch (e) { /* still sign out here */ }
+  handleSignedOut(everywhere ? "Signed out on all your devices." : "Signed out.");
+}
+
+function handleSignedOut(message) {
+  authToken = ""; currentMe = null; joinRequests = [];
+  ['gb_token', 'gb_me', 'gb_cache'].forEach(k => localStorage.removeItem(k));
+  allPosts = []; allBios = {}; allAvatars = {}; feedVersion = ""; lastFeedSignature = "";
+  filterVal = null; filterType = null; incomingPostsCache = null; _sidebarCacheRef = null;
+  document.getElementById('user').value = "";
+  document.getElementById('feed').innerHTML = "";
+  document.getElementById('navBell').style.display = 'none';
+  document.getElementById('mentionsPanel').classList.remove('show');
+  showAuthScreen('pick', message ? { type: 'info', text: message } : null);
+}
+
+let authState = { step: 'pick', members: null, selected: null, emailHint: '', msg: null, busy: false, join: {} };
+
+function showAuthScreen(step, msg) {
+  document.getElementById('appMain').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'block';
+  const pendingJoin = JSON.parse(localStorage.getItem('gb_join') || 'null');
+  authState.step = step || (pendingJoin ? 'waiting' : 'pick');
+  authState.msg = msg || null;
+  renderAuth();
+  if (!authState.members) loadMembers();
+}
+
+async function loadMembers() {
+  try {
+    const res = await fetch(`${SCRIPT_URL}?action=members`);
+    const data = await res.json();
+    authState.members = data.members || [];
+  } catch (e) {
+    authState.msg = { type: 'error', text: "Couldn't reach theGooldbook. Check your connection and try again." };
+  }
+  renderAuth();
+}
+
+function memberAvatar(m, size = 44) {
+  const colors = ['#3b5998', '#e67e22', '#8e44ad', '#16a085', '#c0392b', '#2c3e50', '#d35400'];
+  const initials = m.name.split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase();
+  const color = colors[[...m.name].reduce((a, c) => a + c.charCodeAt(0), 0) % colors.length];
+  const style = `width:${size}px; height:${size}px;`;
+  const fallback = `<div class="auth-ava" style="${style} background:${color};">${escapeHtml(initials)}</div>`;
+  return m.avatar ? `<img class="auth-ava" style="${style}" src="${escapeHtml(m.avatar)}" onerror="this.outerHTML=${escapeHtml(JSON.stringify(fallback))}">` : fallback;
+}
+
+function authMsgHTML() {
+  const m = authState.msg;
+  return m ? `<div class="auth-msg ${m.type}">${escapeHtml(m.text)}</div>` : '';
+}
+
+function renderAuth() {
+  const el = document.getElementById('authScreen');
+  const st = authState;
+  const busy = st.busy ? 'disabled' : '';
+  if (st.step === 'pick') {
+    const list = st.members === null
+      ? '<div class="auth-muted" style="padding:20px;">Loading…</div>'
+      : st.members.map((m, i) => `<button class="who${st.selected && sameUser(st.selected.name, m.name) ? ' sel' : ''}" onclick="selectMember(${i})">${memberAvatar(m)}${escapeHtml(m.name)}</button>`).join('');
+    el.innerHTML = `<div class="card" style="text-align:center;">
+      <div style="font-size:44px;">🦄</div>
+      <h2 style="margin:6px 0 4px;">Welcome to theGooldbook</h2>
+      <div class="auth-muted" style="margin-bottom:16px;">Who are you?</div>
+      ${authMsgHTML()}${list}
+      <button class="btn auth-btn" style="margin-top:6px;" ${busy || (st.selected ? '' : 'disabled')} onclick="sendCode()">${st.busy ? 'Sending…' : 'Email me a code ✉️'}</button>
+      <div style="border-top:1px solid #eee; margin:16px 0 10px;"></div>
+      <div class="auth-muted">Not on the list?</div>
+      <button class="btn btn-alt auth-btn" style="margin-top:8px;" onclick="showAuthScreen('join')">✋ Request to join</button>
+    </div>`;
+  } else if (st.step === 'code') {
+    el.innerHTML = `<div class="card" style="text-align:center;">
+      <div style="display:flex; justify-content:center; margin:6px 0 10px;">${memberAvatar(st.selected, 64)}</div>
+      <h2 style="margin:0 0 6px;">Hi ${escapeHtml(st.selected.name)}!</h2>
+      <div class="auth-muted">We emailed a 6-digit code to<br><b>${escapeHtml(st.emailHint)}</b></div>
+      <input id="codeInput" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" oninput="if(this.value.replace(/\\D/g,'').length===6) submitCode()">
+      ${authMsgHTML()}
+      <button class="btn auth-btn" style="background:#2ecc71;" ${busy} onclick="submitCode()">${st.busy ? 'Checking…' : 'Sign in'}</button>
+      <div class="auth-muted" style="margin-top:10px;">The code works for 10 minutes. Check your junk folder if you don't see it.</div>
+      <button class="auth-link" ${busy} onclick="sendCode()">Resend code</button>
+      <button class="auth-link quiet" onclick="showAuthScreen('pick')">Not you? Pick a different name</button>
+    </div>`;
+    setTimeout(() => { const i = document.getElementById('codeInput'); if (i && !st.busy) i.focus(); }, 50);
+  } else if (st.step === 'join') {
+    const j = st.join;
+    el.innerHTML = `<div class="card">
+      <h2 style="margin:0 0 4px; text-align:center;">Request to join ✋</h2>
+      <div class="auth-muted" style="margin-bottom:14px;">theGooldbook is just for family. Your request will be checked before you can see anything.</div>
+      <label class="auth-label" for="joinName">Your name (how it shows on posts)</label>
+      <input id="joinName" maxlength="40" autocomplete="name" value="${escapeHtml(j.name || '')}">
+      <label class="auth-label" for="joinEmail">Your email</label>
+      <input id="joinEmail" type="email" maxlength="100" autocomplete="email" value="${escapeHtml(j.email || '')}">
+      <label class="auth-label" for="joinNote">Note (optional)</label>
+      <textarea id="joinNote" rows="2" maxlength="300" placeholder="Who are you in the family?">${escapeHtml(j.note || '')}</textarea>
+      ${authMsgHTML()}
+      <button class="btn auth-btn" ${busy} onclick="submitJoin()">${st.busy ? 'Sending…' : 'Send request'}</button>
+      <button class="auth-link quiet" onclick="showAuthScreen('pick')">← Back</button>
+    </div>`;
+  } else if (st.step === 'waiting') {
+    const pj = JSON.parse(localStorage.getItem('gb_join') || '{}');
+    el.innerHTML = `<div class="card" style="text-align:center; padding:28px 18px;">
+      <div style="font-size:52px;">⏳</div>
+      <h2 style="margin:8px 0 6px;">Request sent!</h2>
+      <div class="auth-muted">Thanks, <b>${escapeHtml(pj.name || '')}</b>. Once you're approved you'll get an email at<br><b>${escapeHtml(pj.emailHint || 'your email')}</b>.</div>
+      ${authMsgHTML()}
+      <button class="btn auth-btn" style="margin-top:18px;" ${busy} onclick="checkJoinStatus()">${st.busy ? 'Checking…' : 'Check again'}</button>
+      <button class="auth-link quiet" onclick="cancelJoinWait()">I already have an account</button>
+    </div>`;
+  }
+}
+
+function selectMember(i) {
+  authState.selected = authState.members[i];
+  authState.msg = null;
+  renderAuth();
+}
+
+async function sendCode() {
+  if (!authState.selected || authState.busy) return;
+  authState.busy = true; authState.msg = null; renderAuth();
+  try {
+    const r = await apiPost({ action: 'requestCode', name: authState.selected.name });
+    authState.busy = false;
+    if (r.ok) {
+      authState.emailHint = r.emailHint;
+      authState.step = 'code';
+      authState.msg = { type: 'info', text: 'Code sent! Check your email.' };
+    } else {
+      authState.msg = { type: 'error', text: r.message || "Couldn't send a code. Please try again." };
+    }
+  } catch (e) {
+    authState.busy = false;
+    authState.msg = { type: 'error', text: "Couldn't reach theGooldbook. Check your connection and try again." };
+  }
+  renderAuth();
+}
+
+async function submitCode() {
+  const input = document.getElementById('codeInput');
+  const code = (input ? input.value : '').replace(/\D/g, '');
+  if (authState.busy) return;
+  if (code.length !== 6) { authState.msg = { type: 'error', text: 'Enter the 6-digit code from the email.' }; renderAuth(); return; }
+  authState.busy = true; authState.msg = null; renderAuth();
+  try {
+    const r = await apiPost({ action: 'verifyCode', name: authState.selected.name, code });
+    authState.busy = false;
+    if (r.ok) {
+      authToken = r.token; currentMe = r.me;
+      localStorage.setItem('gb_token', authToken);
+      localStorage.setItem('gb_me', JSON.stringify(currentMe));
+      localStorage.removeItem('gb_join');
+      authState.msg = null;
+      enterApp();
+      return;
+    }
+    authState.msg = { type: 'error', text: r.message || "That code didn't work." };
+  } catch (e) {
+    authState.busy = false;
+    authState.msg = { type: 'error', text: "Couldn't reach theGooldbook. Check your connection and try again." };
+  }
+  renderAuth();
+}
+
+async function submitJoin() {
+  if (authState.busy) return;
+  const j = authState.join = {
+    name: document.getElementById('joinName').value.trim(),
+    email: document.getElementById('joinEmail').value.trim(),
+    note: document.getElementById('joinNote').value.trim()
+  };
+  if (j.name.length < 2) { authState.msg = { type: 'error', text: 'Please enter your name.' }; renderAuth(); return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(j.email)) { authState.msg = { type: 'error', text: 'Please enter a valid email address.' }; renderAuth(); return; }
+  authState.busy = true; authState.msg = null; renderAuth();
+  try {
+    const r = await apiPost({ action: 'requestJoin', name: j.name, email: j.email, note: j.note, device: getDeviceId() });
+    authState.busy = false;
+    if (r.ok) {
+      localStorage.setItem('gb_join', JSON.stringify({ id: r.id, name: r.name, emailHint: r.emailHint }));
+      authState.join = {};
+      showAuthScreen('waiting');
+      return;
+    }
+    authState.msg = { type: 'error', text: r.message || "Couldn't send your request. Please try again." };
+  } catch (e) {
+    authState.busy = false;
+    authState.msg = { type: 'error', text: "Couldn't reach theGooldbook. Check your connection and try again." };
+  }
+  renderAuth();
+}
+
+async function checkJoinStatus() {
+  const pj = JSON.parse(localStorage.getItem('gb_join') || 'null');
+  if (!pj || authState.busy) return;
+  authState.busy = true; authState.msg = null; renderAuth();
+  try {
+    const r = await apiPost({ action: 'joinStatus', id: pj.id });
+    authState.busy = false;
+    if (r.status === 'approved') {
+      localStorage.removeItem('gb_join');
+      authState.members = null;
+      authState.selected = { name: pj.name, avatar: '' };
+      showAuthScreen('pick', { type: 'info', text: `You're approved, ${pj.name}! Tap "Email me a code" to sign in.` });
+      return;
+    }
+    if (r.status === 'declined' || r.status === 'missing') {
+      localStorage.removeItem('gb_join');
+      showAuthScreen('pick', { type: 'error', text: "Your request wasn't approved." });
+      return;
+    }
+    authState.msg = { type: 'info', text: 'Still waiting. Try again a bit later.' };
+  } catch (e) {
+    authState.busy = false;
+    authState.msg = { type: 'error', text: "Couldn't reach theGooldbook. Check your connection and try again." };
+  }
+  renderAuth();
+}
+
+function cancelJoinWait() {
+  localStorage.removeItem('gb_join');
+  showAuthScreen('pick');
+}
+
+// ---- Join requests (admin) ----
+
+function renderJoinRequests() {
+  const el = document.getElementById('joinRequests');
+  if (!currentMe || currentMe.role !== 'admin' || !joinRequests.length || filterVal) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="card join-card"><b>✋ ${joinRequests.length} ${joinRequests.length === 1 ? 'request' : 'requests'} to join</b>${joinRequests.map(r => `
+    <div class="join-req">${memberAvatar({ name: r.name, avatar: '' })}<div style="flex:1; min-width:0;"><b style="color:var(--gb-blue)">${escapeHtml(r.name)}</b><div class="auth-muted" style="text-align:left; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(r.email)} · ${timeAgo(r.time) || 'just now'}</div></div></div>
+    ${r.note ? `<div class="join-note">"${escapeHtml(r.note)}"</div>` : '<div style="height:10px;"></div>'}
+    <div style="display:flex; gap:8px;">
+      <button class="btn" style="flex:1; background:#2ecc71;" onclick="decideJoinRequest(${jsArg(r.id)}, true, this)">✓ Approve</button>
+      <button class="btn btn-alt" style="flex:1;" onclick="decideJoinRequest(${jsArg(r.id)}, false, this)">Decline</button>
+    </div>`).join('<hr style="border:0; border-top:1px solid #f0e2a0; margin:14px 0 0;">')}</div>`;
+}
+
+async function decideJoinRequest(id, approve, btn) {
+  if (!approve && !confirm('Decline this request?')) return;
+  btn.disabled = true; btn.textContent = approve ? 'Approving…' : 'Declining…';
+  try {
+    const r = await apiPost({ action: approve ? 'approveRequest' : 'declineRequest', id });
+    if (r.ok) {
+      joinRequests = joinRequests.filter(x => x.id !== id);
+      renderJoinRequests();
+      showNotif(approve ? `${r.name} is in! They've been emailed how to sign in.` : `Declined ${r.name}'s request.`);
+      return;
+    }
+    alert(r.message || 'Something went wrong. Please try again.');
+  } catch (e) {
+    alert("Couldn't reach theGooldbook. Please try again.");
+  }
+  renderJoinRequests();
 }
