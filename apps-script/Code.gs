@@ -23,6 +23,8 @@ const USER_CONTACTS = {
 //               triggers on), body = "<who>###<message>" on one line (what the Shortcut reads)
 const NOTIFY_MODE = "text";
 const TEXT_SUBJECT = "Gooldbook text to: ";
+// "Text", " text " etc. all count as text mode
+const TEXT_MODE = String(NOTIFY_MODE).trim().toLowerCase() === "text";
 const TEXT_SEPARATOR = "###";
 // In "text" mode, also text sign-in codes through the Shortcut (they're still emailed to the person too,
 // so sign-in works even if your phone is off). Codes pass through MY_EMAIL's inbox when this is on.
@@ -221,7 +223,7 @@ function requestCode(data) {
     body: `Hi ${member.name}!\n\nYour theGooldbook sign-in code is: ${code}\n\nIt works for 10 minutes. If you didn't ask for this, you can ignore this email.\n\n🦄 ${APP_URL}`
   });
   let textedTo = "";
-  if (NOTIFY_MODE === "text" && CODE_BY_TEXT) {
+  if (TEXT_MODE && CODE_BY_TEXT) {
     try {
       sendTextEmail([textTarget(member)], `Your Gooldbook sign-in code is ${code}. It works for 10 minutes.`);
       textedTo = textHint(textTarget(member));
@@ -448,7 +450,7 @@ function doGet(e) {
 
   const output = {
     posts: posts, bios: bios, avatars: avatars, streaks: streaks, version: version,
-    me: { name: me.name, role: me.role, notify: me.notify, textTo: textHint(textTarget(me)), notifyMode: NOTIFY_MODE },
+    me: { name: me.name, role: me.role, notify: me.notify, textTo: textHint(textTarget(me)), notifyMode: TEXT_MODE ? "text" : "classic", email: me.email, textToRaw: me.textTo },
     requests: me.role === "admin" ? pendingRequests() : []
   };
   return json(output);
@@ -494,6 +496,9 @@ function handlePost(e) {
   if (data.action === "signOut") { endSessions(data.token, false); return { ok: true }; }
   if (data.action === "signOutAll") { endSessions(data.token, true); return { ok: true }; }
   if (data.action === "setNotify") return setNotify(me, data.notify || {});
+  if (data.action === "setTextTo") return setTextTo(me, data.textTo);
+  if (data.action === "requestEmailChange") return requestEmailChange(me, data.email);
+  if (data.action === "confirmEmailChange") return confirmEmailChange(me, data.code);
   if (data.action === "approveRequest" || data.action === "declineRequest") {
     if (me.role !== "admin") return { error: "forbidden", message: "Only the family admin can do that." };
     return decideRequest(data.id, data.action === "approveRequest");
@@ -524,7 +529,7 @@ function handlePost(e) {
     }
     sheet.appendRow([new Date(), data.username, data.message, imgValue, "[]", "[]"]);
     const newRowIndex = sheet.getLastRow();
-    if (NOTIFY_MODE === "text") {
+    if (TEXT_MODE) {
       sendTextNotifications({ type: "post", author: data.username, text: data.message, rowIndex: newRowIndex });
     } else {
       sendFamilyNotification("Post", data.username, data.message, "All", "", "", newRowIndex);
@@ -589,7 +594,7 @@ function handlePost(e) {
         originalMessage = sheet.getRange(rowIndex, 3).getValue();
         targetContact = findContact(originalAuthor) || "All";
       } catch(err) { Logger.log("Contact error: " + err); }
-      if (NOTIFY_MODE === "text") {
+      if (TEXT_MODE) {
         sendTextNotifications({ type: "reaction", author: data.username, emoji: em, rowIndex: rowIndex, postAuthor: originalAuthor, postText: originalMessage });
       } else if (!sameName(data.username, originalAuthor)) {
         sendFamilyNotification("Like", data.username, "reacted to your post!", targetContact, originalAuthor, originalMessage, rowIndex);
@@ -613,7 +618,7 @@ function handlePost(e) {
       originalMessage = sheet.getRange(rowIndex, 3).getValue();
       targetContact = findContact(originalAuthor) || "All";
     } catch(err) { Logger.log("Contact error: " + err); }
-    if (NOTIFY_MODE === "text") {
+    if (TEXT_MODE) {
       sendTextNotifications({ type: "comment", author: data.username, text: data.text, rowIndex: rowIndex, postAuthor: originalAuthor, postText: originalMessage });
     } else {
       if (!sameName(data.username, originalAuthor)) {
@@ -772,6 +777,104 @@ function sendTextEmail(targets, message) {
     subject: TEXT_SUBJECT + recipients.join(", "),
     body: recipients.join(",") + TEXT_SEPARATOR + text
   });
+}
+
+// ==========================================
+// SELF-SERVICE CONTACT DETAILS (from each person's profile)
+// ==========================================
+function memberRowIndex(sheet, name) {
+  const rows = sheet.getDataRange().getValues();
+  return rows.findIndex((r, idx) => idx > 0 && sameName(r[0], name));
+}
+
+function isEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+// Where my texts go: a phone number, an iMessage email, or blank for my sign-in email
+function setTextTo(me, raw) {
+  const value = String(raw || "").trim();
+  let clean = "";
+  if (value) {
+    if (isEmail(value)) clean = value.toLowerCase().slice(0, 100);
+    else {
+      const phone = cleanPhone(value);
+      if (!phone.ok || !phone.phone) return { error: "textTo", message: "Enter a phone number (with country code if outside the US) or an iMessage email — or leave it blank to use your email." };
+      clean = phone.phone;
+    }
+  }
+  const sheet = getMembersSheet();
+  const i = memberRowIndex(sheet, me.name);
+  if (i < 1) return { error: "missing" };
+  sheet.getRange(i + 1, 5).setValue(clean);
+  CacheService.getScriptCache().remove("members");
+  return { ok: true, textToRaw: clean, textTo: textHint(clean || me.email) };
+}
+
+// Changing the sign-in email: a code goes to the NEW address and nothing changes until it's entered
+function emailChangeKey(name) {
+  return "emailchg_" + sha256(String(name).trim().toLowerCase());
+}
+
+function requestEmailChange(me, raw) {
+  const email = String(raw || "").trim().toLowerCase().slice(0, 100);
+  if (!isEmail(email)) return { error: "email", message: "Please enter a valid email address." };
+  if (email === me.email.toLowerCase()) return { error: "same", message: "That's already your email." };
+  if (getMembers().some(m => !sameName(m.name, me.name) && m.email.toLowerCase() === email)) {
+    return { error: "taken", message: "Someone else in the family already uses that email." };
+  }
+  const cache = CacheService.getScriptCache();
+  const key = emailChangeKey(me.name);
+  const sentCount = parseInt(cache.get("sent_" + key) || "0");
+  if (sentCount >= CODES_PER_10_MIN) return { error: "tooMany", message: "Too many codes sent. Please wait 10 minutes and try again." };
+  const code = randomCode();
+  cache.put(key, JSON.stringify({ hash: sha256(code), email: email, tries: 0, expires: Date.now() + CODE_TTL_SECONDS * 1000 }), CODE_TTL_SECONDS);
+  cache.put("sent_" + key, String(sentCount + 1), CODE_TTL_SECONDS);
+  MailApp.sendEmail({
+    to: email,
+    subject: `Your Gooldbook code: ${code}`,
+    body: `Hi ${me.name}!\n\nTo make this your theGooldbook email, enter this code: ${code}\n\nIt works for 10 minutes. If you didn't ask for this, you can ignore this email.\n\n🦄 ${APP_URL}`
+  });
+  return { ok: true, emailHint: maskEmail(email) };
+}
+
+function confirmEmailChange(me, rawCode) {
+  const cache = CacheService.getScriptCache();
+  const key = emailChangeKey(me.name);
+  const raw = cache.get(key);
+  if (!raw) return { error: "expired", message: "That code has expired. Start the change again." };
+  const state = JSON.parse(raw);
+  const secondsLeft = Math.floor((state.expires - Date.now()) / 1000);
+  if (secondsLeft <= 0 || state.tries >= CODE_MAX_TRIES) {
+    cache.remove(key);
+    return { error: "expired", message: "That code has expired. Start the change again." };
+  }
+  if (sha256(String(rawCode || "").replace(/\D/g, "")) !== state.hash) {
+    state.tries++;
+    if (state.tries >= CODE_MAX_TRIES) cache.remove(key);
+    else cache.put(key, JSON.stringify(state), secondsLeft);
+    const left = CODE_MAX_TRIES - state.tries;
+    return { error: "wrong", message: left > 0 ? `That code isn't right. ${left} ${left === 1 ? "try" : "tries"} left.` : "Too many wrong tries. Start the change again." };
+  }
+  cache.remove(key);
+  if (getMembers().some(m => !sameName(m.name, me.name) && m.email.toLowerCase() === state.email)) {
+    return { error: "taken", message: "Someone else in the family already uses that email." };
+  }
+  const sheet = getMembersSheet();
+  const i = memberRowIndex(sheet, me.name);
+  if (i < 1) return { error: "missing" };
+  const oldEmail = me.email;
+  sheet.getRange(i + 1, 2).setValue(state.email);
+  CacheService.getScriptCache().remove("members");
+  try {
+    MailApp.sendEmail({
+      to: oldEmail,
+      subject: "Your Gooldbook email was changed",
+      body: `Hi ${me.name}!\n\nYour theGooldbook sign-in email was changed to ${state.email}. From now on your sign-in codes go there.\n\nIf you didn't do this, tell Steven right away.\n\n🦄 ${APP_URL}`
+    });
+  } catch (err) { Logger.log("Email-change notice failed: " + err); }
+  const updated = findMember(me.name);
+  return { ok: true, email: state.email, textTo: textHint(textTarget(updated || me)) };
 }
 
 // Lets each person switch their own texts on and off from their profile

@@ -168,3 +168,10 @@ button { touch-action: manipulation; cursor: pointer; }
 .join-note { background: #fff; border-radius: 8px; padding: 8px 10px; margin: 10px 0; font-size: 13px; font-style: italic; color: #555; }
 .notify-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 14px; cursor: pointer; }
 .notify-row input { width: 20px; height: 20px; margin: 0; padding: 0; flex-shrink: 0; }
+.settings-box summary { cursor: pointer; font-weight: bold; padding: 4px 0; list-style-position: inside; }
+.settings-note { font-weight: normal; color: #65676b; font-size: 13px; }
+.settings-group { margin-top: 14px; }
+.settings-row { display: flex; gap: 8px; align-items: center; }
+.settings-row input { margin: 0; flex: 1; min-width: 0; }
+.settings-row .btn { flex-shrink: 0; padding: 10px 14px; }
+.settings-hint { color: #65676b; font-size: 12px; margin-top: 4px; }
