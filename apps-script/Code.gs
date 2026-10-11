@@ -5,13 +5,24 @@
 const SHEET_ID = "YOUR_SHEET_ID";
 const DRIVE_FOLDER_ID = "YOUR_DRIVE_FOLDER_ID";
 const MY_EMAIL = "you@example.com";
+const APP_URL = "https://karrotz26-rgb.github.io/Gooldbook/";
 
+// Only used once, to fill the "Members" tab the first time it's created.
+// After that, the Members tab in the Sheet is the family list (add/remove people there).
+// Whoever has MY_EMAIL becomes the admin who approves join requests.
 const USER_CONTACTS = {
   "Steven B.": "steven@example.com",
   "Kely Goold": "kely@example.com",
   "Numbuns": "numbuns@example.com",
   "cami wami": "cami@example.com"
 };
+
+const CODE_TTL_SECONDS = 600;      // sign-in codes expire after 10 minutes
+const CODE_MAX_TRIES = 5;          // wrong guesses allowed per code
+const CODES_PER_10_MIN = 3;        // emails per person per 10 minutes
+const SESSION_CACHE_SECONDS = 3600;
+const MAX_PENDING_REQUESTS = 20;
+const JOIN_REQUESTS_PER_DEVICE_PER_DAY = 3;
 
 // ==========================================
 // HELPERS
@@ -25,9 +36,276 @@ function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function findContact(name) {
-  const key = Object.keys(USER_CONTACTS).find(k => sameName(k, name));
-  return key ? USER_CONTACTS[key] : null;
+function json(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+let _ss = null;
+function openSpreadsheet() {
+  if (!_ss) _ss = SpreadsheetApp.openById(SHEET_ID);
+  return _ss;
+}
+
+function sha256(text) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(text), Utilities.Charset.UTF_8)
+    .map(b => ((b + 256) % 256).toString(16).padStart(2, "0")).join("");
+}
+
+function randomCode() {
+  const n = parseInt(Utilities.getUuid().replace(/-/g, "").slice(0, 12), 16) % 1000000;
+  return String(n).padStart(6, "0");
+}
+
+function maskEmail(email) {
+  const [local, domain] = String(email).split("@");
+  if (!domain) return "your email";
+  return local.charAt(0) + "•••••" + (local.length > 1 ? local.charAt(local.length - 1) : "") + "@" + domain;
+}
+
+function getOrCreateSheet(name, headers) {
+  const ss = openSpreadsheet();
+  let sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.appendRow(headers);
+  }
+  return sheet;
+}
+
+// ==========================================
+// MEMBERS (the family list)
+// ==========================================
+function getMembersSheet() {
+  const ss = openSpreadsheet();
+  let sheet = ss.getSheetByName("Members");
+  if (!sheet) {
+    sheet = ss.insertSheet("Members");
+    sheet.appendRow(["Name", "Email", "Role", "Added"]);
+    Object.entries(USER_CONTACTS).forEach(([name, email]) => {
+      sheet.appendRow([name, email, sameName(email, MY_EMAIL) ? "admin" : "member", new Date()]);
+    });
+  }
+  return sheet;
+}
+
+// Cached for 5 minutes, so hand edits to the Members tab take up to 5 minutes to apply
+function getMembers() {
+  const cache = CacheService.getScriptCache();
+  const hit = cache.get("members");
+  if (hit) return JSON.parse(hit);
+  const rows = getMembersSheet().getDataRange().getValues();
+  const members = rows.slice(1)
+    .filter(r => r[0] && r[1])
+    .map(r => ({ name: String(r[0]).trim(), email: String(r[1]).trim(), role: String(r[2] || "member").trim().toLowerCase() }));
+  cache.put("members", JSON.stringify(members), 300);
+  return members;
+}
+
+function findMember(name) {
+  return getMembers().find(m => sameName(m.name, name)) || null;
+}
+
+function adminEmails() {
+  const admins = getMembers().filter(m => m.role === "admin").map(m => m.email);
+  return admins.length ? admins : [MY_EMAIL];
+}
+
+// Names and photos for the sign-in screen (no emails)
+function publicMembers() {
+  const usersData = (openSpreadsheet().getSheetByName("Users") || { getDataRange: () => ({ getValues: () => [] }) }).getDataRange().getValues();
+  return getMembers().map(m => {
+    const row = usersData.find((r, i) => i > 0 && sameName(r[0], m.name));
+    return { name: m.name, avatar: row ? (row[2] || "") : "" };
+  });
+}
+
+// ==========================================
+// SIGN-IN SESSIONS
+// ==========================================
+// Each signed-in device has its own token. Only a hash of it is stored, in the Sessions tab.
+function getSessionsSheet() {
+  return getOrCreateSheet("Sessions", ["TokenHash", "Name", "Created", "LastSeen", "Device"]);
+}
+
+function createSession(name, device) {
+  const token = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, "");
+  getSessionsSheet().appendRow([sha256(token), name, new Date(), new Date(), String(device || "").slice(0, 80)]);
+  return token;
+}
+
+// Returns the signed-in member, or null (bad token, signed out, or removed from Members)
+function getSessionMember(token) {
+  if (!token || String(token).length < 20) return null;
+  const hash = sha256(token);
+  const cache = CacheService.getScriptCache();
+  let name = cache.get("s_" + hash);
+  if (!name) {
+    const sheet = getSessionsSheet();
+    const rows = sheet.getDataRange().getValues();
+    const i = rows.findIndex((r, idx) => idx > 0 && r[0] === hash);
+    if (i < 1) return null;
+    name = String(rows[i][1]);
+    sheet.getRange(i + 1, 4).setValue(new Date());
+    cache.put("s_" + hash, name, SESSION_CACHE_SECONDS);
+  }
+  return findMember(name);
+}
+
+function endSessions(token, everywhere) {
+  const hash = sha256(token);
+  const sheet = getSessionsSheet();
+  const rows = sheet.getDataRange().getValues();
+  const mine = rows.find((r, idx) => idx > 0 && r[0] === hash);
+  if (!mine) return;
+  const cache = CacheService.getScriptCache();
+  // Delete from the bottom up so row numbers stay valid
+  for (let i = rows.length - 1; i >= 1; i--) {
+    if (everywhere ? sameName(rows[i][1], mine[1]) : rows[i][0] === hash) {
+      cache.remove("s_" + rows[i][0]);
+      sheet.deleteRow(i + 1);
+    }
+  }
+}
+
+// ==========================================
+// SIGN-IN CODES
+// ==========================================
+function codeKey(name) {
+  return "code_" + sha256(String(name).trim().toLowerCase());
+}
+
+function requestCode(data) {
+  const member = findMember(data.name);
+  if (!member) return { error: "unknown", message: "That name isn't on the family list." };
+  const cache = CacheService.getScriptCache();
+  const key = codeKey(member.name);
+  const sentCount = parseInt(cache.get("sent_" + key) || "0");
+  if (sentCount >= CODES_PER_10_MIN) {
+    return { error: "tooMany", message: "Too many codes sent. Please wait 10 minutes and try again." };
+  }
+  const code = randomCode();
+  cache.put(key, JSON.stringify({ hash: sha256(code), tries: 0, expires: Date.now() + CODE_TTL_SECONDS * 1000 }), CODE_TTL_SECONDS);
+  cache.put("sent_" + key, String(sentCount + 1), CODE_TTL_SECONDS);
+  MailApp.sendEmail({
+    to: member.email,
+    subject: `Your Gooldbook code: ${code}`,
+    body: `Hi ${member.name}!\n\nYour theGooldbook sign-in code is: ${code}\n\nIt works for 10 minutes. If you didn't ask for this, you can ignore this email.\n\n🦄 ${APP_URL}`
+  });
+  return { ok: true, name: member.name, emailHint: maskEmail(member.email) };
+}
+
+function verifyCode(data) {
+  const member = findMember(data.name);
+  if (!member) return { error: "unknown", message: "That name isn't on the family list." };
+  const cache = CacheService.getScriptCache();
+  const key = codeKey(member.name);
+  const raw = cache.get(key);
+  if (!raw) return { error: "expired", message: "That code has expired. Tap \"Resend code\" for a new one." };
+  const state = JSON.parse(raw);
+  const secondsLeft = Math.floor((state.expires - Date.now()) / 1000);
+  if (secondsLeft <= 0 || state.tries >= CODE_MAX_TRIES) {
+    cache.remove(key);
+    return { error: "expired", message: "That code has expired. Tap \"Resend code\" for a new one." };
+  }
+  const entered = String(data.code || "").replace(/\D/g, "");
+  if (sha256(entered) !== state.hash) {
+    state.tries++;
+    if (state.tries >= CODE_MAX_TRIES) cache.remove(key);
+    else cache.put(key, JSON.stringify(state), secondsLeft);
+    const left = CODE_MAX_TRIES - state.tries;
+    return { error: "wrong", message: left > 0 ? `That code isn't right. ${left} ${left === 1 ? "try" : "tries"} left.` : "Too many wrong tries. Tap \"Resend code\" for a new one." };
+  }
+  cache.remove(key);
+  const token = createSession(member.name, data.device);
+  return { ok: true, token: token, me: { name: member.name, role: member.role } };
+}
+
+// ==========================================
+// REQUESTS TO JOIN
+// ==========================================
+function getRequestsSheet() {
+  return getOrCreateSheet("Requests", ["Id", "Name", "Email", "Note", "Requested", "Status"]);
+}
+
+function requestJoin(data) {
+  const name = String(data.name || "").trim().replace(/\s+/g, " ").slice(0, 40);
+  const email = String(data.email || "").trim().toLowerCase().slice(0, 100);
+  const note = String(data.note || "").trim().slice(0, 300);
+  if (name.length < 2) return { error: "name", message: "Please enter your name." };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "email", message: "Please enter a valid email address." };
+  if (findMember(name)) return { error: "nameTaken", message: "Someone in the family already uses that name. Try adding a last initial." };
+  if (getMembers().some(m => m.email.toLowerCase() === email)) {
+    return { error: "alreadyMember", message: "That email already has an account. Go back and pick your name to sign in." };
+  }
+
+  const sheet = getRequestsSheet();
+  const rows = sheet.getDataRange().getValues();
+  const pending = rows.slice(1).filter(r => r[5] === "pending");
+  const existing = pending.find(r => String(r[2]).toLowerCase() === email);
+  if (existing) return { ok: true, id: existing[0], name: existing[1], emailHint: maskEmail(email) };
+  if (pending.some(r => sameName(r[1], name))) {
+    return { error: "nameTaken", message: "Someone already asked to join with that name. Try adding a last initial." };
+  }
+  if (pending.length >= MAX_PENDING_REQUESTS) return { error: "busy", message: "Too many requests are waiting right now. Please try again later." };
+
+  const cache = CacheService.getScriptCache();
+  const deviceKey = "join_" + sha256(String(data.device || "unknown"));
+  const deviceCount = parseInt(cache.get(deviceKey) || "0");
+  if (deviceCount >= JOIN_REQUESTS_PER_DEVICE_PER_DAY) {
+    return { error: "tooMany", message: "Too many requests from this device today. Please try again tomorrow." };
+  }
+  cache.put(deviceKey, String(deviceCount + 1), 86400);
+
+  const id = Utilities.getUuid();
+  sheet.appendRow([id, name, email, note, new Date(), "pending"]);
+  bumpFeedVersion();
+  try {
+    MailApp.sendEmail({
+      to: adminEmails().join(","),
+      subject: `[Gooldbook] ${name} asked to join`,
+      body: `✋ ${name} (${email}) asked to join theGooldbook.${note ? `\n\nTheir note: "${note}"` : ""}\n\nOpen the app to approve or decline: ${APP_URL}`
+    });
+  } catch (err) { Logger.log("Join request email failed: " + err); }
+  return { ok: true, id: id, name: name, emailHint: maskEmail(email) };
+}
+
+function joinStatus(data) {
+  const rows = getRequestsSheet().getDataRange().getValues();
+  const row = rows.find((r, i) => i > 0 && r[0] === data.id);
+  if (!row) return { status: "missing" };
+  return { status: row[5], name: row[1] };
+}
+
+function pendingRequests() {
+  const rows = getRequestsSheet().getDataRange().getValues();
+  return rows.slice(1).filter(r => r[5] === "pending")
+    .map(r => ({ id: r[0], name: r[1], email: r[2], note: r[3], time: r[4] }));
+}
+
+function decideRequest(id, approve) {
+  const sheet = getRequestsSheet();
+  const rows = sheet.getDataRange().getValues();
+  const i = rows.findIndex((r, idx) => idx > 0 && r[0] === id);
+  if (i < 1 || rows[i][5] !== "pending") return { error: "missing", message: "That request was already handled." };
+  const name = rows[i][1], email = rows[i][2];
+  if (!approve) {
+    sheet.getRange(i + 1, 6).setValue("declined");
+    bumpFeedVersion();
+    return { ok: true, name: name };
+  }
+  if (findMember(name)) return { error: "nameTaken", message: `Someone is already called "${name}". Rename them in the Requests tab first.` };
+  getMembersSheet().appendRow([name, email, "member", new Date()]);
+  CacheService.getScriptCache().remove("members");
+  sheet.getRange(i + 1, 6).setValue("approved");
+  bumpFeedVersion();
+  try {
+    MailApp.sendEmail({
+      to: email,
+      subject: "You're in! Welcome to theGooldbook 🦄",
+      body: `Hi ${name}!\n\nYou've been approved to join theGooldbook.\n\nOpen ${APP_URL}, tap your name and we'll email you a sign-in code.\n\nTip: on iPhone or iPad, tap the Share button and "Add to Home Screen" to use it like an app.`
+    });
+  } catch (err) { Logger.log("Approval email failed: " + err); }
+  return { ok: true, name: name };
 }
 
 // ==========================================
@@ -50,14 +328,18 @@ function bumpFeedVersion() {
 // READ DATA
 // ==========================================
 function doGet(e) {
+  const params = (e && e.parameter) || {};
+  if (params.action === "members") return json({ members: publicMembers() });
+
+  const me = getSessionMember(params.token);
+  if (!me) return json({ error: "auth" });
+
   const version = getFeedVersion();
-  const clientVersion = e && e.parameter ? e.parameter.v : null;
-  if (clientVersion && clientVersion === version) {
-    return ContentService.createTextOutput(JSON.stringify({ unchanged: true, version: version }))
-      .setMimeType(ContentService.MimeType.JSON);
+  if (params.v && params.v === version) {
+    return json({ unchanged: true, version: version });
   }
 
-  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const ss = openSpreadsheet();
   const sheet = ss.getSheets()[0];
   const userSheet = ss.getSheetByName("Users") || ss.insertSheet("Users");
   const streakSheet = ss.getSheetByName("Streaks") || ss.insertSheet("Streaks");
@@ -110,22 +392,29 @@ function doGet(e) {
     });
   }
 
-  const output = { posts: posts, bios: bios, avatars: avatars, streaks: streaks, version: version };
-  return ContentService.createTextOutput(JSON.stringify(output)).setMimeType(ContentService.MimeType.JSON);
+  const output = {
+    posts: posts, bios: bios, avatars: avatars, streaks: streaks, version: version,
+    me: { name: me.name, role: me.role },
+    requests: me.role === "admin" ? pendingRequests() : []
+  };
+  return json(output);
 }
 
 // ==========================================
 // WRITE DATA
 // ==========================================
 function doPost(e) {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
-  const sheet = ss.getSheets()[0];
-  const userSheet = ss.getSheetByName("Users") || ss.insertSheet("Users");
-  const streakSheet = ss.getSheetByName("Streaks") || ss.insertSheet("Streaks");
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    return json(handlePost(e));
+  } finally {
+    lock.releaseLock();
+  }
+}
 
+function handlePost(e) {
   let data = {};
-  let imageBlob = null;
-
   if (e.postData && e.postData.contents) {
     try {
       data = JSON.parse(e.postData.contents);
@@ -136,6 +425,31 @@ function doPost(e) {
     data = e.parameter;
   }
 
+  // --- Actions that work before signing in ---
+  if (data.action === "requestCode") return requestCode(data);
+  if (data.action === "verifyCode") return verifyCode(data);
+  if (data.action === "requestJoin") return requestJoin(data);
+  if (data.action === "joinStatus") return joinStatus(data);
+
+  // --- Everything else needs a signed-in member ---
+  const me = getSessionMember(data.token);
+  if (!me) return { error: "auth" };
+  // The name always comes from the sign-in, never from what the app sends
+  data.username = me.name;
+
+  if (data.action === "signOut") { endSessions(data.token, false); return { ok: true }; }
+  if (data.action === "signOutAll") { endSessions(data.token, true); return { ok: true }; }
+  if (data.action === "approveRequest" || data.action === "declineRequest") {
+    if (me.role !== "admin") return { error: "forbidden", message: "Only the family admin can do that." };
+    return decideRequest(data.id, data.action === "approveRequest");
+  }
+
+  const ss = openSpreadsheet();
+  const sheet = ss.getSheets()[0];
+  const userSheet = ss.getSheetByName("Users") || ss.insertSheet("Users");
+  const streakSheet = ss.getSheetByName("Streaks") || ss.insertSheet("Streaks");
+
+  let imageBlob = null;
   if (data.avatar) {
     imageBlob = convertBase64ToBlob(data.avatar, data.username);
   }
@@ -244,9 +558,13 @@ function doPost(e) {
     sendMentionNotifications(data.text, data.username, rowIndex);
   }
 
+  else {
+    return { error: "unknownAction" };
+  }
+
   // GLOBAL BACKEND STREAK TRACKER
-  // The app now sends a streak computed from real post/comment dates
-  if (data.username && data.streak !== undefined && data.streak !== null) {
+  // The app sends a streak computed from real post/comment dates
+  if (data.streak !== undefined && data.streak !== null) {
     const streakRows = streakSheet.getDataRange().getValues();
     let userFound = false;
     for (let i = 1; i < streakRows.length; i++) {
@@ -266,7 +584,7 @@ function doPost(e) {
   }
 
   bumpFeedVersion();
-  return ContentService.createTextOutput("Success").setMimeType(ContentService.MimeType.TEXT);
+  return { ok: true };
 }
 
 // ==========================================
@@ -303,26 +621,30 @@ function processAndSaveBlob(blob, folderPrefix) {
 // ==========================================
 // NOTIFICATION SYSTEM
 // ==========================================
+function findContact(name) {
+  const member = findMember(name);
+  return member ? member.email : null;
+}
+
 // Same rules as the app: "@Steven B.", "@StevenB." and "@Steven" all mention "Steven B."
 function getMentionedEmails(text, authorName) {
   const lower = String(text || "").toLowerCase();
   const results = [];
   if (!lower.includes("@")) return results;
-  for (const [fullName, email] of Object.entries(USER_CONTACTS)) {
-    if (sameName(fullName, authorName)) continue;
+  getMembers().forEach(({ name: fullName, email }) => {
+    if (sameName(fullName, authorName)) return;
     const full = fullName.trim().toLowerCase();
     const aliases = [full, full.replace(/\s+/g, ""), full.split(/\s+/)[0]];
     const mentioned = aliases.some(a => a && new RegExp("@" + escapeRegex(a) + "(?![\\w])").test(lower));
     if (mentioned && !results.find(r => r.email === email)) {
       results.push({ name: fullName, email: email });
     }
-  }
+  });
   return results;
 }
 
 function sendMentionNotifications(text, authorName, rowIndex) {
-  const baseUrl = "https://karrotz26-rgb.github.io/Gooldbook/";
-  const appUrl = rowIndex ? baseUrl + "?post=" + rowIndex : baseUrl;
+  const appUrl = rowIndex ? APP_URL + "?post=" + rowIndex : APP_URL;
   const mentioned = getMentionedEmails(text, authorName);
   mentioned.forEach(m => {
     try {
@@ -336,8 +658,7 @@ function sendMentionNotifications(text, authorName, rowIndex) {
 }
 
 function sendFamilyNotification(type, author, content, targetRecipient, originalAuthorName, originalPostText, rowIndex) {
-  const baseUrl = "https://karrotz26-rgb.github.io/Gooldbook/";
-  const appUrl = rowIndex ? baseUrl + "?post=" + rowIndex : baseUrl;
+  const appUrl = rowIndex ? APP_URL + "?post=" + rowIndex : APP_URL;
   const safeContent = content ? String(content) : "[No text provided]";
   const previewContent = safeContent.length > 120 ? safeContent.substring(0, 117) + "..." : safeContent;
   const safePostText = originalPostText ? String(originalPostText) : "";

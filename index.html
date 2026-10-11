@@ -12,10 +12,10 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-  <link rel="stylesheet" href="styles.css?v=3">
+  <link rel="stylesheet" href="styles.css?v=4">
   <script defer src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-  <script defer src="app.js?v=3"></script>
+  <script defer src="app.js?v=4"></script>
 </head>
 <body>
 
@@ -75,13 +75,15 @@
   <div class="nav-icon">🦄</div>
   theGooldbook
   <div class="nav-badge" id="navBadge"></div>
-  <button class="nav-bell" id="navBell" onclick="toggleMentionsPanel()" aria-label="Mentions">🔔<span class="nav-bell-badge" id="bellBadge"></span></button>
+  <button class="nav-bell" id="navBell" style="display:none;" onclick="toggleMentionsPanel()" aria-label="Mentions">🔔<span class="nav-bell-badge" id="bellBadge"></span></button>
 </div>
 
 <div class="mentions-panel" id="mentionsPanel"></div>
 <div class="mention-suggest" id="mentionSuggest"></div>
 
-<div class="container">
+<div class="auth-screen" id="authScreen" style="display:none;"></div>
+
+<div class="container" id="appMain" style="display:none;">
   <div class="sidebar">
     <div id="myProfileLink"></div>
     
@@ -94,9 +96,11 @@
   </div>
 
   <div class="main-feed">
+    <div id="joinRequests"></div>
     <div id="filterStatus"></div>
     <div class="card" id="postComposer">
-      <input id="user" placeholder="Your Name" onchange="saveUser()">
+      <input id="user" type="hidden">
+      <div class="posting-as" id="postingAs"></div>
       <textarea id="msg" rows="2" placeholder="What's on your mind?"></textarea>
       <div style="display:flex; gap:6px; margin-bottom:4px;">
         <input type="file" id="file" accept="image/*" onchange="initiateCropper(event)" style="display:none;">
