@@ -1,4 +1,4 @@
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw_PEAG-FeMsmmKZ6vGl338lua4wOVsb696EtqNQpwbdZcQWe2H8DcyWfaDl6fbVabr/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyJMVw4HortdskOjUKFZ4sY-dmzrkVqdGWOjWGqYKXlqPN12H35E97jUYDfRnj7m2lj/exec";
 const GIPHY_API_KEY = "3N3VPi3QqCKZOwSBO6Tn7vjJvgSLLxck";
 let gifSearchTimer;
 let allPosts = JSON.parse(localStorage.getItem("gb_cache") || "[]");
