@@ -425,7 +425,7 @@ function setFilter(type, val) {
 function getAvatarMarkup(user, sizeClass) {
   const ava = ciLookup(allAvatars, user);
   if (!ava || ava === "" || ava === "undefined") return `<div class="${sizeClass}">🦄</div>`;
-  return `<img src="${escapeHtml(ava)}" class="${sizeClass}" loading="lazy" onerror="this.outerHTML='<div class=&quot;${sizeClass}&quot;>🦄</div>'">`;
+  return `<img src="${escapeHtml(ava)}" class="${sizeClass}" loading="lazy" onerror="if (this.parentNode) this.outerHTML='<div class=&quot;${sizeClass}&quot;>🦄</div>'">`;
 }
 
 async function uploadAvatar(user) {
@@ -649,6 +649,8 @@ function render() {
   }
   
   if (!filterVal && !s) updateSidebar();
+  // Photos arrive with the feed, after the composer was first drawn
+  renderPostingAs();
 }
 
 function commentTime(c) { return c.time || c.timestamp; }
@@ -1614,7 +1616,7 @@ function memberAvatar(m, size = 44) {
   const color = colors[[...m.name].reduce((a, c) => a + c.charCodeAt(0), 0) % colors.length];
   const style = `width:${size}px; height:${size}px;`;
   const fallback = `<div class="auth-ava" style="${style} background:${color};">${escapeHtml(initials)}</div>`;
-  return m.avatar ? `<img class="auth-ava" style="${style}" src="${escapeHtml(m.avatar)}" onerror="this.outerHTML=${escapeHtml(JSON.stringify(fallback))}">` : fallback;
+  return m.avatar ? `<img class="auth-ava" style="${style}" src="${escapeHtml(m.avatar)}" onerror="if (this.parentNode) this.outerHTML=${escapeHtml(JSON.stringify(fallback))}">` : fallback;
 }
 
 function authMsgHTML() {
