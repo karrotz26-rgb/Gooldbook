@@ -12,14 +12,27 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-  <link rel="stylesheet" href="styles.css?v=7">
+  <link rel="stylesheet" href="styles.css?v=8">
   <script defer src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-  <script defer src="app.js?v=7"></script>
+  <script defer src="app.js?v=8"></script>
 </head>
 <body>
 
 <div id="backToTop" onclick="window.scrollTo({top: 0, behavior: 'smooth'}); document.body.scrollTop = 0; document.documentElement.scrollTop = 0;">⬆️</div>
+
+<div class="crop-modal" id="shareModal" onclick="if (event.target === this) closeShareModal()">
+  <div class="share-sheet">
+    <div id="shareCardSlot" class="share-card-slot"></div>
+    <div class="share-actions">
+      <button class="btn share-main-btn" id="shareCardBtn" onclick="shareCardNow()">📤 Share</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-alt" style="flex:1;" id="shareLinkBtn" onclick="shareLinkNow(this)">🔗 Copy link</button>
+        <button class="btn btn-alt" style="flex:1;" onclick="closeShareModal()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="crop-modal" id="gifModal">
   <div style="background:#fff; border-radius:12px; width:100%; max-width:480px; max-height:80vh; display:flex; flex-direction:column; overflow:hidden;">

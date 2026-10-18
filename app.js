@@ -998,15 +998,24 @@ async function apiCall(action, rowIndex, event, emoji) {
   }
 }
 
+// iPhone/iPad Safari only allows the share sheet right after a tap, and building the card
+// takes longer than that. So Share builds the card into a preview first; the preview's own
+// "Share" button is a fresh tap that can open the share sheet with the image.
+let pendingShare = null; // { file, text, url, canvas, rowIndex }
+
 async function sharePost(rowIndex, event) {
   const post = allPosts.find(p => p.rowIndex === rowIndex);
   if (!post) return;
   const btn = event.target;
   const originalText = btn.innerText;
   btn.innerText = "⏳ Preparing...";
+  btn.disabled = true;
 
   const shareUrl = `https://karrotz26-rgb.github.io/Gooldbook/?post=${rowIndex}`;
   const shareText = `🦄 ${post.user} on theGooldbook:\n"${(post.message || '').substring(0, 120)}"`;
+  pendingShare = { file: null, text: shareText, url: shareUrl, canvas: null, rowIndex };
+  openShareModal(null);
+
   const amShareMatch = (post.message || "").match(/https?:\/\/music\.apple\.com\/[^\s"<>]+/);
   const postReactions = normalizeLikes(post.likes);
   const names = Object.keys(postReactions).length > 0
@@ -1017,7 +1026,6 @@ async function sharePost(rowIndex, event) {
   const activeIdx = carEl ? parseInt(carEl.dataset.idx || 0) : 0;
   const targetImageUrl = imgs[activeIdx] || "";
 
-  let canvas = null;
   const renderFrame = document.createElement('div');
   renderFrame.style.cssText = `position:fixed;left:-9999px;top:0;width:400px;background:#ffffff;padding:24px;border-radius:12px;font-family:system-ui,-apple-system,sans-serif;color:#1c1e21;box-sizing:border-box;`;
 
@@ -1053,43 +1061,85 @@ async function sharePost(rowIndex, event) {
       <div style="margin-top:15px;border-top:1px dashed #ccc;padding-top:8px;font-size:10px;color:#aaa;text-align:center;font-weight:bold;">SHARED VIA THEGOOLDBOOK 🦄</div>`;
 
     document.body.appendChild(renderFrame);
-    canvas = await Promise.race([
-      html2canvas(renderFrame, { useCORS: true, allowTaint: false, scale: 2, backgroundColor: "#ffffff", logging: false, width: 400 }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('html2canvas timeout')), 8000))
+    const canvas = await Promise.race([
+      html2canvas(renderFrame, {
+        useCORS: true, allowTaint: false, scale: 2, backgroundColor: "#ffffff", logging: false, width: 400,
+        // Only copy the card itself, not the whole feed (much faster on phones)
+        ignoreElements: el => !(el === renderFrame || renderFrame.contains(el) || el.contains(renderFrame))
+      }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('html2canvas timeout')), 12000))
     ]);
-    if (document.body.contains(renderFrame)) document.body.removeChild(renderFrame);
-
     const imageBlob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-    const sharedFile = new File([imageBlob], `Gooldbook_${rowIndex}.png`, { type: 'image/png' });
-
-    if (navigator.canShare && navigator.canShare({ files: [sharedFile] })) {
-      await navigator.share({ files: [sharedFile], title: 'theGooldbook 🦄', text: shareText });
-    } else if (navigator.share) {
-      await navigator.share({ title: 'theGooldbook 🦄', text: shareText, url: shareUrl });
-    } else {
-      shareDownload(canvas, rowIndex);
+    if (!imageBlob) throw new Error('empty card');
+    if (pendingShare && pendingShare.rowIndex === rowIndex) {
+      pendingShare.canvas = canvas;
+      pendingShare.file = new File([imageBlob], `Gooldbook_${rowIndex}.png`, { type: 'image/png' });
+      openShareModal(canvas.toDataURL('image/png'));
     }
-  } catch(e) {
+  } catch (e) {
+    console.warn('Share card failed', e);
+    if (pendingShare && pendingShare.rowIndex === rowIndex) openShareModal('');
+  } finally {
     if (document.body.contains(renderFrame)) document.body.removeChild(renderFrame);
-    if (e.name === 'AbortError') { btn.innerText = originalText; return; }
-    // Fallback: plain URL share or clipboard
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: 'theGooldbook 🦄', text: shareText, url: shareUrl });
-      } else {
-        await navigator.clipboard.writeText(shareUrl);
-        btn.innerText = "✅ Copied!";
-        setTimeout(() => { btn.innerText = originalText; }, 2000);
-        return;
-      }
-    } catch(e2) {
-      if (e2.name !== 'AbortError') {
-        try { await navigator.clipboard.writeText(shareUrl); btn.innerText = "✅ Copied!"; setTimeout(() => { btn.innerText = originalText; }, 2000); return; }
-        catch { alert(`Post link:\n${shareUrl}`); }
-      }
-    }
+    btn.innerText = originalText;
+    btn.disabled = false;
   }
-  btn.innerText = originalText;
+}
+
+// imgSrc: null = still preparing, '' = card failed (link sharing still works), data URL = ready
+function openShareModal(imgSrc) {
+  const slot = document.getElementById('shareCardSlot');
+  const shareBtn = document.getElementById('shareCardBtn');
+  if (imgSrc === null) {
+    slot.innerHTML = '<div class="share-card-wait">⏳ Making your share card…</div>';
+    shareBtn.disabled = true; shareBtn.textContent = '📤 Share';
+  } else if (imgSrc === '') {
+    slot.innerHTML = `<div class="share-card-wait">Couldn't make the picture this time.<br>You can still share the link.</div>`;
+    shareBtn.disabled = false; shareBtn.textContent = '📤 Share link';
+  } else {
+    slot.innerHTML = `<img src="${imgSrc}" class="share-card-img" alt="Share card">`;
+    shareBtn.disabled = false; shareBtn.textContent = '📤 Share';
+  }
+  document.getElementById('shareLinkBtn').textContent = '🔗 Copy link';
+  document.getElementById('shareModal').style.display = 'flex';
+}
+
+function closeShareModal() {
+  document.getElementById('shareModal').style.display = 'none';
+  pendingShare = null;
+}
+
+// Runs straight from a tap, so Safari allows the share sheet
+async function shareCardNow() {
+  const ps = pendingShare;
+  if (!ps) return;
+  try {
+    if (ps.file && navigator.canShare && navigator.canShare({ files: [ps.file] })) {
+      await navigator.share({ files: [ps.file], title: 'theGooldbook 🦄', text: ps.text });
+    } else if (navigator.share) {
+      await navigator.share({ title: 'theGooldbook 🦄', text: ps.text, url: ps.url });
+    } else if (ps.canvas) {
+      shareDownload(ps.canvas, ps.rowIndex);
+    } else {
+      return shareLinkNow(document.getElementById('shareLinkBtn'));
+    }
+    closeShareModal();
+  } catch (e) {
+    if (e.name === 'AbortError') return; // they closed the share sheet; keep the preview open
+    if (ps.canvas) shareDownload(ps.canvas, ps.rowIndex);
+    else shareLinkNow(document.getElementById('shareLinkBtn'));
+  }
+}
+
+async function shareLinkNow(btn) {
+  const url = pendingShare ? pendingShare.url : '';
+  if (!url) return;
+  try {
+    await navigator.clipboard.writeText(url);
+    btn.textContent = '✅ Copied!';
+  } catch {
+    alert(`Post link:\n${url}`);
+  }
 }
 
 function shareDownload(canvas, rowIndex) {
