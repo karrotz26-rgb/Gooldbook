@@ -1115,9 +1115,10 @@ async function shareCardNow() {
   if (!ps) return;
   try {
     if (ps.file && navigator.canShare && navigator.canShare({ files: [ps.file] })) {
-      await navigator.share({ files: [ps.file], title: 'theGooldbook 🦄', text: ps.text });
+      // The card already shows the post, so send the picture plus a link back to it
+      await navigator.share({ files: [ps.file], text: ps.url });
     } else if (navigator.share) {
-      await navigator.share({ title: 'theGooldbook 🦄', text: ps.text, url: ps.url });
+      await navigator.share({ title: 'theGooldbook 🦄', url: ps.url });
     } else if (ps.canvas) {
       shareDownload(ps.canvas, ps.rowIndex);
     } else {
