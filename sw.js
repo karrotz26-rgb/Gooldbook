@@ -1,7 +1,7 @@
 // Offline support: the app opens from the home screen even with no signal,
 // showing the last feed it saw (the feed itself is cached in localStorage by app.js).
-const CACHE = 'gooldbook-v8';
-const APP_SHELL = ['./', 'index.html', 'styles.css?v=8', 'app.js?v=8', 'Manifest.json', 'icon-192.png', 'apple-touch-icon.png'];
+const CACHE = 'gooldbook-v9';
+const APP_SHELL = ['./', 'index.html', 'styles.css?v=9', 'app.js?v=9', 'Manifest.json', 'icon-192.png', 'apple-touch-icon.png'];
 // Version-pinned libraries never change, so they can be served from cache first
 const PINNED_CDN = ['https://cdnjs.cloudflare.com/', 'https://cdn.jsdelivr.net/npm/html2canvas@', 'https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@'];
 
