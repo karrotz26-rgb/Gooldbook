@@ -99,7 +99,10 @@ button { touch-action: manipulation; cursor: pointer; }
 .f-film1982, .f-film1982 .cropper-container, .f-film1982 .cropper-wrap-box { filter: sepia(0.35) contrast(1.2) brightness(1.05) saturate(1.3) hue-rotate(-2deg) !important; }
 .f-cyberpunk, .f-cyberpunk .cropper-container, .f-cyberpunk .cropper-wrap-box { filter: hue-rotate(140deg) saturate(1.8) contrast(1.3) brightness(0.9) !important; }
 .f-vhs90s, .f-vhs90s .cropper-container, .f-vhs90s .cropper-wrap-box { filter: contrast(1.1) saturate(1.3) brightness(1.05) blur(0.3px) !important; }
-.f-technopunk, .f-technopunk .cropper-container, .f-technopunk .cropper-wrap-box { filter: contrast(1.9) brightness(0.7) grayscale(1) !important; }
+/* Technopunk preview: dark black & white photo, with a cyan→magenta colour layer that lights up the bright parts */
+.f-technopunk .cropper-wrap-box { filter: grayscale(1) brightness(0.85) contrast(1.7) !important; }
+.f-technopunk::after { content: ""; position: absolute; inset: 0; background: linear-gradient(135deg, #00f0ff, #ff00c8); mix-blend-mode: color; pointer-events: none; z-index: 2; }
+.tp-preview { background-blend-mode: color, normal; filter: grayscale(0) brightness(0.85) contrast(1.6); }
 .f-aiportrait, .f-aiportrait .cropper-container, .f-aiportrait .cropper-wrap-box { filter: saturate(1.4) contrast(1.25) brightness(1.05) !important; }
 
 @media(max-width:700px){ .container { flex-direction:column; } .sidebar { width:100%; position:static; max-height: none; overflow-y: visible; } }
