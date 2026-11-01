@@ -71,7 +71,8 @@ function loadSelfieSegmentation() {
     script.crossOrigin = 'anonymous';
     script.onload = () => {
       selfieSegmentationModelInstance = new SelfieSegmentation({ locateFile: (file) => `${MEDIAPIPE_BASE}/${file}` });
-      selfieSegmentationModelInstance.setOptions({ modelSelection: 1 });
+      // 0 = the square 256×256 "general" model; 1 (landscape, 144×256) gave blocky, stair-stepped edges on square photos
+      selfieSegmentationModelInstance.setOptions({ modelSelection: 0 });
       resolve(selfieSegmentationModelInstance);
     };
     script.onerror = () => { selfieSegmentationLoadPromise = null; reject(new Error('MediaPipe failed to load')); };
@@ -1179,16 +1180,9 @@ async function applyImageCropAndFilter() {
 
     await withTimeout(new Promise((resolve, reject) => {
       segmenter.onResults((results) => {
-        // Blur background via downsample trick (works on iOS — no ctx.filter needed)
-        const tiny = document.createElement('canvas');
-        tiny.width = 40; tiny.height = 40;
-        tiny.getContext('2d').drawImage(results.image, 0, 0, 40, 40);
-        const blurC = document.createElement('canvas');
-        blurC.width = 800; blurC.height = 800;
+        // Creamy background blur: shrink and enlarge in halving steps (works on iOS — no ctx.filter needed)
+        const blurC = stepBlur(results.image, 800, 25);
         const blurCtx = blurC.getContext('2d');
-        blurCtx.imageSmoothingEnabled = true;
-        blurCtx.imageSmoothingQuality = 'high';
-        blurCtx.drawImage(tiny, 0, 0, 800, 800);
 
         // Slightly dim and desaturate background via pixel manipulation
         const bgData = blurCtx.getImageData(0, 0, 800, 800);
@@ -1201,11 +1195,15 @@ async function applyImageCropAndFilter() {
         }
         blurCtx.putImageData(bgData, 0, 0);
 
-        // Get segmentation mask pixel data (white = person)
+        // Segmentation mask (confidence in the alpha channel)
         const maskC = document.createElement('canvas');
         maskC.width = 800; maskC.height = 800;
-        maskC.getContext('2d').drawImage(results.segmentationMask, 0, 0, 800, 800);
-        const maskPx = maskC.getContext('2d').getImageData(0, 0, 800, 800).data;
+        const maskCtx = maskC.getContext('2d');
+        maskCtx.imageSmoothingEnabled = true;
+        maskCtx.imageSmoothingQuality = 'high';
+        maskCtx.drawImage(results.segmentationMask, 0, 0, 800, 800);
+        // Soften the mask so its edge is smooth instead of stair-stepped, and small stray specks fade out
+        const maskPx = stepBlur(maskC, 800, 100).getContext('2d').getImageData(0, 0, 800, 800).data;
 
         // Get sharp original image pixels
         const origC = document.createElement('canvas');
@@ -1217,7 +1215,11 @@ async function applyImageCropAndFilter() {
         const outData = outContext.createImageData(800, 800);
         const op = outData.data;
         for (let j = 0; j < op.length; j += 4) {
-          const a = maskPx[j] / 255; // 1=person, 0=background
+          // The model's confidence (1=person, 0=background) is in the mask's ALPHA channel; red is
+          // 255 wherever confidence is above zero, which made the cut-out too big and hard-edged.
+          // Re-tighten the softened edge into a short feather centred on 50% confidence.
+          const m = Math.min(1, Math.max(0, (maskPx[j + 3] / 255 - 0.3) / 0.4));
+          const a = m * m * (3 - 2 * m);
           op[j]   = origPx[j]   * a + bgPx[j]   * (1 - a);
           op[j+1] = origPx[j+1] * a + bgPx[j+1] * (1 - a);
           op[j+2] = origPx[j+2] * a + bgPx[j+2] * (1 - a);
@@ -1395,6 +1397,23 @@ async function applyImageCropAndFilter() {
 
 // Black & white in the style of Ansel Adams: a red-filter mix (darker skies), the full tonal
 // range from true black to true white, extra local contrast for texture, and a gentle S-curve
+// Blur by shrinking to minSize in halving steps, then enlarging back the same way
+function stepBlur(src, size, minSize) {
+  let cur = src, w = size;
+  const draw = (img, to) => {
+    const c = document.createElement('canvas');
+    c.width = c.height = to;
+    const x = c.getContext('2d');
+    x.imageSmoothingEnabled = true;
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(img, 0, 0, to, to);
+    return c;
+  };
+  while (w / 2 >= minSize) { w = Math.round(w / 2); cur = draw(cur, w); }
+  while (w < size) { w = Math.min(size, w * 2); cur = draw(cur, w); }
+  return cur;
+}
+
 function applyAnselAdams(ctx, canvas) {
   const W = canvas.width, H = canvas.height;
   const img = ctx.getImageData(0, 0, W, H);
