@@ -100,9 +100,11 @@ button { touch-action: manipulation; cursor: pointer; }
 .f-cyberpunk, .f-cyberpunk .cropper-container, .f-cyberpunk .cropper-wrap-box { filter: hue-rotate(140deg) saturate(1.8) contrast(1.3) brightness(0.9) !important; }
 .f-vhs90s, .f-vhs90s .cropper-container, .f-vhs90s .cropper-wrap-box { filter: contrast(1.1) saturate(1.3) brightness(1.05) blur(0.3px) !important; }
 /* Technopunk preview: dark black & white photo, with a cyan→magenta colour layer that lights up the bright parts */
-.f-technopunk .cropper-wrap-box { filter: grayscale(1) brightness(0.85) contrast(1.7) !important; }
-.f-technopunk::after { content: ""; position: absolute; inset: 0; background: linear-gradient(135deg, #00f0ff, #ff00c8); mix-blend-mode: color; pointer-events: none; z-index: 2; }
+.f-technopunk::after { content: ""; position: absolute; inset: 0; background: linear-gradient(135deg, #00f0ff, #8c28ff, #ff00be); mix-blend-mode: color; pointer-events: none; z-index: 2; }
+/* Cropper shows the photo twice (behind and inside the crop box), so style both */
+.f-technopunk .cropper-canvas img, .f-technopunk .cropper-view-box img { filter: grayscale(1) brightness(0.95) contrast(1.6) !important; }
 .tp-preview { background-blend-mode: color, normal; filter: grayscale(0) brightness(0.85) contrast(1.6); }
+.f-anseladams .cropper-canvas img, .f-anseladams .cropper-view-box img { filter: grayscale(1) contrast(1.4) brightness(1.05) !important; }
 .f-aiportrait, .f-aiportrait .cropper-container, .f-aiportrait .cropper-wrap-box { filter: saturate(1.4) contrast(1.25) brightness(1.05) !important; }
 
 @media(max-width:700px){ .container { flex-direction:column; } .sidebar { width:100%; position:static; max-height: none; overflow-y: visible; } }
