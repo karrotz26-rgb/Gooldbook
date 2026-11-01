@@ -43,6 +43,7 @@ const filterMatrixConfigurations = {
   cyberpunk: 'hue-rotate(140deg) saturate(1.8) contrast(1.3) brightness(0.9)',
   vhs90s: 'contrast(1.1) saturate(1.3) brightness(1.05)',
   technopunk: 'none',
+  anseladams: 'none',
   aiportrait: 'none'
 };
 
@@ -1239,6 +1240,9 @@ async function applyImageCropAndFilter() {
       outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
       showNotif("AI Portrait timed out — saved without the background blur.");
     });
+  } else if (chosenFilterStyleName === 'anseladams') {
+    outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
+    applyAnselAdams(outContext, outputCanvas);
   } else {
     outContext.drawImage(croppedCanvas, 0, 0, 800, 800);
     const imgData = outContext.getImageData(0, 0, 800, 800);
@@ -1343,13 +1347,15 @@ async function applyImageCropAndFilter() {
         let v = r * 0.299 + g * 0.587 + b * 0.114;
         v = (v * 0.85 - 127.5) * 1.7 + 127.5;
         v = Math.min(255, Math.max(0, v));
-        // Neon colour sweeps cyan → magenta across the photo
+        // Neon colour sweeps cyan → electric purple → hot pink across the photo
         const t = (colX + rowY) / 1600;
-        const nr = 255 * t, ng = 240 * (1 - t), nb = 255 - 55 * t;
+        let nr, ng, nb;
+        if (t < 0.5) { const u = t * 2; nr = 140 * u; ng = 240 - 200 * u; nb = 255; }
+        else { const u = (t - 0.5) * 2; nr = 140 + 115 * u; ng = 40 - 40 * u; nb = 255 - 65 * u; }
         // Shadows stay black; the brighter a pixel, the more it glows neon
-        const lit = Math.min(1, Math.max(0, (v - 50) / 140));
+        const lit = Math.min(1, Math.max(0, (v - 35) / 120));
         const glow = lit * lit * (3 - 2 * lit);
-        const boost = 0.5 + 0.8 * (v / 255);
+        const boost = Math.min(1.05, 0.5 + 0.75 * (v / 255)); // capped so highlights stay coloured, not white
         r = v * (1 - glow) + nr * boost * glow;
         g = v * (1 - glow) + ng * boost * glow;
         b = v * (1 - glow) + nb * boost * glow;
@@ -1369,7 +1375,7 @@ async function applyImageCropAndFilter() {
       bloom.getContext('2d').drawImage(outputCanvas, 0, 0, 80, 80);
       outContext.save();
       outContext.globalCompositeOperation = 'screen';
-      outContext.globalAlpha = 0.55;
+      outContext.globalAlpha = 0.7;
       outContext.imageSmoothingEnabled = true;
       outContext.drawImage(bloom, 0, 0, 800, 800);
       outContext.restore();
@@ -1385,6 +1391,54 @@ async function applyImageCropAndFilter() {
   document.getElementById('cropModal').style.display = 'none';
   if(activeCropperInstance) activeCropperInstance.destroy();
   activeCropperInstance = null;
+}
+
+// Black & white in the style of Ansel Adams: a red-filter mix (darker skies), the full tonal
+// range from true black to true white, extra local contrast for texture, and a gentle S-curve
+function applyAnselAdams(ctx, canvas) {
+  const W = canvas.width, H = canvas.height;
+  const img = ctx.getImageData(0, 0, W, H);
+  const px = img.data;
+  const n = W * H;
+  const gray = new Float32Array(n);
+  const hist = new Uint32Array(256);
+  for (let i = 0, j = 0; j < n; i += 4, j++) {
+    // Like shooting through a red filter: blues (skies) go darker, warm tones lighter
+    const v = Math.min(255, px[i] * 0.55 + px[i + 1] * 0.38 + px[i + 2] * 0.07);
+    gray[j] = v;
+    hist[v | 0]++;
+  }
+  // Stretch so the darkest 0.5% is black and the brightest 0.5% is white
+  const cut = n * 0.005;
+  let lo = 0, hi = 255, acc = 0;
+  for (let k = 0; k < 256; k++) { acc += hist[k]; if (acc > cut) { lo = k; break; } }
+  acc = 0;
+  for (let k = 255; k >= 0; k--) { acc += hist[k]; if (acc > cut) { hi = k; break; } }
+  const range = Math.max(1, hi - lo);
+  for (let j = 0; j < n; j++) gray[j] = Math.min(255, Math.max(0, (gray[j] - lo) * 255 / range));
+
+  // Blurred copy (shrink then enlarge) for local contrast
+  const g = document.createElement('canvas'); g.width = W; g.height = H;
+  const gctx = g.getContext('2d');
+  const gimg = gctx.createImageData(W, H);
+  for (let i = 0, j = 0; j < n; i += 4, j++) { gimg.data[i] = gimg.data[i + 1] = gimg.data[i + 2] = gray[j]; gimg.data[i + 3] = 255; }
+  gctx.putImageData(gimg, 0, 0);
+  const small = document.createElement('canvas'); small.width = 50; small.height = 50;
+  small.getContext('2d').drawImage(g, 0, 0, 50, 50);
+  const blur = document.createElement('canvas'); blur.width = W; blur.height = H;
+  const bctx = blur.getContext('2d');
+  bctx.imageSmoothingEnabled = true; bctx.imageSmoothingQuality = 'high';
+  bctx.drawImage(small, 0, 0, W, H);
+  const bl = bctx.getImageData(0, 0, W, H).data;
+
+  for (let i = 0, j = 0; j < n; i += 4, j++) {
+    let v = gray[j] + (gray[j] - bl[i]) * 0.6;           // local contrast
+    let x = Math.min(1, Math.max(0, v / 255));
+    x = x < 0.5 ? 0.5 * Math.pow(2 * x, 1.35) : 1 - 0.5 * Math.pow(2 * (1 - x), 1.35); // S-curve
+    const out = Math.round(x * 255);
+    px[i] = px[i + 1] = px[i + 2] = out;
+  }
+  ctx.putImageData(img, 0, 0);
 }
 
 function timeAgo(d) {
