@@ -96,7 +96,8 @@ function initiateCropper(event) {
     if(elements[0]) elements[0].classList.add('active');
 
     document.querySelectorAll('.filter-preview-box').forEach(box => {
-       box.style.backgroundImage = `url('${e.target.result}')`;
+       // Some previews (Technopunk) layer a colour gradient over the photo
+       box.style.backgroundImage = (box.dataset.overlay ? box.dataset.overlay + ', ' : '') + `url('${e.target.result}')`;
     });
 
     document.getElementById('cropModal').style.display = 'flex';
@@ -1338,15 +1339,22 @@ async function applyImageCropAndFilter() {
         modificationAmount += (Math.random() - 0.5) * 8;
       } 
       else if (chosenFilterStyleName === 'technopunk') {
-        // Replicate CSS: grayscale(1) brightness(0.7) contrast(1.9)
-        let v = r * 0.299 + g * 0.587 + b * 0.114; // grayscale
-        v = v * 0.7;                                 // brightness(0.7)
-        v = (v - 127.5) * 1.9 + 127.5;              // contrast(1.9)
-        if (rowY % 5 === 0) v -= 45;                 // scanline bars
-        v += (Math.random() - 0.5) * 10;             // subtle grain
-        const tv = Math.min(255, Math.max(0, v));
-        r = tv; g = tv; b = tv;
-        modificationAmount = 0;
+        // Dark, high-contrast black & white base
+        let v = r * 0.299 + g * 0.587 + b * 0.114;
+        v = (v * 0.85 - 127.5) * 1.7 + 127.5;
+        v = Math.min(255, Math.max(0, v));
+        // Neon colour sweeps cyan → magenta across the photo
+        const t = (colX + rowY) / 1600;
+        const nr = 255 * t, ng = 240 * (1 - t), nb = 255 - 55 * t;
+        // Shadows stay black; the brighter a pixel, the more it glows neon
+        const lit = Math.min(1, Math.max(0, (v - 50) / 140));
+        const glow = lit * lit * (3 - 2 * lit);
+        const boost = 0.5 + 0.8 * (v / 255);
+        r = v * (1 - glow) + nr * boost * glow;
+        g = v * (1 - glow) + ng * boost * glow;
+        b = v * (1 - glow) + nb * boost * glow;
+        if (rowY % 5 === 0) { r *= 0.7; g *= 0.7; b *= 0.7; } // scanlines
+        modificationAmount = (Math.random() - 0.5) * 10;       // grain
       }
 
       pixels[i]     = Math.min(255, Math.max(0, r + modificationAmount));     
@@ -1354,6 +1362,18 @@ async function applyImageCropAndFilter() {
       pixels[i + 2] = Math.min(255, Math.max(0, b + modificationAmount)); 
     }
     outContext.putImageData(imgData, 0, 0);
+    if (chosenFilterStyleName === 'technopunk') {
+      // Soft neon bloom: a blurred copy of the image screened back over itself
+      const bloom = document.createElement('canvas');
+      bloom.width = 80; bloom.height = 80;
+      bloom.getContext('2d').drawImage(outputCanvas, 0, 0, 80, 80);
+      outContext.save();
+      outContext.globalCompositeOperation = 'screen';
+      outContext.globalAlpha = 0.55;
+      outContext.imageSmoothingEnabled = true;
+      outContext.drawImage(bloom, 0, 0, 800, 800);
+      outContext.restore();
+    }
   }
   
   if (processedBase64Images.length < 4) {
