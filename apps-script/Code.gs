@@ -30,6 +30,8 @@ const TEXT_SEPARATOR = "###";
 // so sign-in works even if your phone is off). Codes pass through MY_EMAIL's inbox when this is on.
 const CODE_BY_TEXT = true;
 
+const COMMENT_EMOJIS = ["❤️", "🤯", "😡", "🙄", "😉"]; // same five as post reactions
+
 const CODE_TTL_SECONDS = 600;      // sign-in codes expire after 10 minutes
 const CODE_MAX_TRIES = 5;          // wrong guesses allowed per code
 const CODES_PER_10_MIN = 3;        // emails per person per 10 minutes
@@ -628,6 +630,30 @@ function handlePost(e) {
     }
   }
 
+  // --- ACTION: REACT TO A COMMENT ---
+  else if (data.action === "commentReact") {
+    const rowIndex = parseInt(data.rowIndex);
+    const idx = parseInt(data.commentIndex);
+    const em = data.emoji;
+    if (COMMENT_EMOJIS.indexOf(em) === -1) return { error: "emoji" };
+    const range = sheet.getRange(rowIndex, 6);
+    let comments = [];
+    try { comments = JSON.parse(range.getValue() || "[]"); } catch (err) { return { error: "missing" }; }
+    const c = comments[idx];
+    if (!c) return { error: "missing", message: "That comment isn't there any more." };
+    const likes = (c.likes && typeof c.likes === "object") ? c.likes : {};
+    // One reaction per person: tap the same one again to remove it, a different one to switch
+    const existingKey = Object.keys(likes).find(k => sameName(k, data.username));
+    const key = existingKey !== undefined ? existingKey : data.username;
+    const isNew = existingKey === undefined;
+    if (likes[key] === em) delete likes[key]; else likes[key] = em;
+    c.likes = likes;
+    range.setValue(JSON.stringify(comments));
+    if (isNew && TEXT_MODE) {
+      sendTextNotifications({ type: "commentReaction", author: data.username, emoji: em, rowIndex: rowIndex, commentAuthor: c.user, commentText: c.text });
+    }
+  }
+
   else {
     return { error: "unknownAction" };
   }
@@ -743,7 +769,7 @@ function sendTextNotifications(ev) {
     (groups[message] = groups[message] || []).push(textTarget(member));
   };
 
-  if (ev.type !== "reaction") {
+  if (ev.type !== "reaction" && ev.type !== "commentReaction") {
     getMentionedMembers(ev.text, ev.author).forEach(m =>
       add(m, "mentions", `📣 ${ev.author} mentioned you on theGooldbook: "${shortPreview(ev.text)}" ${url}`));
   }
@@ -753,6 +779,11 @@ function sendTextNotifications(ev) {
   }
   if (ev.type === "reaction" && owner) {
     add(owner, "reactions", `${ev.emoji || "❤️"} ${ev.author} reacted to your post "${shortPreview(ev.postText)}" ${url}`);
+  }
+  // Reactions to a comment go to the commenter, under their "reactions" switch
+  const commenter = ev.type === "commentReaction" && ev.commentAuthor ? findMember(ev.commentAuthor) : null;
+  if (commenter) {
+    add(commenter, "reactions", `${ev.emoji || "❤️"} ${ev.author} reacted to your comment "${shortPreview(ev.commentText)}" ${url}`);
   }
   if (ev.type === "post") {
     getMembers().forEach(m => add(m, "newPosts", `🦄 ${ev.author} posted on theGooldbook: "${shortPreview(ev.text)}" ${url}`));

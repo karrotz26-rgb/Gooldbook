@@ -187,3 +187,13 @@ button { touch-action: manipulation; cursor: pointer; }
 .share-actions { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-top: 1px solid #eee; }
 .share-main-btn { width: 100%; padding: 12px; font-size: 16px; border-radius: 8px; }
 .share-main-btn:disabled { opacity: 0.5; }
+.c-rx { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 4px; }
+.c-rx-chip, .c-rx-add { background: #fff; border: 1px solid #dde0e4; border-radius: 12px; padding: 1px 7px; font-size: 12px; line-height: 18px; cursor: pointer; }
+.c-rx-chip span { font-weight: bold; color: #444; font-size: 11px; }
+.c-rx-chip.active { background: #e8f0fe; border-color: var(--gb-blue); }
+.c-rx-add { color: #65676b; opacity: 0.75; }
+.c-rx-panel { flex-basis: 100%; background: #fff; border: 1px solid #dde0e4; border-radius: 10px; padding: 6px 8px; margin-top: 2px; }
+.c-rx-pick { display: flex; gap: 6px; }
+.c-rx-pick button { background: #f0f2f5; border: 1.5px solid transparent; border-radius: 16px; font-size: 18px; padding: 2px 8px; cursor: pointer; }
+.c-rx-pick button.active { background: #e8f0fe; border-color: var(--gb-blue); }
+.c-rx-who { font-size: 11px; color: #65676b; margin-top: 6px; }
