@@ -193,7 +193,7 @@ async function loadFeed() {
 
 // Cheap fingerprint of everything the feed shows, so any new reaction/comment/bio triggers a refresh
 function feedSignature(data) {
-  const posts = (data.posts || []).map(p => `${p.rowIndex}:${JSON.stringify(normalizeLikes(p.likes))}:${(p.comments || []).length}:${p.message}`).join('|');
+  const posts = (data.posts || []).map(p => `${p.rowIndex}:${JSON.stringify(normalizeLikes(p.likes))}:${(p.comments || []).length}:${JSON.stringify((p.comments || []).map(c => c.likes || {}))}:${p.message}`).join('|');
   return posts + JSON.stringify(data.bios || {}) + JSON.stringify(data.avatars || {}) + JSON.stringify((data.requests || []).map(r => r.id));
 }
 
@@ -637,7 +637,7 @@ function render() {
       let toggleLabelHTML = "";
       if(totalCommentsCount > 2 && !trayOpen) { toggleLabelHTML = `<div id="toggle-label-${p.rowIndex}" style="color:var(--gb-blue); font-size:12px; font-weight:bold; margin-top:8px; cursor:pointer;" onclick="toggleCommentsVisibility(${p.rowIndex})">💬 View all ${totalCommentsCount} comments</div>`; }
 
-      return `<div class="card" id="post-${p.rowIndex}"><div class="user-header">${getAvatarMarkup(p.user, 'avatar-small')}<div class="user-info"><div style="display:flex; align-items:center;"><span class="user-name" onclick="setFilter('author', ${jsArg(p.user)})">${escapeHtml(p.user)}</span>${likeBadge}</div><span class="time-stamp">${timeAgo(p.timestamp)}</span></div></div><p style="margin:10px 0;">${highlightHashtags(p.message)}</p>${mediaHTML}<div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;"><div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;"><div class="reaction-bar">${reactionBarHTML}</div><button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button></div><div class="liked-by-container" style="font-size:11px; color:#65676b; margin-left:5px; line-height:1.4; display: ${reactionCount > 0 ? 'block' : 'none'};">Reacted: <span class="liked-by-list">${likeNames}</span></div></div><div class="comment-section" style="margin-top:10px;"><div class="comments-list">${initialComments.map(renderCommentHTML).join('')}${toggleLabelHTML}<div id="comments-tray-${p.rowIndex}" style="display:${trayOpen ? 'block' : 'none'};">${hiddenComments.map(renderCommentHTML).join('')}</div></div><div style="margin-top:10px"><input id="c-${p.rowIndex}" class="reply-input" data-row="${p.rowIndex}" enterkeyhint="send" placeholder="Reply..." style="margin-bottom:0; font-size:13px!important;"><button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button></div></div></div>`;
+      return `<div class="card" id="post-${p.rowIndex}"><div class="user-header">${getAvatarMarkup(p.user, 'avatar-small')}<div class="user-info"><div style="display:flex; align-items:center;"><span class="user-name" onclick="setFilter('author', ${jsArg(p.user)})">${escapeHtml(p.user)}</span>${likeBadge}</div><span class="time-stamp">${timeAgo(p.timestamp)}</span></div></div><p style="margin:10px 0;">${highlightHashtags(p.message)}</p>${mediaHTML}<div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;"><div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;"><div class="reaction-bar">${reactionBarHTML}</div><button class="btn-alt" onclick="sharePost(${p.rowIndex}, event)">🔗 Share</button></div><div class="liked-by-container" style="font-size:11px; color:#65676b; margin-left:5px; line-height:1.4; display: ${reactionCount > 0 ? 'block' : 'none'};">Reacted: <span class="liked-by-list">${likeNames}</span></div></div><div class="comment-section" style="margin-top:10px;"><div class="comments-list">${initialComments.map((c, i) => renderCommentHTML(c, p.rowIndex, i)).join('')}${toggleLabelHTML}<div id="comments-tray-${p.rowIndex}" style="display:${trayOpen ? 'block' : 'none'};">${hiddenComments.map((c, i) => renderCommentHTML(c, p.rowIndex, i + 2)).join('')}</div></div><div style="margin-top:10px"><input id="c-${p.rowIndex}" class="reply-input" data-row="${p.rowIndex}" enterkeyhint="send" placeholder="Reply..." style="margin-bottom:0; font-size:13px!important;"><button class="btn-comment" onclick="apiCall('comment', ${p.rowIndex})">Post Reply</button></div></div></div>`;
     } catch (err) { console.error("Error rendering post:", err); return `<div class="card">Error loading this post.</div>`; }
   }).join('');
 
@@ -658,8 +658,59 @@ function render() {
 
 function commentTime(c) { return c.time || c.timestamp; }
 
-function renderCommentHTML(c) {
-  return `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${escapeHtml(c.user)}</b><span style="font-size:10px; color:#888;">${timeAgo(commentTime(c))}</span></div><div>${highlightHashtags(c.text)}</div></div>`;
+function renderCommentHTML(c, rowIndex, idx) {
+  const rx = rowIndex === undefined ? '' : `<div class="c-rx" id="crx-${rowIndex}-${idx}">${commentReactionsHTML(c, rowIndex, idx)}</div>`;
+  return `<div class="comment-box"><div style="display:flex; justify-content:space-between;"><b>${escapeHtml(c.user)}</b><span style="font-size:10px; color:#888;">${timeAgo(commentTime(c)) || 'just now'}</span></div><div>${highlightHashtags(c.text)}</div>${rx}</div>`;
+}
+
+// ---- Comment reactions ----
+
+const COMMENT_EMOJIS = ['❤️', '🤯', '😡', '🙄', '😉'];
+let openCommentPicker = null; // "row-idx" of the comment whose picker is open
+
+function commentReactionsHTML(c, rowIndex, idx) {
+  const likes = c.likes || {};
+  const me = document.getElementById('user').value.trim();
+  const mine = ciLookup(likes, me);
+  const chips = COMMENT_EMOJIS.map(em => {
+    const n = Object.values(likes).filter(e => e === em).length;
+    return n ? `<button class="c-rx-chip${mine === em ? ' active' : ''}" onclick="toggleCommentPicker(${rowIndex}, ${idx})">${em} <span>${n}</span></button>` : '';
+  }).join('');
+  const open = openCommentPicker === `${rowIndex}-${idx}`;
+  const who = Object.entries(likes).map(([n, e]) => `${escapeHtml(n)} ${e}`).join(' · ');
+  const picker = open ? `<div class="c-rx-panel">
+      <div class="c-rx-pick">${COMMENT_EMOJIS.map(em => `<button class="${mine === em ? 'active' : ''}" onclick="reactToComment(${rowIndex}, ${idx}, '${em}')">${em}</button>`).join('')}</div>
+      ${who ? `<div class="c-rx-who">${who}</div>` : ''}
+    </div>` : '';
+  return `${chips}<button class="c-rx-add" aria-label="React to comment" onclick="toggleCommentPicker(${rowIndex}, ${idx})">😀+</button>${picker}`;
+}
+
+function refreshCommentReactions(rowIndex, idx) {
+  const p = allPosts.find(x => x.rowIndex === rowIndex);
+  const el = document.getElementById(`crx-${rowIndex}-${idx}`);
+  if (p && el && p.comments[idx]) el.innerHTML = commentReactionsHTML(p.comments[idx], rowIndex, idx);
+}
+
+function toggleCommentPicker(rowIndex, idx) {
+  const key = `${rowIndex}-${idx}`;
+  const previous = openCommentPicker;
+  openCommentPicker = previous === key ? null : key;
+  if (previous && previous !== key) { const [r, i] = previous.split('-').map(Number); refreshCommentReactions(r, i); }
+  refreshCommentReactions(rowIndex, idx);
+}
+
+function reactToComment(rowIndex, idx, em) {
+  const user = document.getElementById('user').value.trim();
+  const p = allPosts.find(x => x.rowIndex === rowIndex);
+  if (!user || !p || !p.comments[idx]) return;
+  const c = p.comments[idx];
+  const likes = c.likes || {};
+  const key = ciKey(likes, user);
+  if (likes[key] === em) delete likes[key]; else likes[key] = em;
+  c.likes = likes;
+  openCommentPicker = null;
+  refreshCommentReactions(rowIndex, idx);
+  apiPost({ action: 'commentReact', rowIndex, commentIndex: idx, emoji: em, streak: String(currentStreakFor(user)) }).then(warnIfNotSaved, warnIfNotSaved);
 }
 
 function reactionNamesHTML(reactions) {
@@ -994,7 +1045,7 @@ async function apiCall(action, rowIndex, event, emoji) {
   } else if (action === 'comment') {
     const input = document.getElementById(`c-${rowIndex}`); if(!input || !input.value.trim()) return; const txt = input.value.trim();
     const newCommentObj = { user, text: txt, time: new Date().toISOString() }; p.comments.push(newCommentObj); input.value = ""; 
-    if (postEl) { const list = postEl.querySelector('.comments-list'); if (list) { const div = document.createElement('div'); div.className = 'comment-box'; div.innerHTML = `<div style="display:flex; justify-content:space-between;"><b>${escapeHtml(user)}</b><span style="font-size:10px; color:#888;">just now</span></div><div>${highlightHashtags(txt)}</div>`; list.appendChild(div); } }
+    if (postEl) { const list = postEl.querySelector('.comments-list'); if (list) { list.insertAdjacentHTML('beforeend', renderCommentHTML(newCommentObj, rowIndex, p.comments.length - 1)); } }
     
     // PACKAGES STREAK VALUE ON COMMENT EXECUTIONS
     apiPost({ action, rowIndex, text: txt, streak: currentLocalStreak }).then(warnIfNotSaved, warnIfNotSaved);
