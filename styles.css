@@ -85,8 +85,16 @@ button { touch-action: manipulation; cursor: pointer; }
 .unicorn-pop { position: fixed; font-size: 40px; pointer-events: none; z-index: 9999; animation: unicornFloat 1.5s ease-out forwards; }
 @keyframes unicornFloat { 0% { transform: translateY(0) scale(0); opacity: 0; } 30% { opacity: 1; transform: translateY(-40px) scale(1.2); } 100% { transform: translateY(-120px) scale(0); opacity: 0; } }
 
-.crop-modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.9); z-index: 50000; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 15px; box-sizing: border-box; }
-.crop-workspace { width: 100%; max-width: 420px; aspect-ratio: 1/1; background: #000; margin-bottom: 15px; overflow: hidden; border-radius: 8px; position: relative; }
+/* Sized to the part of the screen that's actually visible (dvh), kept clear of the notch and home bar,
+   and scrollable as a last resort so the buttons can always be reached */
+.crop-modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; height: 100dvh; background: rgba(0,0,0,0.9); z-index: 50000; display: none; flex-direction: column; align-items: center; padding: 15px; padding-top: calc(15px + env(safe-area-inset-top)); padding-bottom: calc(15px + env(safe-area-inset-bottom)); box-sizing: border-box; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+/* Centred with auto margins: unlike justify-content, the top stays reachable when the content is taller than the screen */
+.crop-modal > :first-child { margin-top: auto; }
+.crop-modal > :last-child { margin-bottom: auto; }
+.crop-modal > * { flex-shrink: 0; }
+/* An explicit square that shrinks on short screens so the filters and buttons below always fit */
+.crop-workspace { --crop: max(180px, min(100vw - 30px, 420px, 100vh - 215px - env(safe-area-inset-top) - env(safe-area-inset-bottom))); width: var(--crop); height: var(--crop); background: #000; margin-bottom: 15px; overflow: hidden; border-radius: 8px; position: relative; }
+@supports (height: 100dvh) { .crop-workspace { --crop: max(180px, min(100vw - 30px, 420px, 100dvh - 215px - env(safe-area-inset-top) - env(safe-area-inset-bottom))); } }
 .crop-workspace img { max-width: 100%; display: block; }
 
 .filter-tray { display: flex; gap: 10px; width: 100%; max-width: 420px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 15px; scrollbar-width: none; }
