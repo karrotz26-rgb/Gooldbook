@@ -6,7 +6,6 @@ let linkPreviewCache = JSON.parse(localStorage.getItem("gb_link_preview_cache") 
 const linkPreviewFetchesInFlight = new Set();
 let incomingPostsCache = null; 
 let allBios = {}, allAvatars = {};
-let allStreaks = []; 
 let postsToShow = 10;
 let filterType = null, filterVal = null;
 let lastPostCount = allPosts.length;
@@ -179,8 +178,7 @@ async function loadFeed() {
     allPosts = data.posts || [];
     allBios = data.bios || {};
     allAvatars = data.avatars || {};
-    allStreaks = data.streaks || []; 
-    localStorage.setItem("gb_cache", JSON.stringify(allPosts));
+    saveFeedCache();
     lastPostCount = allPosts.length;
     lastFeedSignature = feedSignature(data);
     incomingPostsCache = null;
@@ -242,9 +240,8 @@ async function pollForUpdates() {
       allPosts = newPosts;
       allBios = data.bios || {};
       allAvatars = data.avatars || {};
-      allStreaks = data.streaks || [];
       lastPostCount = newPosts.length;
-      localStorage.setItem("gb_cache", JSON.stringify(allPosts));
+      saveFeedCache();
       render();
       updateMentions(false);
     }
@@ -252,13 +249,21 @@ async function pollForUpdates() {
   finally { _isPollRunning = false; }
 }
 
+// The saved feed is only for opening instantly and offline, so a full phone must never stop the app
+function saveFeedCache() {
+  try { localStorage.setItem("gb_cache", JSON.stringify(allPosts)); }
+  catch (e) {
+    try { localStorage.setItem("gb_cache", JSON.stringify(allPosts.slice(0, 50))); }
+    catch (e2) { try { localStorage.removeItem("gb_cache"); } catch (e3) {} }
+  }
+}
+
 function acceptNewPosts() {
   if (incomingPostsCache) {
     allPosts = incomingPostsCache.posts || [];
     allBios = incomingPostsCache.bios || {};
     allAvatars = incomingPostsCache.avatars || {};
-    allStreaks = incomingPostsCache.streaks || [];
-    localStorage.setItem("gb_cache", JSON.stringify(allPosts));
+    saveFeedCache();
     lastPostCount = allPosts.length;
     lastFeedSignature = feedSignature(incomingPostsCache);
     incomingPostsCache = null;
@@ -677,7 +682,7 @@ function commentReactionsHTML(c, rowIndex, idx) {
     return n ? `<button class="c-rx-chip${mine === em ? ' active' : ''}" onclick="toggleCommentPicker(${rowIndex}, ${idx})">${em} <span>${n}</span></button>` : '';
   }).join('');
   const open = openCommentPicker === `${rowIndex}-${idx}`;
-  const who = Object.entries(likes).map(([n, e]) => `${escapeHtml(n)} ${e}`).join(' · ');
+  const who = Object.entries(likes).map(([n, e]) => `${escapeHtml(n)} ${escapeHtml(e)}`).join(' · ');
   const picker = open ? `<div class="c-rx-panel">
       <div class="c-rx-pick">${COMMENT_EMOJIS.map(em => `<button class="${mine === em ? 'active' : ''}" onclick="reactToComment(${rowIndex}, ${idx}, '${em}')">${em}</button>`).join('')}</div>
       ${who ? `<div class="c-rx-who">${who}</div>` : ''}
@@ -710,11 +715,11 @@ function reactToComment(rowIndex, idx, em) {
   c.likes = likes;
   openCommentPicker = null;
   refreshCommentReactions(rowIndex, idx);
-  apiPost({ action: 'commentReact', rowIndex, commentIndex: idx, emoji: em, streak: String(currentStreakFor(user)) }).then(warnIfNotSaved, warnIfNotSaved);
+  apiPost({ action: 'commentReact', rowIndex, commentIndex: idx, emoji: em }).then(warnIfNotSaved, warnIfNotSaved);
 }
 
 function reactionNamesHTML(reactions) {
-  return Object.entries(reactions).map(([n, e]) => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', ${jsArg(n.trim())})">${escapeHtml(n.trim())} ${e}</b>`).join(', ');
+  return Object.entries(reactions).map(([n, e]) => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', ${jsArg(n.trim())})">${escapeHtml(n.trim())} ${escapeHtml(e)}</b>`).join(', ');
 }
 
 // Re-rendering the feed (e.g. on a live update) shouldn't lose a half-typed reply,
@@ -767,14 +772,6 @@ function bestStreakInWindow(daySet, today) {
     best = Math.max(best, run);
   }
   return best;
-}
-
-// Streak to report to the server after the user does something today
-function currentStreakFor(user) {
-  const today = dayIndex(new Date());
-  const set = new Set(activityDaysByUser()[normUser(user)] || []);
-  set.add(today);
-  return currentStreakFromDays(set, today);
 }
 
 function isWithinActivityWindow(when) {
@@ -869,7 +866,7 @@ function renderGifGrid(gifs) {
   const grid = document.getElementById('gifGrid');
   if (!gifs || !gifs.length) { grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:20px; color:#888;">No GIFs found.</div>'; return; }
   grid.innerHTML = gifs.map(g =>
-    `<img src="${g.images.fixed_height_small.url}" class="gif-item" onclick="selectGif('${g.images.fixed_height.url}')" loading="lazy">`
+    `<img src="${escapeHtml(g.images.fixed_height_small.url)}" class="gif-item" onclick="selectGif(${jsArg(g.images.fixed_height.url)})" loading="lazy">`
   ).join('');
 }
 
@@ -911,7 +908,7 @@ function updateImagePreviewStrip() {
   if (!strip) return;
   strip.innerHTML = processedBase64Images.map((src, i) =>
     `<div class="img-thumb-wrap">
-       <img src="${src}" class="img-thumb">
+       <img src="${escapeHtml(src)}" class="img-thumb">
        <button class="img-thumb-remove" onclick="removePostImage(${i})">×</button>
      </div>`
   ).join('');
@@ -949,16 +946,13 @@ async function upload() {
   postBtn.innerText = "⏳ Uploading...";
   postBtn.disabled = true;
   
-  const currentLocalStreak = String(currentStreakFor(user));
-  
   try {
-    const result = await apiPost({ action: 'post', message: msg, images: processedBase64Images, streak: currentLocalStreak });
+    const result = await apiPost({ action: 'post', message: msg, images: processedBase64Images });
     if (!result.ok) throw new Error(result.error || 'post failed');
 
     document.getElementById('msg').value = ""; document.getElementById('file').value = "";
     processedBase64Images = []; updateImagePreviewStrip();
     postBtn.innerText = "✨ Finalizing post...";
-    await new Promise(resolve => setTimeout(resolve, 2500));
     await loadFeed(); 
   } catch(e) { console.error("Upload failed:", e); alert("Post creation failed. Please try again."); } finally { postBtn.innerText = "Post Update"; postBtn.disabled = false; }
 }
@@ -1014,8 +1008,6 @@ async function apiCall(action, rowIndex, event, emoji) {
   const user = document.getElementById('user').value.trim();
   if(!user) return;
 
-  const currentLocalStreak = String(currentStreakFor(user));
-
   const p = allPosts.find(x => x.rowIndex === rowIndex);
   if (!p) return;
   const postEl = document.getElementById(`post-${rowIndex}`);
@@ -1040,15 +1032,13 @@ async function apiCall(action, rowIndex, event, emoji) {
     }
     if (!wasReacted && event) { const u = document.createElement('div'); u.className='unicorn-pop'; u.textContent=em; u.style.left=event.clientX+'px'; u.style.top=event.clientY+'px'; document.body.appendChild(u); setTimeout(()=>u.remove(), 1500); }
 
-    // PACKAGES STREAK VALUE ON LIKE EXECUTIONS
-    apiPost({ action, rowIndex, streak: currentLocalStreak, emoji: em }).then(warnIfNotSaved, warnIfNotSaved);
+    apiPost({ action, rowIndex, emoji: em }).then(warnIfNotSaved, warnIfNotSaved);
   } else if (action === 'comment') {
     const input = document.getElementById(`c-${rowIndex}`); if(!input || !input.value.trim()) return; const txt = input.value.trim();
     const newCommentObj = { user, text: txt, time: new Date().toISOString() }; p.comments.push(newCommentObj); input.value = ""; 
     if (postEl) { const list = postEl.querySelector('.comments-list'); if (list) { list.insertAdjacentHTML('beforeend', renderCommentHTML(newCommentObj, rowIndex, p.comments.length - 1)); } }
     
-    // PACKAGES STREAK VALUE ON COMMENT EXECUTIONS
-    apiPost({ action, rowIndex, text: txt, streak: currentLocalStreak }).then(warnIfNotSaved, warnIfNotSaved);
+    apiPost({ action, rowIndex, text: txt }).then(warnIfNotSaved, warnIfNotSaved);
   }
 }
 
