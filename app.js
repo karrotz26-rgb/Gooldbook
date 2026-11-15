@@ -542,7 +542,7 @@ function getFilteredPosts() {
   let filtered = allPosts.filter(p => postMatchesSearch(p, s));
   if (filterVal) {
     if (filterType === 'author') filtered = filtered.filter(p => sameUser(p.user, filterVal));
-    if (filterType === 'likes') filtered = filtered.filter(p => Object.keys(normalizeLikes(p.likes)).some(n => sameUser(n, filterVal)));
+    if (filterType === 'likes') filtered = filtered.filter(p => allReactors(p).some(n => sameUser(n, filterVal)));
     if (filterType === 'hashtag') {
       const tag = filterVal.toLowerCase();
       filtered = filtered.filter(p => (p.message || "").toLowerCase().includes(tag) || (p.comments || []).some(c => (c.text || "").toLowerCase().includes(tag)));
@@ -718,6 +718,21 @@ function reactToComment(rowIndex, idx, em) {
   apiPost({ action: 'commentReact', rowIndex, commentIndex: idx, emoji: em }).then(warnIfNotSaved, warnIfNotSaved);
 }
 
+// Reactions on a post's comments count alongside reactions on the post itself
+function commentReactionCount(p) {
+  return (p.comments || []).reduce((n, c) => n + Object.keys(c.likes || {}).length, 0);
+}
+function totalReactionCount(p) { return Object.keys(normalizeLikes(p.likes)).length + commentReactionCount(p); }
+// One name per reaction given on this post or its comments
+function allReactors(p) {
+  return Object.keys(normalizeLikes(p.likes)).concat(...(p.comments || []).map(c => Object.keys(c.likes || {})));
+}
+// "❤️ 2 🤯 1" for a comment, or "" if nobody reacted
+function commentReactionSummary(c) {
+  const likes = Object.values(c.likes || {});
+  return COMMENT_EMOJIS.map(em => { const n = likes.filter(e => e === em).length; return n ? `${em} ${n}` : ''; }).filter(Boolean).join('  ');
+}
+
 function reactionNamesHTML(reactions) {
   return Object.entries(reactions).map(([n, e]) => `<b style="color:var(--gb-blue); cursor:pointer;" onclick="setFilter('author', ${jsArg(n.trim())})">${escapeHtml(n.trim())} ${escapeHtml(e)}</b>`).join(', ');
 }
@@ -785,12 +800,12 @@ function updateSidebar() {
   const myName = document.getElementById('user').value.trim();
   document.getElementById('myProfileLink').innerHTML = myName ? `<div class="sidebar-card" style="cursor:pointer; color:var(--gb-blue); font-weight:bold; display:flex; align-items:center; gap:10px;" onclick="setFilter('author', ${jsArg(myName)})">${getAvatarMarkup(myName, 'avatar-small')} My Profile</div>` : "";
   
-  const engagement = p => Object.keys(normalizeLikes(p.likes)).length + (p.comments?.length || 0);
+  const engagement = p => totalReactionCount(p) + (p.comments?.length || 0);
   const recentPosts = allPosts.filter(p => isWithinActivityWindow(p.timestamp));
   const topPosts = [...recentPosts].sort((a,b) => engagement(b) - engagement(a)).slice(0,3);
-  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b> <span class="trend-stats" style="display:inline">· last ${ACTIVITY_WINDOW_DAYS} days</span><br>${topPosts.map(p => `<div class="sidebar-item" onclick="scrollToPost(${p.rowIndex})"><div style="font-weight:bold; color:var(--gb-blue);">${escapeHtml(p.user)}</div><div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(p.message)}</div><span class="trend-stats">❤️ ${Object.keys(normalizeLikes(p.likes)).length} • 💬 ${p.comments.length}</span></div>`).join('') || '<div style="color:#888; font-size:11px; padding:4px 0;">Quiet month!</div>'}</div>`;
+  document.getElementById('trending').innerHTML = `<div class="sidebar-card"><b style="color: #e67e22;">🔥 Trending Activity</b> <span class="trend-stats" style="display:inline">· last ${ACTIVITY_WINDOW_DAYS} days</span><br>${topPosts.map(p => `<div class="sidebar-item" onclick="scrollToPost(${p.rowIndex})"><div style="font-weight:bold; color:var(--gb-blue);">${escapeHtml(p.user)}</div><div style="font-size:11px; color:#666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(p.message)}</div><span class="trend-stats">❤️ ${totalReactionCount(p)} • 💬 ${p.comments.length}</span></div>`).join('') || '<div style="color:#888; font-size:11px; padding:4px 0;">Quiet month!</div>'}</div>`;
 
-  const lCounts = {}; allPosts.forEach(p => Object.keys(normalizeLikes(p.likes)).forEach(n => { const k = ciKey(lCounts, n); lCounts[k] = (lCounts[k]||0)+1; }));
+  const lCounts = {}; allPosts.forEach(p => allReactors(p).forEach(n => { const k = ciKey(lCounts, n); lCounts[k] = (lCounts[k]||0)+1; }));
   const topLikers = Object.entries(lCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
   document.getElementById('leaderboard').innerHTML = `<div class="sidebar-card"><b>🏆 Top Likers</b><br>${topLikers.map(([n,c], i) => `<div class="sidebar-item" onclick="setFilter('likes',${jsArg(n)})">${i===0?'🥇':i===1?'🥈':'🥉'} ${escapeHtml(n)} <b>${c} ❤️</b></div>`).join('')}</div>`;
   
@@ -813,11 +828,11 @@ function updateSidebar() {
   const hCounts = {};
   const countTags = text => ((text || "").match(/#(\w+)/g) || []).forEach(t => { const ct = t.toLowerCase().trim(); hCounts[ct] = (hCounts[ct]||0)+1; });
   allPosts.forEach(p => {
-    if (isWithinActivityWindow(p.timestamp)) countTags(p.message);
-    (p.comments || []).forEach(c => { if (isWithinActivityWindow(commentTime(c) || p.timestamp)) countTags(c.text); });
+    countTags(p.message);
+    (p.comments || []).forEach(c => countTags(c.text));
   });
-  const topTags = Object.entries(hCounts).sort((a,b) => b[1] - a[1]).slice(0, 8);
-  document.getElementById('hashtags').innerHTML = `<div class="sidebar-card"><b>#️⃣ Trending Tags</b> <span class="trend-stats" style="display:inline">· last ${ACTIVITY_WINDOW_DAYS} days</span><div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">${topTags.map(([tag, count]) => `<div class="sidebar-item" style="background: #f0f2f5; padding: 5px 10px; border-radius: 15px; font-size: 12px; cursor: pointer;" onclick="setFilter('hashtag',${jsArg(tag)})"><span style="color:var(--gb-hover); font-weight:bold;">${escapeHtml(tag)}</span> <span style="color:#888; font-size: 10px;">${count}</span></div>`).join('') || 'None'}</div></div>`;
+  const topTags = Object.entries(hCounts).sort((a,b) => b[1] - a[1]).slice(0, 5);
+  document.getElementById('hashtags').innerHTML = `<div class="sidebar-card"><b>#️⃣ Top Tags</b> <span class="trend-stats" style="display:inline">· all time</span><div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">${topTags.map(([tag, count]) => `<div class="sidebar-item" style="background: #f0f2f5; padding: 5px 10px; border-radius: 15px; font-size: 12px; cursor: pointer;" onclick="setFilter('hashtag',${jsArg(tag)})"><span style="color:var(--gb-hover); font-weight:bold;">${escapeHtml(tag)}</span> <span style="color:#888; font-size: 10px;">${count}</span></div>`).join('') || 'None'}</div></div>`;
 }
 
 function playYouTube(el, videoId) {
@@ -1081,7 +1096,7 @@ async function sharePost(rowIndex, event) {
       ]),
       buildLinkPreviewShareHTML(post, amShareMatch),
       Promise.resolve(post.comments.slice(0, 3).map(c =>
-        `<div style="background:#f0f2f5;padding:8px;border-radius:8px;margin-top:5px;font-size:13px;text-align:left;"><b>${escapeHtml(c.user)}</b>: ${escapeHtml(c.text)}</div>`
+        `<div style="background:#f0f2f5;padding:8px;border-radius:8px;margin-top:5px;font-size:13px;text-align:left;"><b>${escapeHtml(c.user)}</b>: ${escapeHtml(c.text)}${commentReactionSummary(c) ? `<div style="margin-top:4px;font-size:11px;color:#65676b;">${commentReactionSummary(c)}</div>` : ''}</div>`
       ).join(''))
     ]);
 
@@ -1094,7 +1109,7 @@ async function sharePost(rowIndex, event) {
       ${safeBase64Image ? `<img src="${safeBase64Image}" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px;margin-bottom:10px;display:block;">` : ''}
       <div style="border-top:2px solid #f0f2f5;padding-top:12px;margin-top:5px;">
         <div style="display:flex;gap:15px;font-size:14px;font-weight:bold;color:#65676b;margin-bottom:4px;">
-          <span>❤️ ${Object.keys(postReactions).length} Reactions</span>
+          <span>❤️ ${totalReactionCount(post)} Reactions</span>
           <span>💬 ${post.comments.length} Comments</span>
         </div>
         ${names ? `<div style="font-size:11px;color:#888;margin-bottom:10px;">Reacted: <b>${escapeHtml(names)}</b></div>` : ''}
