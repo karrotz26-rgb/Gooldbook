@@ -30,11 +30,14 @@ const TEXT_SEPARATOR = "###";
 // so sign-in works even if your phone is off). Codes pass through MY_EMAIL's inbox when this is on.
 const CODE_BY_TEXT = true;
 
-const COMMENT_EMOJIS = ["❤️", "🤯", "😡", "🙄", "😉"]; // same five as post reactions
+const COMMENT_EMOJIS = ["❤️", "🤯", "😡", "🙄", "😉"]; // the only reactions accepted, on posts and comments
+const MAX_POST_IMAGES = 4;
+const GIF_URL = /^https:\/\/([a-z0-9-]+\.)*giphy\.com\//i; // GIFs come from the app's Giphy picker
 
 const CODE_TTL_SECONDS = 600;      // sign-in codes expire after 10 minutes
 const CODE_MAX_TRIES = 5;          // wrong guesses allowed per code
 const CODES_PER_10_MIN = 3;        // emails per person per 10 minutes
+const CODES_PER_DAY = 10;          // and per day, so nobody can be flooded with codes or have theirs guessed
 const SESSION_CACHE_SECONDS = 3600;
 const MAX_PENDING_REQUESTS = 20;
 const JOIN_REQUESTS_PER_DEVICE_PER_DAY = 3;
@@ -49,6 +52,27 @@ function sameName(a, b) {
 
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Sheets treats what a script writes like something typed into a cell: "=..." becomes a formula,
+// "42" a number, "12/25" a date. A leading apostrophe keeps typed text as plain text (it isn't shown or read back).
+function txt(value) {
+  return "'" + String(value == null ? "" : value);
+}
+
+function parseJson(cell, fallback) {
+  try {
+    const parsed = JSON.parse(cell || "");
+    return parsed === null || typeof parsed !== "object" ? fallback : parsed;
+  } catch (err) {
+    return fallback;
+  }
+}
+
+// True only if rowIndex is a real post (not the header, a blank row, or past the end)
+function isPostRow(sheet, rowIndex) {
+  if (!(rowIndex >= 2) || rowIndex > sheet.getLastRow()) return null;
+  return sheet.getRange(rowIndex, 2).getValue() ? true : null;
 }
 
 function json(obj) {
@@ -162,7 +186,7 @@ function getSessionsSheet() {
 
 function createSession(name, device) {
   const token = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, "");
-  getSessionsSheet().appendRow([sha256(token), name, new Date(), new Date(), String(device || "").slice(0, 80)]);
+  getSessionsSheet().appendRow([sha256(token), name, new Date(), new Date(), txt(String(device || "").slice(0, 80))]);
   return token;
 }
 
@@ -216,6 +240,14 @@ function requestCode(data) {
   if (sentCount >= CODES_PER_10_MIN) {
     return { error: "tooMany", message: "Too many codes sent. Please wait 10 minutes and try again." };
   }
+  const props = PropertiesService.getScriptProperties();
+  const today = new Date().toISOString().slice(0, 10);
+  const [day, count] = String(props.getProperty("day_" + key) || "").split(":");
+  const sentToday = day === today ? (parseInt(count) || 0) : 0;
+  if (sentToday >= CODES_PER_DAY) {
+    return { error: "tooMany", message: "Too many codes sent today. Please try again tomorrow." };
+  }
+  props.setProperty("day_" + key, today + ":" + (sentToday + 1));
   const code = randomCode();
   cache.put(key, JSON.stringify({ hash: sha256(code), tries: 0, expires: Date.now() + CODE_TTL_SECONDS * 1000 }), CODE_TTL_SECONDS);
   cache.put("sent_" + key, String(sentCount + 1), CODE_TTL_SECONDS);
@@ -314,7 +346,7 @@ function requestJoin(data) {
   cache.put(deviceKey, String(deviceCount + 1), 86400);
 
   const id = Utilities.getUuid();
-  sheet.appendRow([id, name, email, note, new Date(), "pending", phone.phone]);
+  sheet.appendRow([id, txt(name), txt(email), txt(note), new Date(), "pending", txt(phone.phone)]);
   bumpFeedVersion();
   try {
     MailApp.sendEmail({
@@ -336,7 +368,7 @@ function joinStatus(data) {
 function pendingRequests() {
   const rows = getRequestsSheet().getDataRange().getValues();
   return rows.slice(1).filter(r => r[5] === "pending")
-    .map(r => ({ id: r[0], name: r[1], email: r[2], note: r[3], time: r[4], phone: r[6] || "" }));
+    .map(r => ({ id: r[0], name: String(r[1]), email: String(r[2]), note: String(r[3]), time: r[4], phone: String(r[6] || "") }));
 }
 
 function decideRequest(id, approve) {
@@ -344,7 +376,7 @@ function decideRequest(id, approve) {
   const rows = sheet.getDataRange().getValues();
   const i = rows.findIndex((r, idx) => idx > 0 && r[0] === id);
   if (i < 1 || rows[i][5] !== "pending") return { error: "missing", message: "That request was already handled." };
-  const name = rows[i][1], email = rows[i][2], phone = String(rows[i][6] || "").trim();
+  const name = String(rows[i][1]), email = String(rows[i][2]), phone = String(rows[i][6] || "").trim();
   if (!approve) {
     sheet.getRange(i + 1, 6).setValue("declined");
     bumpFeedVersion();
@@ -352,7 +384,7 @@ function decideRequest(id, approve) {
   }
   if (findMember(name)) return { error: "nameTaken", message: `Someone is already called "${name}". Rename them in the Requests tab first.` };
   // Their texts (notifications and sign-in codes) go to the phone they gave, if any
-  getMembersSheet().appendRow([name, email, "member", new Date(), phone, "yes", "yes", "yes", "yes"]);
+  getMembersSheet().appendRow([txt(name), txt(email), "member", new Date(), txt(phone), "yes", "yes", "yes", "yes"]);
   CacheService.getScriptCache().remove("members");
   sheet.getRange(i + 1, 6).setValue("approved");
   bumpFeedVersion();
@@ -400,7 +432,6 @@ function doGet(e) {
   const ss = openSpreadsheet();
   const sheet = ss.getSheets()[0];
   const userSheet = ss.getSheetByName("Users") || ss.insertSheet("Users");
-  const streakSheet = ss.getSheetByName("Streaks") || ss.insertSheet("Streaks");
 
   const postsData = sheet.getDataRange().getValues();
   let posts = [];
@@ -420,12 +451,13 @@ function doGet(e) {
     posts.push({
       rowIndex: i + 1,
       timestamp: postsData[i][0],
-      user: postsData[i][1],
-      message: postsData[i][2],
+      user: String(postsData[i][1]),
+      message: String(postsData[i][2]),
       image: imagesArray[0] || "",
       images: imagesArray,
-      likes: JSON.parse(postsData[i][4] || "[]"),
-      comments: JSON.parse(postsData[i][5] || "[]")
+      // A damaged cell only loses that post's reactions or comments, not the whole feed
+      likes: parseJson(postsData[i][4], []),
+      comments: (c => Array.isArray(c) ? c : [])(parseJson(postsData[i][5], []))
     });
   }
 
@@ -439,19 +471,8 @@ function doGet(e) {
     avatars[nameKey] = usersData[i][2] || "";
   }
 
-  const streaksData = streakSheet.getDataRange().getValues();
-  let streaks = [];
-  for (let i = 1; i < streaksData.length; i++) {
-    if (!streaksData[i][0]) continue;
-    streaks.push({
-      user: streaksData[i][0],
-      streak: parseInt(streaksData[i][1] || "0"),
-      lastUpdated: streaksData[i][2] ? new Date(streaksData[i][2]).toISOString().split('T')[0] : null
-    });
-  }
-
   const output = {
-    posts: posts, bios: bios, avatars: avatars, streaks: streaks, version: version,
+    posts: posts, bios: bios, avatars: avatars, version: version,
     me: { name: me.name, role: me.role, notify: me.notify, textTo: textHint(textTarget(me)), notifyMode: TEXT_MODE ? "text" : "classic", email: me.email, textToRaw: me.textTo },
     requests: me.role === "admin" ? pendingRequests() : []
   };
@@ -509,7 +530,6 @@ function handlePost(e) {
   const ss = openSpreadsheet();
   const sheet = ss.getSheets()[0];
   const userSheet = ss.getSheetByName("Users") || ss.insertSheet("Users");
-  const streakSheet = ss.getSheetByName("Streaks") || ss.insertSheet("Streaks");
 
   let imageBlob = null;
   if (data.avatar) {
@@ -518,18 +538,19 @@ function handlePost(e) {
 
   // --- ACTION: NEW POST ---
   if (data.action === "post") {
-    const sources = Array.isArray(data.images) && data.images.length ? data.images
-                  : (data.image ? [data.image] : []);
+    const sources = (Array.isArray(data.images) && data.images.length ? data.images
+                  : (data.image ? [data.image] : []))
+                  .filter(src => typeof src === "string").slice(0, MAX_POST_IMAGES);
     let imgValue = "";
     if (sources.length > 0) {
       const urls = sources.map(src => {
-        if (src.startsWith("https://")) return src;
+        if (src.startsWith("https://")) return GIF_URL.test(src) ? src : "";
         const blob = convertBase64ToBlob(src, data.username);
         return blob ? processAndSaveBlob(blob, "post") : "";
       }).filter(u => u);
       if (urls.length > 0) imgValue = JSON.stringify(urls);
     }
-    sheet.appendRow([new Date(), data.username, data.message, imgValue, "[]", "[]"]);
+    sheet.appendRow([new Date(), txt(data.username), txt(data.message), imgValue, "[]", "[]"]);
     const newRowIndex = sheet.getLastRow();
     if (TEXT_MODE) {
       sendTextNotifications({ type: "post", author: data.username, text: data.message, rowIndex: newRowIndex });
@@ -550,19 +571,22 @@ function handlePost(e) {
       if (sameName(userRows[i][0], data.username)) { foundRow = i + 1; break; }
     }
     if (foundRow !== -1) {
-      userSheet.getRange(foundRow, 2).setValue(data.bio);
+      userSheet.getRange(foundRow, 2).setValue(txt(data.bio));
       if (imgUrl) userSheet.getRange(foundRow, 3).setValue(imgUrl);
     } else {
       if (userSheet.getLastRow() === 0) {
         userSheet.appendRow(["User", "Bio", "AvatarUrl"]);
       }
-      userSheet.appendRow([data.username, data.bio, imgUrl || ""]);
+      userSheet.appendRow([txt(data.username), txt(data.bio), imgUrl || ""]);
     }
   }
 
   // --- ACTION: LIKE ---
   else if (data.action === "like") {
     const rowIndex = parseInt(data.rowIndex);
+    const em = data.emoji || '❤️';
+    if (COMMENT_EMOJIS.indexOf(em) === -1) return { error: "emoji" };
+    if (!isPostRow(sheet, rowIndex)) return { error: "missing", message: "That post isn't there any more." };
     const range = sheet.getRange(rowIndex, 5);
     let likesData = {};
     try {
@@ -575,7 +599,6 @@ function handlePost(e) {
       }
     } catch(e) { likesData = {}; }
 
-    const em = data.emoji || '❤️';
     // Reuse the existing spelling so one person can't end up with two reactions
     const existingKey = Object.keys(likesData).find(k => sameName(k, data.username));
     const likeKey = existingKey !== undefined ? existingKey : data.username;
@@ -607,6 +630,7 @@ function handlePost(e) {
   // --- ACTION: NEW COMMENT ---
   else if (data.action === "comment") {
     const rowIndex = parseInt(data.rowIndex);
+    if (!isPostRow(sheet, rowIndex)) return { error: "missing", message: "That post isn't there any more." };
     const range = sheet.getRange(rowIndex, 6);
     let comments = JSON.parse(range.getValue() || "[]");
     comments.push({ user: data.username, text: data.text, time: new Date() });
@@ -636,6 +660,7 @@ function handlePost(e) {
     const idx = parseInt(data.commentIndex);
     const em = data.emoji;
     if (COMMENT_EMOJIS.indexOf(em) === -1) return { error: "emoji" };
+    if (!isPostRow(sheet, rowIndex)) return { error: "missing", message: "That post isn't there any more." };
     const range = sheet.getRange(rowIndex, 6);
     let comments = [];
     try { comments = JSON.parse(range.getValue() || "[]"); } catch (err) { return { error: "missing" }; }
@@ -656,27 +681,6 @@ function handlePost(e) {
 
   else {
     return { error: "unknownAction" };
-  }
-
-  // GLOBAL BACKEND STREAK TRACKER
-  // The app sends a streak computed from real post/comment dates
-  if (data.streak !== undefined && data.streak !== null) {
-    const streakRows = streakSheet.getDataRange().getValues();
-    let userFound = false;
-    for (let i = 1; i < streakRows.length; i++) {
-      if (sameName(streakRows[i][0], data.username)) {
-        streakSheet.getRange(i + 1, 2).setValue(data.streak);
-        streakSheet.getRange(i + 1, 3).setValue(new Date());
-        userFound = true;
-        break;
-      }
-    }
-    if (!userFound) {
-      if (streakSheet.getLastRow() === 0) {
-        streakSheet.appendRow(["User", "Streak", "LastUpdated"]);
-      }
-      streakSheet.appendRow([data.username, data.streak, new Date()]);
-    }
   }
 
   bumpFeedVersion();
@@ -837,7 +841,7 @@ function setTextTo(me, raw) {
   const sheet = getMembersSheet();
   const i = memberRowIndex(sheet, me.name);
   if (i < 1) return { error: "missing" };
-  sheet.getRange(i + 1, 5).setValue(clean);
+  sheet.getRange(i + 1, 5).setValue(clean ? txt(clean) : "");
   CacheService.getScriptCache().remove("members");
   return { ok: true, textToRaw: clean, textTo: textHint(clean || me.email) };
 }
@@ -895,7 +899,7 @@ function confirmEmailChange(me, rawCode) {
   const i = memberRowIndex(sheet, me.name);
   if (i < 1) return { error: "missing" };
   const oldEmail = me.email;
-  sheet.getRange(i + 1, 2).setValue(state.email);
+  sheet.getRange(i + 1, 2).setValue(txt(state.email));
   CacheService.getScriptCache().remove("members");
   try {
     MailApp.sendEmail({
